@@ -21,7 +21,8 @@ namespace Gunplay
 
         public List<ProjectileTrailState> Trails => trails;
 
-        public static MapComponent_ProjectileTrails For(Map map)
+        // 该地图尚未创建本组件时返回 null（例如地图正在卸载）；调用方统一用 ?. 处理。
+        public static MapComponent_ProjectileTrails? For(Map? map)
         {
             return map?.GetComponent<MapComponent_ProjectileTrails>();
         }

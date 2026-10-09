@@ -30,11 +30,11 @@ namespace Gunplay
         public static bool TrailEnabled(ThingDef projectileDef)
         {
             if (projectileDef == null) return false;
-            if (!Gunplay.settings.enableTrails) return false;
+            if (!GunplaySettings.enableTrails) return false;
             if (!ProjectileOverrides.AllowsTrail(projectileDef)) return false;
 
             // 没解析出 ProjectileTrailDef 的投射物根本不会登记轨迹（见两条 Launch 补丁）
-            ProjectilePropDef prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
+            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
 
             return prop?.trail != null;
         }

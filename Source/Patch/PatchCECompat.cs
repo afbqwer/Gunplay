@@ -36,41 +36,43 @@ namespace Gunplay.Patch
         internal const float MaxTrailLength = 40f;
 
         // ---------------- 反射成员（TryPatch 时解析；均为 CE 的 public 成员）----------------
-        static PropertyInfo exactPositionProp;   // ProjectileCE.ExactPosition : Vector3（virtual，反射 GetValue 走虚分派）
-        static PropertyInfo damageAmountProp;    // ProjectileCE.DamageAmount : float（含武器品质倍率）
-        static FieldInfo destinationField;       // ProjectileCE.Destination : Vector2（预测落点，Launch/Throw 内赋值）
-        static FieldInfo shotAngleField;         // ProjectileCE.shotAngle : float（出射仰角，弧度）
-        static FieldInfo originIV3Field;         // ProjectileCE.OriginIV3 : IntVec3（发射点所在格）
-        static FieldInfo equipmentDefField;      // ProjectileCE.equipmentDef : ThingDef（无武器投射物为 null）
-        static PropertyInfo trajectoryWorkerProp;    // ProjectilePropertiesCE.TrajectoryWorker（决定绘制高度映射）
-        static FieldInfo flightTicksField;           // ProjectileCE.FlightTicks : int
-        static FieldInfo ticksToTruePositionField;   // ProjectileCE.ticksToTruePosition : int（出膛渐升 tick 数）
-        static FieldInfo startingTicksToImpactField; // ProjectileCE.startingTicksToImpact : float
+        // CE 未安装或成员改名时全部为 null，各读取点必须能承受缺失。
+        static PropertyInfo? exactPositionProp;      // ProjectileCE.ExactPosition : Vector3（virtual，反射 GetValue 走虚分派）
+        static PropertyInfo? damageAmountProp;       // ProjectileCE.DamageAmount : float（含武器品质倍率）
+        static FieldInfo? destinationField;          // ProjectileCE.Destination : Vector2（预测落点，Launch/Throw 内赋值）
+        static FieldInfo? shotAngleField;            // ProjectileCE.shotAngle : float（出射仰角，弧度）
+        static FieldInfo? originIV3Field;            // ProjectileCE.OriginIV3 : IntVec3（发射点所在格）
+        static FieldInfo? equipmentDefField;         // ProjectileCE.equipmentDef : ThingDef（无武器投射物为 null）
+        static PropertyInfo? trajectoryWorkerProp;   // ProjectilePropertiesCE.TrajectoryWorker（决定绘制高度映射）
+        static FieldInfo? flightTicksField;          // ProjectileCE.FlightTicks : int
+        static FieldInfo? ticksToTruePositionField;  // ProjectileCE.ticksToTruePosition : int（出膛渐升 tick 数）
+        static FieldInfo? startingTicksToImpactField;// ProjectileCE.startingTicksToImpact : float
 
         // ExactPosToDrawPos 按 worker 运行时类型缓存（worker 实例随 def 而异，方法随类型固定）
         static readonly Dictionary<Type, MethodInfo> drawMethodCache = new Dictionary<Type, MethodInfo>();
 
-        // CE 投射物存活期间的实时位置读取器（由 ProjectileTrail 每 tick 调用）
+        // CE 投射物存活期间的实时位置读取器（由轨迹每 tick 调用）
         internal static Func<Vector3> CreateExactPositionGetter(Thing proj)
         {
-            return () => (Vector3)exactPositionProp.GetValue(proj);
+            // 反射取值失败时退回本体绘制位置，而不是在某次版本失配后每 tick 抛异常
+            return () => exactPositionProp?.GetValue(proj) is Vector3 pos ? pos : proj.DrawPos;
         }
 
         internal static float GetDamageAmount(Thing proj)
         {
-            return damageAmountProp != null ? (float)damageAmountProp.GetValue(proj) : 10f;
+            return damageAmountProp?.GetValue(proj) is float damage ? damage : 10f;
         }
 
         internal static float GetShotAngle(Thing proj)
         {
-            return shotAngleField != null ? (float)shotAngleField.GetValue(proj) : 0f;
+            return shotAngleField?.GetValue(proj) is float angle ? angle : 0f;
         }
 
         // ---------------- 绘制位置（CE 高度映射）----------------
 
-        static MethodInfo GetDrawMethod(Type workerType)
+        static MethodInfo? GetDrawMethod(Type workerType)
         {
-            if (!drawMethodCache.TryGetValue(workerType, out MethodInfo method))
+            if (!drawMethodCache.TryGetValue(workerType, out MethodInfo? method))
             {
                 method = AccessTools.Method(workerType, "ExactPosToDrawPos");
                 drawMethodCache[workerType] = method;
@@ -81,23 +83,23 @@ namespace Gunplay.Patch
         // 经 worker 的 ExactPosToDrawPos 计算投射物当前的实际绘制位置（y 为 altitude 层，z 含高度偏移）
         internal static Vector3 GetDrawPosition(Thing proj)
         {
-            Vector3 exact = (Vector3)exactPositionProp.GetValue(proj);
-            object worker = trajectoryWorkerProp != null ? trajectoryWorkerProp.GetValue(proj.def.projectile) : null;
-            int flightTicks = flightTicksField != null ? (int)flightTicksField.GetValue(proj) : 0;
+            Vector3 exact = exactPositionProp?.GetValue(proj) is Vector3 pos ? pos : proj.DrawPos;
+            object? worker = trajectoryWorkerProp?.GetValue(proj.def.projectile);
+            int flightTicks = flightTicksField?.GetValue(proj) is int ticks ? ticks : 0;
             return DrawViaWorker(proj, worker, exact, flightTicks);
         }
 
-        static Vector3 DrawViaWorker(Thing proj, object worker, Vector3 exact, int flightTicks)
+        static Vector3 DrawViaWorker(Thing proj, object? worker, Vector3 exact, int flightTicks)
         {
             float altitude = proj.def.Altitude;
-            MethodInfo draw = worker != null ? GetDrawMethod(worker.GetType()) : null;
+            MethodInfo? draw = worker != null ? GetDrawMethod(worker.GetType()) : null;
             if (draw == null) return new Vector3(exact.x, altitude, exact.z); // 反射失败兜底：地面投影
 
             object[] args =
             {
                 exact,
                 flightTicks,
-                ticksToTruePositionField != null ? (int)ticksToTruePositionField.GetValue(proj) : 0,
+                ticksToTruePositionField?.GetValue(proj) is int trueTicks ? trueTicks : 0,
                 altitude
             };
             return (Vector3)draw.Invoke(worker, args);
@@ -112,18 +114,19 @@ namespace Gunplay.Patch
         // 采样整条弹道的实际绘制位置（含高度偏移与出膛渐升），供弧线轨迹构建带状网格。
         // 仅在 Launch/Throw 之后、首次 Tick 之前调用：此时投射物 FlightTicks 为 0，
         // LerpedTrajectoryWorker 的 PredictPositions 只写临时列表，不会影响其自身推进。
-        internal static List<Vector3> PredictDrawPositions(Thing proj, int tickCount)
+        // 采样点数不足或反射缺失时返回 null，调用方回退解析抛物线
+        internal static List<Vector3>? PredictDrawPositions(Thing proj, int tickCount)
         {
-            object worker = trajectoryWorkerProp != null ? trajectoryWorkerProp.GetValue(proj.def.projectile) : null;
-            MethodInfo predict = worker != null ? AccessTools.Method(worker.GetType(), "PredictPositions") : null;
+            object? worker = trajectoryWorkerProp != null ? trajectoryWorkerProp.GetValue(proj.def.projectile) : null;
+            MethodInfo? predict = worker != null ? AccessTools.Method(worker.GetType(), "PredictPositions") : null;
             if (worker == null || predict == null || tickCount < 1) return null;
 
-            IEnumerable<Vector3> exacts = predict.Invoke(worker, new object[] { proj, tickCount }) as IEnumerable<Vector3>;
+            IEnumerable<Vector3>? exacts = predict.Invoke(worker, new object[] { proj, tickCount }) as IEnumerable<Vector3>;
             if (exacts == null) return null;
 
             // 统一为“第 j 个点 = 第 j tick 的绘制位置”（两种 worker 的起点约定不同，统一补发射点）
             List<Vector3> result = new List<Vector3>(tickCount + 2);
-            Vector3 launchExact = (Vector3)exactPositionProp.GetValue(proj);
+            Vector3 launchExact = exactPositionProp?.GetValue(proj) is Vector3 launch ? launch : proj.DrawPos;
             Vector3 last = DrawViaWorker(proj, worker, launchExact, 0);
             result.Add(last);
 
@@ -154,7 +157,7 @@ namespace Gunplay.Patch
 
         public static void TryPatch(Harmony harmony)
         {
-            Type ceType = AccessTools.TypeByName("CombatExtended.ProjectileCE");
+            Type? ceType = AccessTools.TypeByName("CombatExtended.ProjectileCE");
             if (ceType == null) return; // 未安装 CE
 
             exactPositionProp = AccessTools.Property(ceType, "ExactPosition");
@@ -165,15 +168,15 @@ namespace Gunplay.Patch
             equipmentDefField = AccessTools.Field(ceType, "equipmentDef");
 
             // 绘制高度映射相关成员；缺失时 GetDrawPosition 回退为地面投影
-            Type propsType = AccessTools.TypeByName("CombatExtended.ProjectilePropertiesCE");
+            Type? propsType = AccessTools.TypeByName("CombatExtended.ProjectilePropertiesCE");
             trajectoryWorkerProp = propsType != null ? AccessTools.Property(propsType, "TrajectoryWorker") : null;
             flightTicksField = AccessTools.Field(ceType, "FlightTicks");
             ticksToTruePositionField = AccessTools.Field(ceType, "ticksToTruePosition");
             startingTicksToImpactField = AccessTools.Field(ceType, "startingTicksToImpact");
 
-            MethodBase launch = AccessTools.Method(ceType, "Launch", new[] { typeof(Thing), typeof(Vector2), typeof(Thing) });
-            MethodBase throwLaunch = AccessTools.Method(ceType, "Throw", new[] { typeof(Thing), typeof(Vector3), typeof(Vector3), typeof(Thing) });
-            MethodBase impact = AccessTools.Method(ceType, "Impact", new[] { typeof(Thing) });
+            MethodBase? launch = AccessTools.Method(ceType, "Launch", new[] { typeof(Thing), typeof(Vector2), typeof(Thing) });
+            MethodBase? throwLaunch = AccessTools.Method(ceType, "Throw", new[] { typeof(Thing), typeof(Vector3), typeof(Vector3), typeof(Thing) });
+            MethodBase? impact = AccessTools.Method(ceType, "Impact", new[] { typeof(Thing) });
 
             if (launch == null || impact == null || exactPositionProp == null)
             {
@@ -201,17 +204,17 @@ namespace Gunplay.Patch
             if (unarmed && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
 
             // 直线轨迹模式下，抛射类投射物（迫击炮弹/榴弹等大仰角发射）不显示轨迹
-            if (Gunplay.settings.ceStraightTrails && GetShotAngle(__instance) > ArcAngleThreshold) return;
+            if (GunplaySettings.ceStraightTrails && GetShotAngle(__instance) > ArcAngleThreshold) return;
 
             // 投射物在 Launch/Throw 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
-            Map map = __instance.Map ?? launcher?.Map;
-            ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
+            Map? map = __instance.Map ?? launcher?.Map;
+            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
             if (map == null || prop?.trail == null) return;
 
             // 轨迹不再 spawn Thing：登记到该地图的轨迹集合，由批量绘制统一处理。
             // CE 的 Destination 是发射时预测的落点（零高度），仅提供轨迹初始方向/弧线几何；
             // 直线轨迹的实际方向随后每 tick 由投射物真实位移校正。
-            Vector2 dest2 = (Vector2)destinationField.GetValue(__instance);
+            Vector2 dest2 = destinationField?.GetValue(__instance) is Vector2 dest ? dest : new Vector2(__instance.DrawPos.x, __instance.DrawPos.z);
             MapComponent_ProjectileTrails.For(map)?.RegisterCE(__instance, new Vector3(dest2.x, 0f, dest2.y), prop.trail);
         }
 
@@ -225,7 +228,7 @@ namespace Gunplay.Patch
             MapComponent_ProjectileTrails.For(map)?.CaptureFinalPositionCE(__instance);
 
             // 无武器投射物受独立开关控制（与轨迹开关保持同一判定口径）
-            object equipmentDef = equipmentDefField != null ? equipmentDefField.GetValue(__instance) : null;
+            object? equipmentDef = equipmentDefField?.GetValue(__instance);
             if (equipmentDef == null && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
 
             IntVec3 originCell = originIV3Field != null ? (IntVec3)originIV3Field.GetValue(__instance) : __instance.Position;

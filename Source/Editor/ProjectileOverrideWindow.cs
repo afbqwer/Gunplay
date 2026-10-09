@@ -51,18 +51,20 @@ namespace Gunplay
             Hidden    // 只看不画轨迹的
         }
 
+        // 全字段由 BuildRows 的对象初始化器一次性填好；这里不用 required（需要运行时 polyfill），
+        // 恒赋值的字段标 null!，可为 null 的（无武器时的两列）如实标可空。
         class Row
         {
-            public ThingDef projectile;
-            public string projectileLabel;
-            public List<ThingDef> weapons;
-            public string weaponDefName;   // 首个武器的 defName（含 "+N"）
-            public string weaponLabel;     // 首个武器的显示名
-            public string modName;
-            public string searchText;      // 参与搜索的文本：投射物 + 全部武器 的 defName/label
-            public string weaponTip;       // 武器列的悬浮内容
-            public float editWidth;        // 输入框绑定的当前值
-            public string widthBuffer;     // 输入框字符串缓冲
+            public ThingDef projectile = null!;
+            public string projectileLabel = null!;
+            public List<ThingDef> weapons = null!;
+            public string? weaponDefName;   // 首个武器的 defName（含 "+N"）；无武器时为 null
+            public string? weaponLabel;     // 首个武器的显示名；无武器时为 null
+            public string modName = null!;
+            public string searchText = null!;   // 参与搜索的文本：投射物 + 全部武器 的 defName/label
+            public string weaponTip = null!;    // 武器列的悬浮内容
+            public float editWidth;         // 输入框绑定的当前值
+            public string? widthBuffer;     // 输入框字符串缓冲；null 表示尚未输入过
         }
 
         readonly List<Row> rows = new List<Row>();
@@ -78,7 +80,7 @@ namespace Gunplay
         readonly Dictionary<string, string> truncateTiny = new Dictionary<string, string>();
         float truncateWidth = -1f;
 
-        string modFilter;               // null = 全部
+        string? modFilter;              // null = 全部
         TrailFilter trailFilter = TrailFilter.Any;
         bool onlyOverridden;
         Vector2 scrollPosition;
@@ -149,7 +151,9 @@ namespace Gunplay
             {
                 if (def.projectile == null) continue;
 
-                List<ThingDef> weapons = weaponMap.TryGetValue(def, null) ?? new List<ThingDef>();
+                List<ThingDef> weapons = weaponMap.TryGetValue(def, out List<ThingDef>? list)
+                    ? list
+                    : new List<ThingDef>();
 
                 rows.Add(new Row
                 {
@@ -182,7 +186,8 @@ namespace Gunplay
             return label.NullOrEmpty() ? def.defName : label;
         }
 
-        static string WeaponDefName(List<ThingDef> weapons)
+        // 无武器时返回 null（该列显示占位符）
+        static string? WeaponDefName(List<ThingDef> weapons)
         {
             if (weapons.Count == 0) return null;
 
@@ -246,7 +251,7 @@ namespace Gunplay
         // 轨迹列显示什么、轨迹过滤按什么筛，都只认这个方法，保证两者永远一致。
         static bool TrailShown(Row row)
         {
-            ProjectileOverride over = ProjectileOverrides.Get(row.projectile);
+            ProjectileOverride? over = ProjectileOverrides.Get(row.projectile);
             return over != null ? over.trailEnabled : ProjectileRules.TrailEnabled(row.projectile);
         }
 
@@ -325,7 +330,7 @@ namespace Gunplay
 
             // mod 过滤（按投射物所属 modContentPack）
             Rect modRect = new Rect(curX, rect.y, ModButtonWidth, rect.height);
-            string currentMod = modFilter;
+            string? currentMod = modFilter;
             if (currentMod == null) currentMod = "GunplayOverrideAllMods".Translate();
             string modLabel = "GunplayOverrideModFilter".Translate() + ": " + currentMod;
             if (Widgets.ButtonText(modRect, modLabel)) OpenModMenu();
@@ -497,7 +502,7 @@ namespace Gunplay
             float y = index * RowHeight;
             Widgets.DrawHighlightIfMouseover(new Rect(0f, y, viewWidth, RowHeight));
 
-            ProjectileOverride over = ProjectileOverrides.Get(row.projectile);
+            ProjectileOverride? over = ProjectileOverrides.Get(row.projectile);
             bool overridden = over != null;
             bool trailOn = TrailShown(row);   // 未覆写时是默认情况，不再是恒为勾选
 
@@ -562,7 +567,7 @@ namespace Gunplay
 
         // 名称单元格：图标 + 上排 label（Small）+ 下排 defName（Tiny 灰色）。
         // 两行都按可用宽度截断，避免长名字折行后压到下一行。
-        void DrawNameCell(ThingDef def, string label, string defNameText, float x, float y, float width, string tooltip)
+        void DrawNameCell(ThingDef def, string label, string defNameText, float x, float y, float width, string? tooltip)
         {
             float textX = x + IconSize + 10f;
             float textW = Mathf.Max(0f, width - IconSize - 14f);
@@ -608,7 +613,9 @@ namespace Gunplay
                 return;
             }
 
-            DrawNameCell(row.weapons[0], row.weaponLabel, row.weaponDefName, x, y, width, row.weaponTip);
+            // 走到这里必有武器（Count == 0 已在上面返回），两个 ?. 兜底只是为了让编译器不必猜
+            ThingDef weapon = row.weapons[0];
+            DrawNameCell(weapon, row.weaponLabel ?? weapon.defName, row.weaponDefName ?? weapon.defName, x, y, width, row.weaponTip);
         }
 
         void DrawWidthCell(Row row, float x, float y, bool overridden, bool trailOn)
@@ -650,7 +657,7 @@ namespace Gunplay
         public override void PostClose()
         {
             base.PostClose();
-            Gunplay.settings?.Write();
+            GunplaySettings.Save();
         }
     }
 }

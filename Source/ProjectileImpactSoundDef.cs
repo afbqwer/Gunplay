@@ -9,16 +9,17 @@ namespace Gunplay
 {
     public class ProjectileImpactSoundDef : Def
     {
-        public SoundDef fallback;
-        public SoundDef fabric;
-        public SoundDef flesh;
-        public SoundDef metal;
-        public SoundDef soil;
-        public SoundDef stone;
-        public SoundDef wood;
+        // 全部按材质可选的声效：XML 未配的材质走 fallback，fallback 本身缺失则返回 null。
+        public SoundDef? fallback;
+        public SoundDef? fabric;
+        public SoundDef? flesh;
+        public SoundDef? metal;
+        public SoundDef? soil;
+        public SoundDef? stone;
+        public SoundDef? wood;
 
-        public SoundDef Effect(MaterialKind kind) {
-            SoundDef res = null;
+        public SoundDef? Effect(MaterialKind kind) {
+            SoundDef? res = null;
 
             switch (kind)
             {

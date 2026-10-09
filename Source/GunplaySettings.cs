@@ -17,22 +17,31 @@ namespace Gunplay
 
     public class GunplaySettings : ModSettings
     {
-        public bool enableTrails = true;
-        public bool enableSounds = true;
-        public bool enableWeaponAnimations = true;
-        public bool enableEffects = true;
-        public bool showPuffs = true;
-        public bool unarmedProjectileEffects = true;
-        public bool unarmedOnlyBullets = true;
-        public float particleMultiplier = 1f;
-        public float projectileSpeed = 3f;
-        public TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
-        public float trailWidthFactor = 1f;
-        public bool ceStraightTrails = true;
+        // 设置项全部是静态字段：mod 设置在进程内天然只有一份，套一层实例（或单例）没有收益，
+        // 还会让每次读取都要先经过一次「拿实例」的间接。
+        //
+        // ExposeData / Write 是 ModSettings 的实例成员，所以仍需一个实例作为存档读写句柄，
+        // 见下方 Handle。它只用于存取，不承载任何状态。
+        public static bool enableTrails = true;
+        public static bool enableSounds = true;
+        public static bool enableWeaponAnimations = true;
+        public static bool enableEffects = true;
+        public static bool showPuffs = true;
+        public static bool unarmedProjectileEffects = true;
+        public static bool unarmedOnlyBullets = true;
+        public static float particleMultiplier = 1f;
+        public static float projectileSpeed = 3f;
+        public static TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
+        public static float trailWidthFactor = 1f;
+        public static bool ceStraightTrails = true;
 
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
-        public Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
+        public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
+        // 存档读写句柄。由 Gunplay 构造时注入；在此之前调用 Save() 是空操作。
+        internal static GunplaySettings? Handle;
+
+        public static void Save() => Handle?.Write();
 
         override public void ExposeData()
         {
@@ -53,7 +62,7 @@ namespace Gunplay
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
         }
 
-        public void DoSettingsWindowContents(Rect inRect)
+        public static void DoSettingsWindowContents(Rect inRect)
         {
             Listing_Standard listing_Standard = new Listing_Standard();
             listing_Standard.Begin(inRect);

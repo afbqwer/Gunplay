@@ -13,7 +13,9 @@ namespace Gunplay
     {
 
         // 覆写是否命中。命中即完全接管，调用方不应再叠加任何全局系数。
-        public static bool TryOverride(ThingDef projectileDef, out float width)
+        // 以下入参的 projectileDef 一律可为 null：命中多态/CE 投射物时不一定拿得到 ThingDef，
+        // 传 null 表示「无法解析」，各方法按 0 宽度或全局默认值处理，不抛异常。
+        public static bool TryOverride(ThingDef? projectileDef, out float width)
         {
             width = 0f;
             if (!ProjectileOverrides.TryGetTrailWidth(projectileDef, out float w)) return false;
@@ -23,11 +25,11 @@ namespace Gunplay
         }
 
         // 基础宽度（伤害 / 贴图口径），不含 trailDef 覆盖与全局系数。
-        public static float Base(ThingDef projectileDef, float damage)
+        public static float Base(ThingDef? projectileDef, float damage)
         {
             if (projectileDef == null) return 0f;
 
-            if (Gunplay.settings.trailWidthMode == TrailWidthMode.Texture)
+            if (GunplaySettings.trailWidthMode == TrailWidthMode.Texture)
             {
                 // 投射物贴图经 GridPlane(drawSize) 旋转绘制，drawSize.x 为垂直于飞行方向的横向宽度
                 GraphicData graphicData = projectileDef.graphicData;
@@ -38,22 +40,22 @@ namespace Gunplay
         }
 
         // 运行时最终宽度。trailDef 为该投射物解析出的 ProjectileTrailDef（可能为 null）。
-        public static float Effective(ThingDef projectileDef, float damage, ProjectileTrailDef trailDef)
+        public static float Effective(ThingDef? projectileDef, float damage, ProjectileTrailDef? trailDef)
         {
             if (TryOverride(projectileDef, out float w)) return w;
 
             float width = Base(projectileDef, damage);
             if (trailDef != null && trailDef.trailWidth != -1) width = trailDef.trailWidth;
 
-            return width * Gunplay.settings.trailWidthFactor;
+            return width * GunplaySettings.trailWidthFactor;
         }
 
         // 设置界面口径：无法知道实际开火的武器，因此按无武器加成解析伤害（见 BaseDamage）。
-        public static float EffectiveForDef(ThingDef projectileDef)
+        public static float EffectiveForDef(ThingDef? projectileDef)
         {
             if (TryOverride(projectileDef, out float w)) return w;
 
-            ProjectilePropDef prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
+            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
 
             return Effective(projectileDef, BaseDamage(projectileDef), prop?.trail);
         }
@@ -66,7 +68,7 @@ namespace Gunplay
         // 这里用公开重载 GetDamageAmount(1f, null, null)：伤害倍率取 1、不填 explanation，
         // 等价于「无武器加成的基础伤害」，与运行时（带武器 RangedWeapon_DamageMultiplier）
         // 可能有小幅差异；覆写值本身是绝对值，一旦开启就不受该近似影响。
-        static float BaseDamage(ThingDef projectileDef)
+        static float BaseDamage(ThingDef? projectileDef)
         {
             if (projectileDef?.projectile == null) return 0f;
 

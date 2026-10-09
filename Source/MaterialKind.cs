@@ -118,14 +118,14 @@ namespace Gunplay
 
             map[def] = MaterialKind.None;
 
-            ThingDef thingDef = def as ThingDef;
+            ThingDef? thingDef = def as ThingDef;
             if (thingDef != null)
             {
                 kind = GetWithoutCache(thingDef);
             }
             else
             {
-                BuildableDef buildableDef = def as BuildableDef;
+                BuildableDef? buildableDef = def as BuildableDef;
                 if (buildableDef != null) kind = GetWithoutCache(buildableDef);
             }
 

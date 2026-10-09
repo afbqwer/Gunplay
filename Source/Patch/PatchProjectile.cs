@@ -16,19 +16,19 @@ namespace Gunplay.Patch
     [HarmonyPatch(typeof(Projectile), "Launch", new Type[] { typeof(Thing), typeof(Vector3), typeof(LocalTargetInfo), typeof(LocalTargetInfo), typeof(ProjectileHitFlags), typeof(bool), typeof(Thing), typeof(ThingDef) })]
     class PatchProjectileLaunch
     {
-        static PropertyInfo StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
+        static PropertyInfo? StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
 
         // 无武器投射物的特效开关：总开关 + 仅子弹伤害过滤
         internal static bool UnarmedEffectsAllowed(Thing projectile)
         {
-            if (!Gunplay.settings.unarmedProjectileEffects) return false;
-            if (Gunplay.settings.unarmedOnlyBullets && projectile.def.projectile.damageDef != RimWorld.DamageDefOf.Bullet) return false;
+            if (!GunplaySettings.unarmedProjectileEffects) return false;
+            if (GunplaySettings.unarmedOnlyBullets && projectile.def.projectile.damageDef != RimWorld.DamageDefOf.Bullet) return false;
             return true;
         }
 
         public static void Postfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
         {
-            CompGun comp = equipment?.TryGetComp<CompGun>();
+            CompGun? comp = equipment?.TryGetComp<CompGun>();
             if (comp != null)
             {
                 float angle = (___destination - ___origin).AngleFlat() - (intendedTarget.CenterVector3 - ___origin).AngleFlat();
@@ -39,12 +39,17 @@ namespace Gunplay.Patch
             }
 
             // 枪口前移仍由武器侧 barrelLength 决定
-            GunPropDef gunProp = GunplaySetup.GunProp(equipment);
+            GunPropDef? gunProp = GunplaySetup.GunProp(equipment);
             if (launcher as Pawn != null && gunProp != null)
             {
                 ___origin += (___destination - ___origin).normalized * gunProp.barrelLength;
-                ___ticksToImpact = Mathf.CeilToInt((float) StartingTicksToImpactProp.GetValue(__instance));
-                if (___ticksToImpact < 1) ___ticksToImpact = 1;
+
+                // 反射取值失败时（版本变动改名）保留原 tick 数，不在这条热路径上抛异常影响轨迹登记
+                if (StartingTicksToImpactProp?.GetValue(__instance) is float startingTicksToImpact)
+                {
+                    ___ticksToImpact = Mathf.CeilToInt(startingTicksToImpact);
+                    if (___ticksToImpact < 1) ___ticksToImpact = 1;
+                }
             }
 
             // 轨迹由投射物 def 决定（与发射武器无关）。
@@ -59,8 +64,8 @@ namespace Gunplay.Patch
                 {
                     // 投射物在 Launch 之前已 Spawn，本体的 Map 可作为无发射者时的兜底。
                     // 轨迹不再 spawn Thing：登记到该地图的轨迹集合，由批量绘制统一处理。
-                    Map map = __instance.Map ?? launcher?.Map;
-                    ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
+                    Map? map = __instance.Map ?? launcher?.Map;
+                    ProjectilePropDef? prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
                     if (map != null && prop?.trail != null)
                     {
                         MapComponent_ProjectileTrails.For(map)?.Register(__instance, ___destination, prop.trail);
@@ -75,13 +80,13 @@ namespace Gunplay.Patch
     {
         static float Postfix(float value, Projectile __instance)
         {
-            ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def);
+            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(__instance.def);
             if (prop != null && prop.preserveSpeed) return value;
 
             // 独立排除机制：弧线投射物（手雷/炮弹）不受全局速度缩放影响
             if (!ProjectileRules.ShouldScaleSpeed(__instance.def)) return value;
 
-            return value / Gunplay.settings.projectileSpeed;
+            return value / GunplaySettings.projectileSpeed;
         }
 
     }
@@ -110,7 +115,7 @@ namespace Gunplay.Patch
             Map map = projectile.Map;
 
             // 命中特效/音效由投射物 def 决定
-            ProjectilePropDef prop = GunplaySetup.ProjectileProp(projectile.def) ?? GunplaySetup.DefaultProjectileProp;
+            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectile.def) ?? GunplaySetup.DefaultProjectileProp;
             if (prop == null) return;
 
             MaterialKind kind = MaterialKind.None;
@@ -126,15 +131,15 @@ namespace Gunplay.Patch
                 kind = MaterialKindGetter.Get(terrainDef);
             }
 
-            if (Gunplay.settings.enableSounds)
+            if (GunplaySettings.enableSounds)
             {
-                SoundDef sound = prop.projectileImpactSound == null ? null : prop.projectileImpactSound.Effect(kind);
+                SoundDef? sound = prop.projectileImpactSound == null ? null : prop.projectileImpactSound.Effect(kind);
                 if (sound != null) sound.PlayOneShot(new TargetInfo(projectile.Position, map, false));
             }
 
-            if (Gunplay.settings.enableEffects)
+            if (GunplaySettings.enableEffects)
             {
-                EffecterDef effecterDef = prop.projectileImpactEffect == null ? null : prop.projectileImpactEffect.Effect(kind);
+                EffecterDef? effecterDef = prop.projectileImpactEffect == null ? null : prop.projectileImpactEffect.Effect(kind);
                 if (effecterDef != null)
                 {
                     Effecter effecter = new Effecter(effecterDef);

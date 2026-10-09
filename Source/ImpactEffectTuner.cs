@@ -10,15 +10,16 @@ namespace Gunplay
     {
         static readonly HashSet<string> PuffFlecks = new HashSet<string> { "DustPuff", "DustPuffThick", "AirPuff" };
 
-        static Dictionary<SubEffecterDef, IntRange> originalBurstCounts;
+        // 惰性建立：首次 Apply 时记录在改前的原始值，之后始终从原始值重算倍率。
+        static Dictionary<SubEffecterDef, IntRange>? originalBurstCounts;
 
         public static void Apply()
         {
             if (originalBurstCounts == null)
                 originalBurstCounts = new Dictionary<SubEffecterDef, IntRange>();
 
-            float multiplier = Gunplay.settings.particleMultiplier;
-            bool showPuffs = Gunplay.settings.showPuffs;
+            float multiplier = GunplaySettings.particleMultiplier;
+            bool showPuffs = GunplaySettings.showPuffs;
 
             foreach (EffecterDef def in DefDatabase<EffecterDef>.AllDefs)
             {

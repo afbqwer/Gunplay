@@ -54,15 +54,15 @@ namespace Gunplay
         internal const float DepthEpsilon = -0.002f;
 
         // 归属信息
-        internal ProjectileTrailDef def;     // 材质来源 + 高度层来源
-        internal Thing LookupKey;            // 登记时的投射物引用（捕获后仍保留），用于从集合移除
-        internal bool Dead;                  // 生命周期结束，由集合回收
+        internal ProjectileTrailDef def = null!;   // 材质来源 + 高度层来源；由 Initialize* 首个赋值，之后恒非空
+        internal Thing? LookupKey;                 // 登记时的投射物引用（捕获后仍保留），用于从集合移除
+        internal bool Dead;                        // 生命周期结束，由集合回收
 
         // ---------------- 直线/通用状态 ----------------
         int ticksUtilDeath;
         int ticksIdle;
-        Thing projectile;
-        Func<Vector3> exactPositionGetter;
+        Thing? projectile;
+        Func<Vector3>? exactPositionGetter;
         Vector3 a;
         Vector3 exactPosition;
         Vector3 previousPosition;
@@ -92,8 +92,9 @@ namespace Gunplay
         // 使拖尾/弧线贴着弹体而不是地面投影。采样失败回退解析弧线时退回地面口径。
         bool ceTrackDrawnPosition;
         // 弧线 CE 投射物：发射时按 CE 绘制映射采样的整条弹道绘制点（世界坐标，y 为 altitude 层）
-        List<Vector3> ceArcSamples;
-        float[] ceArcCumLen;   // 采样点间绘制路径的累计长度（与 traveled 的绘制口径一致）
+        // CE 投射物：null 表示未/无法采样，此时按解析抛物线取点（ceArcCumLen 同样可能仍为 null）
+        List<Vector3>? ceArcSamples;
+        float[]? ceArcCumLen;   // 采样点间绘制路径的累计长度（与 traveled 的绘制口径一致）
         float ceArcTotalLen;
 
         // ---------------- 初始化 ----------------
@@ -162,11 +163,11 @@ namespace Gunplay
             //   * 关闭 → 全部 CE 投射物绘制弧线轨迹：按 CE 自己的绘制映射采样整条弹道的绘制位置。
             // 弧线采样失败时回退为地面解析抛物线（原版算法，弧高 tan(θ)*L/4）。
             float shotAngle = PatchCECompat.GetShotAngle(proj);
-            arcing = !Gunplay.settings.ceStraightTrails;
+            arcing = !GunplaySettings.ceStraightTrails;
             ceTrackDrawnPosition = true;
             if (arcing)
             {
-                List<Vector3> samples = PatchCECompat.PredictDrawPositions(proj, PatchCECompat.GetStartingTicksToImpact(proj));
+                List<Vector3>? samples = PatchCECompat.PredictDrawPositions(proj, PatchCECompat.GetStartingTicksToImpact(proj));
                 if (samples == null || !InitializeArcFromSamples(samples))
                 {
                     ceTrackDrawnPosition = false;
@@ -201,7 +202,10 @@ namespace Gunplay
                 {
                     // 只在投射物存活时读取位置；销毁后不再访问它。
                     // CE 直线投射物跟踪"绘制位置"（含高度屏幕偏移），其余跟踪地面投影。
-                    ApplyPosition(ceTrackDrawnPosition ? PatchCECompat.GetDrawPosition(projectile) : exactPositionGetter());
+                    Vector3? drawn = ceTrackDrawnPosition
+                        ? PatchCECompat.GetDrawPosition(projectile)
+                        : exactPositionGetter?.Invoke();
+                    if (drawn.HasValue) ApplyPosition(drawn.Value);
                 }
             }
 
@@ -248,7 +252,13 @@ namespace Gunplay
         public void CaptureFinalPositionCE(Thing proj)
         {
             if (projectile == null) return;
-            CaptureFinalPosition(ceTrackDrawnPosition ? PatchCECompat.GetDrawPosition(proj) : exactPositionGetter());
+
+            Vector3? drawn = ceTrackDrawnPosition
+                ? PatchCECompat.GetDrawPosition(proj)
+                : exactPositionGetter?.Invoke();
+            if (!drawn.HasValue) return;
+
+            CaptureFinalPosition(drawn.Value);
         }
 
         // ---------------- 剔除 ----------------
@@ -353,7 +363,7 @@ namespace Gunplay
                 float t = Mathf.Lerp(tail, head, f);
 
                 Vector3 center;
-                if (ceArcSamples != null)
+                if (ceArcSamples != null && ceArcCumLen != null)
                 {
                     // 按绘制路径累计长度在采样点间插值（t 单调递增，段指针只前进）
                     float d = Mathf.Clamp01(t) * ceArcTotalLen;
@@ -426,7 +436,7 @@ namespace Gunplay
                 ? Mathf.Clamp(length / arcHorizontalLength, ArcMinTailFraction, 1f)
                 : 1f;
 
-            ComputeSampledArcBounds();
+            ComputeSampledArcBounds(samples);
             return true;
         }
 
@@ -461,14 +471,16 @@ namespace Gunplay
         }
 
         // CE 采样点列的包围盒
-        void ComputeSampledArcBounds()
+        void ComputeSampledArcBounds(List<Vector3> samples)
         {
-            Vector3 lo = ceArcSamples[0];
-            Vector3 hi = ceArcSamples[0];
-            for (int i = 1; i < ceArcSamples.Count; i++)
+            if (samples.Count == 0) return;
+
+            Vector3 lo = samples[0];
+            Vector3 hi = samples[0];
+            for (int i = 1; i < samples.Count; i++)
             {
-                lo = Vector3.Min(lo, ceArcSamples[i]);
-                hi = Vector3.Max(hi, ceArcSamples[i]);
+                lo = Vector3.Min(lo, samples[i]);
+                hi = Vector3.Max(hi, samples[i]);
             }
             // 等价于原先的 Bounds((lo+hi)/2, hi-lo+pad)：即外扩 pad 的一半
             Vector3 pad = new Vector3(width + 1f, 1f, width + 1f);

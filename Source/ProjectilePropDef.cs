@@ -8,16 +8,16 @@ namespace Gunplay
     public class ProjectilePropDef : Def
     {
         // 显式指向某投射物 ThingDef 的 defName。命中时优先于名称关键字匹配。
-        public string defTarget;
+        public string? defTarget;
 
         // 名称匹配关键字：投射物 defName 含任一关键字（忽略大小写）即套用本配置包。
         // 关键字更长者优先匹配（更具体者胜出）。同样可由第三方 mod 在 XML 中扩展。
-        public List<string> matchKeywords;
+        public List<string>? matchKeywords;
 
-        public ProjectileTrailDef trail;
+        public ProjectileTrailDef? trail;
 
-        public ProjectileImpactSoundDef projectileImpactSound;
-        public ProjectileImpactEffectDef projectileImpactEffect;
+        public ProjectileImpactSoundDef? projectileImpactSound;
+        public ProjectileImpactEffectDef? projectileImpactEffect;
 
         public bool preserveSpeed = false;
     }

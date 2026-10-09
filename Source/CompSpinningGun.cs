@@ -10,7 +10,8 @@ namespace Gunplay
 {
     class CompSpinningGun : CompPrimer
     {
-        new CompPropertiesSpinningGun props => base.props as CompPropertiesSpinningGun;
+        // 同 CompPrimeAnimation：props 的类型由 compClass 保证，强转而非 as。
+        new CompPropertiesSpinningGun props => (CompPropertiesSpinningGun)base.props;
         public override int TicksToIdle => props.ticksToIdle;
 
         float rotation = 0;

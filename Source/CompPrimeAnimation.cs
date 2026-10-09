@@ -10,7 +10,10 @@ namespace Gunplay
 {
     class CompPrimeAnimation : CompPrimer
     {
-        new CompPropertiesPrimeAnimation props => base.props as CompPropertiesPrimeAnimation;
+        // base.props 一定是本 comp 的 CompProperties（ThingComp 由 props.compClass 创建），
+        // 所以这里用强转而不是 as：类型不对时抛 InvalidCastException 指向真正的原因，
+        // 而不是让空引用散落到后面每一处 props.xxx。
+        new CompPropertiesPrimeAnimation props => (CompPropertiesPrimeAnimation)base.props;
 
         public override int TicksToIdle => props.ticksToIdle;
 

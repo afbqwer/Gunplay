@@ -14,14 +14,14 @@ namespace Gunplay.Patch
     [HarmonyPatch(typeof(PawnRenderUtility), "DrawEquipmentAiming", new Type[] { typeof(Thing), typeof(Vector3), typeof(float) })]
     class PatchPawnRenderUtilityDrawEquipmentAiming
     {
-        static FieldInfo pawnField = typeof(PawnRenderer).GetField("pawn", BindingFlags.NonPublic | BindingFlags.Instance);
+        static FieldInfo? pawnField = typeof(PawnRenderer).GetField("pawn", BindingFlags.NonPublic | BindingFlags.Instance);
         static Vector3 equipmentDir = new Vector3(0f, 0f, 0.4f);
         static Vector3 drawingScale = new Vector3(1f, 1f, 1f);
         static Matrix4x4 drawingMatrix = default;
 
         static bool Prefix(ref Thing eq, ref Vector3 drawLoc, ref float aimAngle)
         {
-            if (!Gunplay.settings.enableWeaponAnimations) return true;
+            if (!GunplaySettings.enableWeaponAnimations) return true;
 
             CompGun comp = eq.TryGetComp<CompGun>();
             if (comp == null) return true;
@@ -30,7 +30,7 @@ namespace Gunplay.Patch
             aimAngle = (aimAngle + comp.RotationOffset) % 360;
             drawLoc += equipmentDir.RotatedBy(aimAngle);
 
-            GunPropDef prop = GunplaySetup.GunProp(eq);
+            GunPropDef? prop = GunplaySetup.GunProp(eq);
             if (prop == null) return true;
 
             float num = aimAngle - 90f;
@@ -65,7 +65,7 @@ namespace Gunplay.Patch
 
             Material mat;
 
-            Graphic_StackCount graphic_StackCount = eq.Graphic as Graphic_StackCount;
+            Graphic_StackCount? graphic_StackCount = eq.Graphic as Graphic_StackCount;
             if (graphic_StackCount != null)
             {
                 mat = graphic_StackCount.SubGraphicForStackCount(1, eq.def).MatSingle;

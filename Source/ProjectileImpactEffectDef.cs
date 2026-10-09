@@ -4,17 +4,18 @@ namespace Gunplay
 {
     public class ProjectileImpactEffectDef : Def
     {
-        public EffecterDef fallback;
-        public EffecterDef fabric;
-        public EffecterDef flesh;
-        public EffecterDef metal;
-        public EffecterDef soil;
-        public EffecterDef stone;
-        public EffecterDef wood;
+        // 全部按材质可选的声效/特效：XML 未配的材质走 fallback，fallback 本身缺失则返回 null。
+        public EffecterDef? fallback;
+        public EffecterDef? fabric;
+        public EffecterDef? flesh;
+        public EffecterDef? metal;
+        public EffecterDef? soil;
+        public EffecterDef? stone;
+        public EffecterDef? wood;
 
-        public EffecterDef Effect(MaterialKind kind)
+        public EffecterDef? Effect(MaterialKind kind)
         {
-            EffecterDef res = null;
+            EffecterDef? res = null;
 
             switch (kind)
             {

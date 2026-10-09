@@ -53,7 +53,7 @@ namespace Gunplay
             if (holder == null) return;
 
             Stance stance = holder.pawn.stances.curStance;
-            Stance_Warmup warmup;
+            Stance_Warmup? warmup;
 
             switch (state)
             {
@@ -84,7 +84,7 @@ namespace Gunplay
                     if (!IsBrusting(holder.pawn))
                     {
                         state = State.Idle;
-                        Stance_Cooldown cooldown = stance as Stance_Cooldown;
+                        Stance_Cooldown? cooldown = stance as Stance_Cooldown;
                         if (cooldown != null)
                             ReachPosition(0.0f, TicksToIdle);
                         else

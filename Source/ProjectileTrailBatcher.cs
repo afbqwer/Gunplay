@@ -41,7 +41,7 @@ namespace Gunplay
 
         class InstancedGroup
         {
-            internal Material material;   // 创建分组时解析一次；null 表示该 def 无材质，整组跳过
+            internal Material? material;   // 创建分组时解析一次；null 表示该 def 无材质，整组跳过
             internal readonly Matrix4x4[] matrices = new Matrix4x4[MaxInstancesPerCall];
             internal int count;
             internal bool touched;
@@ -71,7 +71,7 @@ namespace Gunplay
 
             internal void Draw()
             {
-                if (count == 0) return;
+                if (count == 0 || material == null) return;
                 Graphics.DrawMeshInstanced(MeshPool.plane10, 0, material, matrices, count,
                     sharedProps, ShadowCastingMode.Off, false, 0);
                 count = 0;
@@ -82,8 +82,8 @@ namespace Gunplay
 
         class ArcGroup
         {
-            internal Material material;
-            internal Mesh mesh;
+            internal Material? material;
+            internal Mesh? mesh;          // 首帧惰性创建（常规 Maps 上几乎不会走到弧线路径）
             internal readonly List<Vector3> verts = new List<Vector3>();
             internal readonly List<Vector2> uvs = new List<Vector2>();
             internal readonly List<int> tris = new List<int>();
@@ -124,6 +124,8 @@ namespace Gunplay
 
             internal void UploadAndDraw()
             {
+                if (material == null) return;
+
                 if (mesh == null)
                 {
                     mesh = new Mesh { name = "GunplayProjectileTrailBatch" };

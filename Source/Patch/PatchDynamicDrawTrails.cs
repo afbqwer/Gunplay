@@ -20,7 +20,7 @@ namespace Gunplay.Patch
     {
         public static bool TryPatch(Harmony harmony)
         {
-            MethodInfo target = AccessTools.Method(typeof(DynamicDrawManager), nameof(DynamicDrawManager.DrawDynamicThings));
+            MethodInfo? target = AccessTools.Method(typeof(DynamicDrawManager), nameof(DynamicDrawManager.DrawDynamicThings));
             if (target == null)
             {
                 Log.Error("[Gunplay] Could not find DynamicDrawManager.DrawDynamicThings; projectile trails are disabled.");
@@ -33,15 +33,15 @@ namespace Gunplay.Patch
 
         // 缓存「当前地图 → 组件」。Map.GetComponent<T> 会线性扫描 components 列表，
         // 放在每帧的绘制路径上不值得；地图切换或组件尚未就绪时才重新解析。
-        static Map cachedMap;
-        static MapComponent_ProjectileTrails cachedComp;
+        static Map? cachedMap;
+        static MapComponent_ProjectileTrails? cachedComp;
 
         static void Postfix()
         {
             // 与目标方法保持同一开关口径
             if (!DebugViewSettings.drawThingsDynamic) return;
 
-            Map map = Find.CurrentMap;
+            Map? map = Find.CurrentMap;
             if (map == null || map.Disposed)
             {
                 cachedMap = null;

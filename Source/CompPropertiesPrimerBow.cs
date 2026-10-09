@@ -11,7 +11,8 @@ namespace Gunplay
     {
         public CompPropertiesPrimerBow() { compClass = typeof(CompPrimerBow); }
 
-        public GraphicData graphicData;
+        // 可选：未配时 CompPrimerBow 回退到 parent.DefaultGraphic。
+        public GraphicData? graphicData;
         public float stretchHorizontal = 0.45f;
         public float stretchVertical = -0.25f;
     }

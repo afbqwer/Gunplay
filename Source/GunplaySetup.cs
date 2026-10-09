@@ -18,7 +18,9 @@ namespace Gunplay
 
         // ---------------- 投射物侧 ----------------
         static Dictionary<ThingDef, ProjectilePropDef> projectilePropMap = new Dictionary<ThingDef, ProjectilePropDef>();
-        static ProjectilePropDef defaultProjectileDef = DefDatabase<ProjectilePropDef>.GetNamed("default", false);
+
+        // 缺该项时 BuildProjectileProps 会报错并跳过整个投射物侧解析。
+        static ProjectilePropDef? defaultProjectileDef = DefDatabase<ProjectilePropDef>.GetNamed("default", false);
 
         static GunplaySetup()
         {
@@ -41,7 +43,7 @@ namespace Gunplay
 
             foreach (GunPropDef def in DefDatabase<GunPropDef>.AllDefs)
             {
-                ThingDef target = null;
+                ThingDef? target = null;
 
                 if (def.defTarget != null) target = DefDatabase<ThingDef>.GetNamed(def.defTarget, false);
                 if (target == null) target = DefDatabase<ThingDef>.GetNamed(def.defName, false);
@@ -59,15 +61,15 @@ namespace Gunplay
 
                 def.comps.Add(new CompProperties() { compClass = typeof(CompGun) });
 
-                GunPropDef prop = propMap.TryGetValue(def);
-                if (prop != null)
-                {
-                    if (prop.soundAiming != null) shoot.soundAiming = prop.soundAiming;
-                    if (prop.soundCast != null) shoot.soundCast = prop.soundCast;
-                    if (prop.spinner != null) def.comps.Add(prop.spinner);
-                    if (prop.primer != null) def.comps.Add(prop.primer);
-                    if (prop.bow != null) def.comps.Add(prop.bow);
-                }
+                // 上一行已保证键存在（未显式配置者填 defaultDef），这里用 BCL 的 TryGetValue：
+                // Verse 的同名扩展对字典的可空签名有要求，传 null 兜底值会触发 CS8620。
+                if (!propMap.TryGetValue(def, out GunPropDef? prop)) continue;
+
+                if (prop.soundAiming != null) shoot.soundAiming = prop.soundAiming;
+                if (prop.soundCast != null) shoot.soundCast = prop.soundCast;
+                if (prop.spinner != null) def.comps.Add(prop.spinner);
+                if (prop.primer != null) def.comps.Add(prop.primer);
+                if (prop.bow != null) def.comps.Add(prop.bow);
             }
 
             BuildProjectileProps();
@@ -89,7 +91,7 @@ namespace Gunplay
             {
                 if (def == defaultProjectileDef) continue;
 
-                ThingDef target = null;
+                ThingDef? target = null;
                 if (def.defTarget != null) target = DefDatabase<ThingDef>.GetNamed(def.defTarget, false);
                 if (target == null) target = DefDatabase<ThingDef>.GetNamed(def.defName, false);
 
@@ -124,9 +126,9 @@ namespace Gunplay
                 if (projectilePropMap.ContainsKey(def)) continue;
 
                 // 收集 defName 命中的全部关键字；若命中多个，则更短者被更长者覆盖，需要报错提示。
-                ProjectilePropDef matched = null;
-                string winnerKeyword = null;
-                List<string> shadowed = null;
+                ProjectilePropDef? matched = null;
+                string? winnerKeyword = null;
+                List<string>? shadowed = null;
 
                 if (def.defName != null)
                 {
@@ -157,18 +159,19 @@ namespace Gunplay
             }
         }
 
-        public static GunPropDef GunProp(ThingDef equipment)
+        // 未注册的武器返回 null（正常带 shoot verb 的武器在启动时已全部注册）
+        public static GunPropDef? GunProp(ThingDef? equipment)
         {
             if (equipment == null) return null;
 
-            return propMap.TryGetValue(equipment, null);
+            return propMap.TryGetValue(equipment, out GunPropDef? prop) ? prop : null;
         }
 
-        public static GunPropDef GunProp(Thing equipment)
+        public static GunPropDef? GunProp(Thing? equipment)
         {
             if (equipment?.def == null) return null;
 
-            return propMap.TryGetValue(equipment.def, defaultDef);
+            return propMap.TryGetValue(equipment.def, out GunPropDef? prop) ? prop : defaultDef;
         }
 
         public static GunPropDef DefaultProp => defaultDef;
@@ -176,13 +179,13 @@ namespace Gunplay
         // ---------------- 投射物侧入口 ----------------
 
         // 未注册的投射物返回 null（正常投射物在启动时已全部注册）
-        public static ProjectilePropDef ProjectileProp(ThingDef projectileDef)
+        public static ProjectilePropDef? ProjectileProp(ThingDef? projectileDef)
         {
             if (projectileDef == null) return null;
 
-            return projectilePropMap.TryGetValue(projectileDef, null);
+            return projectilePropMap.TryGetValue(projectileDef, out ProjectilePropDef? prop) ? prop : null;
         }
 
-        public static ProjectilePropDef DefaultProjectileProp => defaultProjectileDef;
+        public static ProjectilePropDef? DefaultProjectileProp => defaultProjectileDef;
     }
 }

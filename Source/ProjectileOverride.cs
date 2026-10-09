@@ -28,50 +28,54 @@ namespace Gunplay
     // 用 defName 而非 ThingDef 做键，是为了让 mod 增删后残留的条目不炸（读不到就当没有）。
     public static class ProjectileOverrides
     {
-        static Dictionary<string, ProjectileOverride> Map => Gunplay.settings?.projectileOverrides;
+        // 存储挂在 GunplaySettings 上（全局，跨存档），键为投射物 defName。
+        // 静态字典必定存在，不像过去那样要先拿实例再判 null。
+        static Dictionary<string, ProjectileOverride> Map => GunplaySettings.projectileOverrides;
 
         public static bool Has(ThingDef projectileDef)
         {
-            return projectileDef != null && Map != null && Map.ContainsKey(projectileDef.defName);
+            return projectileDef != null && Map.ContainsKey(projectileDef.defName);
         }
 
-        public static ProjectileOverride Get(ThingDef projectileDef)
+        // 未覆写时返回 null，调用方据此区分「没设过」和「设过但是关着」。
+        public static ProjectileOverride? Get(ThingDef? projectileDef)
         {
-            if (projectileDef == null || Map == null) return null;
+            if (projectileDef == null) return null;
 
-            return Map.TryGetValue(projectileDef.defName, null);
+            // 用 BCL 的 TryGetValue：Verse 的同名扩展要求字典的 value 为可空类型，会触发 CS8620。
+            return Map.TryGetValue(projectileDef.defName, out ProjectileOverride? over) ? over : null;
         }
 
-        public static bool TryGetTrailWidth(ThingDef projectileDef, out float width)
+        public static bool TryGetTrailWidth(ThingDef? projectileDef, out float width)
         {
-            ProjectileOverride over = Get(projectileDef);
+            ProjectileOverride? over = Get(projectileDef);
             width = over?.trailWidth ?? 0f;
             return over != null;
         }
 
         // 开启覆写：以当前计算出的宽度为起点，用户从「现状」开始调，不会看到轨迹突然变粗/变细。
-        public static void Enable(ThingDef projectileDef)
+        public static void Enable(ThingDef? projectileDef)
         {
-            if (projectileDef == null || Map == null) return;
+            if (projectileDef == null) return;
 
             Set(projectileDef, true, TrailWidth.EffectiveForDef(projectileDef));
         }
 
-        public static void SetTrailWidth(ThingDef projectileDef, float width)
+        public static void SetTrailWidth(ThingDef? projectileDef, float width)
         {
-            if (projectileDef == null || Map == null) return;
+            if (projectileDef == null) return;
 
-            ProjectileOverride over = Get(projectileDef);
+            ProjectileOverride? over = Get(projectileDef);
             if (over != null) over.trailWidth = width;
             else Set(projectileDef, true, width);
         }
 
         // 设置轨迹开关。记录不存在时按「顺带开启覆写」处理，调用方无需自己分两步。
-        public static void SetTrailEnabled(ThingDef projectileDef, bool enabled)
+        public static void SetTrailEnabled(ThingDef? projectileDef, bool enabled)
         {
-            if (projectileDef == null || Map == null) return;
+            if (projectileDef == null) return;
 
-            ProjectileOverride over = Get(projectileDef);
+            ProjectileOverride? over = Get(projectileDef);
             if (over != null) over.trailEnabled = enabled;
             else Set(projectileDef, enabled, TrailWidth.EffectiveForDef(projectileDef));
         }
@@ -86,26 +90,26 @@ namespace Gunplay
         }
 
         // 关闭覆写 = 丢弃记录（见类注释）。下次打开会重新计算。
-        public static void Disable(ThingDef projectileDef)
+        public static void Disable(ThingDef? projectileDef)
         {
-            if (projectileDef == null || Map == null) return;
+            if (projectileDef == null) return;
 
             Map.Remove(projectileDef.defName);
         }
 
         public static void Clear()
         {
-            Map?.Clear();
+            Map.Clear();
         }
 
         // 单项覆写层是否允许绘制轨迹。未覆写 = 继承全局（允许），是否真的画由全局 enableTrails 决定。
-        // 调用处形如：Gunplay.settings.enableTrails && ProjectileOverrides.AllowsTrail(def)
-        public static bool AllowsTrail(ThingDef projectileDef)
+        // 调用处形如：GunplaySettings.enableTrails && ProjectileOverrides.AllowsTrail(def)
+        public static bool AllowsTrail(ThingDef? projectileDef)
         {
-            ProjectileOverride over = Get(projectileDef);
+            ProjectileOverride? over = Get(projectileDef);
             return over == null || over.trailEnabled;
         }
 
-        public static int Count => Map?.Count ?? 0;
+        public static int Count => Map.Count;
     }
 }

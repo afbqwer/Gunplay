@@ -10,17 +10,16 @@ namespace Gunplay
 {
     public class Gunplay : Mod
     {
-        public static GunplaySettings settings;
-
         public Gunplay(ModContentPack pack) : base(pack)
         {
-            settings = GetSettings<GunplaySettings>();
+            // 只把实例交给 GunplaySettings 当存档句柄；设置本身是静态的，读的时候不经过这里。
+            GunplaySettings.Handle = GetSettings<GunplaySettings>();
         }
 
         public override void DoSettingsWindowContents(Rect inRect)
         {
             base.DoSettingsWindowContents(inRect);
-            settings.DoSettingsWindowContents(inRect);
+            GunplaySettings.DoSettingsWindowContents(inRect);
         }
 
         public override string SettingsCategory()

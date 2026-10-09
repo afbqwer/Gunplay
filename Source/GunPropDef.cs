@@ -12,14 +12,14 @@ namespace Gunplay
     // 已迁移到 ProjectilePropDef，由投射物 def 决定。
     public class GunPropDef : Def
     {
-        public string defTarget;
+        public string? defTarget;
 
-        public CompPropertiesSpinningGun spinner;
-        public CompPropertiesPrimeAnimation primer;
-        public CompPropertiesPrimerBow bow;
+        public CompPropertiesSpinningGun? spinner;
+        public CompPropertiesPrimeAnimation? primer;
+        public CompPropertiesPrimerBow? bow;
 
-        public SoundDef soundAiming;
-        public SoundDef soundCast;
+        public SoundDef? soundAiming;
+        public SoundDef? soundCast;
 
         public float barrelLength = -1;
 
