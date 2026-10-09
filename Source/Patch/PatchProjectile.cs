@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -18,20 +17,6 @@ namespace Gunplay.Patch
     class PatchProjectileLaunch
     {
         static PropertyInfo StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        // 原版 Projectile 与 CE 的 ProjectileCE 都可作为键（后者不是 Projectile 子类）
-        static readonly ConditionalWeakTable<Thing, ProjectileTrail> trails = new ConditionalWeakTable<Thing, ProjectileTrail>();
-
-        public static bool TryGetTrail(Thing proj, out ProjectileTrail trail)
-        {
-            return trails.TryGetValue(proj, out trail);
-        }
-
-        internal static void RegisterTrail(Thing proj, ProjectileTrail trail)
-        {
-            trails.Remove(proj);
-            trails.Add(proj, trail);
-        }
 
         // 无武器投射物的特效开关：总开关 + 仅子弹伤害过滤
         internal static bool UnarmedEffectsAllowed(Thing projectile)
@@ -64,24 +49,20 @@ namespace Gunplay.Patch
 
             // 轨迹由投射物 def 决定（与发射武器无关）。
             // 直线投射物与弧线投射物共用这一条生成路径，具体用哪种绘制方式由
-            // ProjectileTrail 内部按“是否弧线”决定，因此多数（直线）投射物不会执行弧线相关代码。
+            // ProjectileTrailState 内部按“是否弧线”决定，因此多数（直线）投射物不会执行弧线相关代码。
             if (Gunplay.settings.enableTrails)
             {
                 // 无武器判定口径 = equipment 为 null（Launch 体内执行完后等价于 EquipmentDef == null）
                 bool unarmed = equipment == null;
                 if (!unarmed || UnarmedEffectsAllowed(__instance))
                 {
-                    // 投射物在 Launch 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
+                    // 投射物在 Launch 之前已 Spawn，本体的 Map 可作为无发射者时的兜底。
+                    // 轨迹不再 spawn Thing：登记到该地图的轨迹集合，由批量绘制统一处理。
                     Map map = __instance.Map ?? launcher?.Map;
                     ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
                     if (map != null && prop?.trail != null)
                     {
-                        ProjectileTrail trail = GenSpawn.Spawn(prop.trail, ___origin.ToIntVec3(), map, WipeMode.Vanish) as ProjectileTrail;
-                        if (trail != null)
-                        {
-                            trail.Initialize(__instance, ___destination, equipment);
-                            RegisterTrail(__instance, trail);
-                        }
+                        MapComponent_ProjectileTrails.For(map)?.Register(__instance, ___destination, prop.trail);
                     }
                 }
             }
@@ -113,8 +94,7 @@ namespace Gunplay.Patch
             if (map == null) return;
 
             // Impact 在 Destroy 之前执行，此时投射物仍存活，取到的就是最终落点
-            if (PatchProjectileLaunch.TryGetTrail(__instance, out ProjectileTrail trail))
-                trail.CaptureFinalPosition(__instance.ExactPosition);
+            MapComponent_ProjectileTrails.For(map)?.CaptureFinalPosition(__instance, __instance.ExactPosition);
 
             // 无武器投射物受独立开关控制（与轨迹开关保持同一判定口径）
             if (__instance.EquipmentDef == null && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;

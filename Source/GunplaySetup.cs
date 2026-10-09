@@ -1,4 +1,4 @@
-﻿﻿using Gunplay.Patch;
+﻿﻿﻿﻿using Gunplay.Patch;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -28,6 +28,9 @@ namespace Gunplay
             // CE 软兼容（反射，无硬依赖）：CE 的 ProjectileCE 不继承原版 Projectile，
             // 需要把轨迹与命中特效/音效补到 CE 自己的方法上；未安装 CE 时自动跳过
             PatchCECompat.TryPatch(harmony);
+
+            // 轨迹批量绘制：显式挂载（目标方法缺失时只报错并禁用轨迹，不抛异常）
+            PatchDynamicDrawTrails.TryPatch(harmony);
 
             foreach (ProjectileTrailDef def in DefDatabase<ProjectileTrailDef>.AllDefs)
             {
