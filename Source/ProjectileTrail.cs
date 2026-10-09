@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -43,10 +43,21 @@ namespace Gunplay
             length = speed * 15f;
             ticksPerLength = speed > 0f ? length / speed : 0f;
             dir = (b - a).normalized;
-            width = Mathf.Min(proj.DamageAmount, 50f) * 0.006f;
+            if (Gunplay.settings.trailWidthMode == TrailWidthMode.Texture)
+            {
+                // 投射物贴图经 GridPlane(drawSize) 旋转绘制，drawSize.x 为垂直于飞行方向的横向宽度
+                GraphicData graphicData = projectile.def.graphicData;
+                width = (graphicData != null ? graphicData.drawSize.x : 1f) * 0.1f;
+            }
+            else
+            {
+                width = Mathf.Min(projectile.DamageAmount, 50f) * 0.006f;
+            }
 
             ProjectileTrailDef trailDef = def as ProjectileTrailDef;
             if (trailDef != null && trailDef.trailWidth != -1) width = trailDef.trailWidth;
+
+            width *= Gunplay.settings.trailWidthFactor;
         }
 
 

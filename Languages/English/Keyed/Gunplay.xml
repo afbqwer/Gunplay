@@ -12,4 +12,9 @@
   <GunplayEnableEffectsDesc>Show visual effects for projectiles impacting targets.</GunplayEnableEffectsDesc>
   <GunplayProjectileSpeedName>Projectile speed</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>Alter speed to specified percentage for all projectiles.</GunplayProjectileSpeedDesc>
+  <GunplayTrailWidthModeDesc>Determines how the base trail width is calculated.</GunplayTrailWidthModeDesc>
+  <GunplayTrailWidthModeDamage>Trail width: based on projectile damage</GunplayTrailWidthModeDamage>
+  <GunplayTrailWidthModeTexture>Trail width: based on projectile texture size</GunplayTrailWidthModeTexture>
+  <GunplayTrailWidthFactorName>Trail width multiplier</GunplayTrailWidthFactorName>
+  <GunplayTrailWidthFactorDesc>Multiplies the calculated trail width. Default 100%, range 5% to 400%, in 5% steps.</GunplayTrailWidthFactorDesc>
 </LanguageData>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <GunplayTitle>Gunplay</GunplayTitle>
 
@@ -12,5 +12,10 @@
   <GunplayEnableEffectsDesc>目標に影響する発射体の視覚的な効果を表示します。</GunplayEnableEffectsDesc>
   <GunplayProjectileSpeedName>発射体速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>全種類の発射体の飛翔速度を指定したパーセンテージに変更します。</GunplayProjectileSpeedDesc>
+  <GunplayTrailWidthModeDesc>弾道の基本幅の計算方法を指定します。</GunplayTrailWidthModeDesc>
+  <GunplayTrailWidthModeDamage>弾道の幅：発射体のダメージに基づく</GunplayTrailWidthModeDamage>
+  <GunplayTrailWidthModeTexture>弾道の幅：発射体のテクスチャサイズに基づく</GunplayTrailWidthModeTexture>
+  <GunplayTrailWidthFactorName>弾道の幅の倍率</GunplayTrailWidthFactorName>
+  <GunplayTrailWidthFactorDesc>計算された弾道の幅に対する倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayTrailWidthFactorDesc>
 
 </LanguageData>

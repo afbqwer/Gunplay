@@ -8,6 +8,12 @@ using Verse;
 
 namespace Gunplay
 {
+    public enum TrailWidthMode
+    {
+        Damage,
+        Texture
+    }
+
     public class GunplaySettings : ModSettings
     {
         public bool enableTrails = true;
@@ -15,6 +21,8 @@ namespace Gunplay
         public bool enableWeaponAnimations = true;
         public bool enableEffects = true;
         public float projectileSpeed = 3f;
+        public TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
+        public float trailWidthFactor = 1f;
 
 
         override public void ExposeData()
@@ -24,6 +32,8 @@ namespace Gunplay
             Scribe_Values.Look(ref enableWeaponAnimations, "enableWeaponAnimations");
             Scribe_Values.Look(ref enableEffects, "enableEffects");
             Scribe_Values.Look(ref projectileSpeed, "projectileSpeed");
+            Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
+            Scribe_Values.Look(ref trailWidthFactor, "trailWidthFactor", 1f);
         }
 
         public void DoSettingsWindowContents(Rect inRect)
@@ -34,7 +44,17 @@ namespace Gunplay
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableEffectsName".Translate(), ref enableEffects, "GunplayEnableEffectsDesc".Translate());
-            listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10, projectileSpeed.ToStringPercent());
+            listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
+            listing_Standard.Gap(8f);
+
+            if (listing_Standard.RadioButton("GunplayTrailWidthModeDamage".Translate(), trailWidthMode == TrailWidthMode.Damage, tooltip: "GunplayTrailWidthModeDesc".Translate()))
+                trailWidthMode = TrailWidthMode.Damage;
+            if (listing_Standard.RadioButton("GunplayTrailWidthModeTexture".Translate(), trailWidthMode == TrailWidthMode.Texture, tooltip: "GunplayTrailWidthModeDesc".Translate()))
+                trailWidthMode = TrailWidthMode.Texture;
+
+            trailWidthFactor = Mathf.Round(trailWidthFactor * 20f) / 20f;
+            listing_Standard.SliderLabeled("GunplayTrailWidthFactorName".Translate(), ref trailWidthFactor, "GunplayTrailWidthFactorDesc".Translate(), 0.05f, 4f);
+            trailWidthFactor = Mathf.Round(trailWidthFactor * 20f) / 20f;
             listing_Standard.End();
         }
     }

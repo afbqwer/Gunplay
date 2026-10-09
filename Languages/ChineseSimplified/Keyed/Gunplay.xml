@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <GunplayTitle>枪战升级Gunplay</GunplayTitle>
 
@@ -12,5 +12,10 @@
   <GunplayEnableEffectsDesc>显示子弹击中目标的视觉效果（火花四溅等）.</GunplayEnableEffectsDesc>
   <GunplayProjectileSpeedName>子弹速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>将所有子弹的速度调整到指定的百分比(默认300%)</GunplayProjectileSpeedDesc>
+  <GunplayTrailWidthModeDesc>决定子弹轨迹基础宽度的计算方式.</GunplayTrailWidthModeDesc>
+  <GunplayTrailWidthModeDamage>轨迹宽度：基于投射物伤害</GunplayTrailWidthModeDamage>
+  <GunplayTrailWidthModeTexture>轨迹宽度：基于投射物贴图尺寸</GunplayTrailWidthModeTexture>
+  <GunplayTrailWidthFactorName>轨迹宽度倍率</GunplayTrailWidthFactorName>
+  <GunplayTrailWidthFactorDesc>对计算出的轨迹宽度进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayTrailWidthFactorDesc>
 
 </LanguageData>

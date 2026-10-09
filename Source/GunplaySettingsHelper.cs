@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,7 +10,7 @@ namespace Gunplay
 {
     public static class GunplaySettingsHelper
     {
-        public static void SliderLabeled(this Listing_Standard listing, string label, ref float val, string tooltip, float min, float max, string format)
+        public static void SliderLabeled(this Listing_Standard listing, string label, ref float val, string tooltip, float min, float max)
         {
             Rect rect = listing.GetRect(Text.LineHeight);
 
@@ -19,7 +19,7 @@ namespace Gunplay
             Widgets.Label(rect.LeftPart(0.5f), label);
             val = Widgets.HorizontalSlider(rect.RightPart(0.5f).LeftPart(0.8f), val, min, max, true);
             Text.Anchor = TextAnchor.MiddleRight;
-            Widgets.Label(rect.RightPart(0.1f), string.Format(format, val));
+            Widgets.Label(rect.RightPart(0.1f), val.ToStringPercent());
             if (!tooltip.NullOrEmpty()) TooltipHandler.TipRegion(rect, tooltip);
             Text.Anchor = anchor;
 
