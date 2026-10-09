@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Defs>
-  <!-- 全局默认配置包：所有未显式配置、且未命中名称规则的投射物都套用它 -->
+  <!-- 全局默认配置包：所有未显式配置、且未命中名称匹配的投射物都套用它 -->
   <Gunplay.ProjectilePropDef>
     <defName>default</defName>
     
@@ -8,42 +8,62 @@
     <projectileImpactEffect>generic</projectileImpactEffect>
   </Gunplay.ProjectilePropDef>
 
-  <!-- ===== 名称规则目标：由投射物 defName 关键字匹配（见 GunplaySetup.projectileNameRules） ===== -->
+  <!-- ===== 以下配置包通过 matchKeywords 匹配投射物 defName（忽略大小写，多关键字更具体者优先） ===== -->
 
-  <!-- defName 含 "charge" 的投射物（如 Bullet_ChargeRifle） -->
+  <!-- Bullet_ChargeRifle / Bullet_ChargeLance / Bullet_ChargeBlasterHeavy -->
   <Gunplay.ProjectilePropDef>
     <defName>charge</defName>
+    
+    <matchKeywords>
+      <li>charge</li>
+    </matchKeywords>
     
     <trail>charge</trail>
     <!-- projectileImpactEffect 缺省 -> 启动时自动继承 default 的 generic -->
   </Gunplay.ProjectilePropDef>
 
-  <!-- defName 含 "incendiary"（如 Bullet_IncendiaryLauncher） -->
+  <!-- Bullet_IncendiaryLauncher（Bullet_Shell_Incendiary 为弧线，不生成轨迹） -->
   <Gunplay.ProjectilePropDef>
     <defName>incendiary</defName>
+    
+    <matchKeywords>
+      <li>incendiary</li>
+    </matchKeywords>
     
     <trail>incendiary</trail>
     <!-- 沿袭原 Gun_IncendiaryLauncher 的 preserveSpeed=true 语义 -->
     <preserveSpeed>true</preserveSpeed>
   </Gunplay.ProjectilePropDef>
 
-  <!-- defName 含 "smoke"（如 Bullet_SmokeLauncher） -->
+  <!-- Bullet_SmokeLauncher（Bullet_Shell_Smoke 为弧线，不生成轨迹） -->
   <Gunplay.ProjectilePropDef>
     <defName>medium</defName>
+    
+    <matchKeywords>
+      <li>smoke</li>
+    </matchKeywords>
     
     <trail>medium</trail>
   </Gunplay.ProjectilePropDef>
 
-  <!-- defName 含 "shotgun"（如 Bullet_Shotgun） -->
+  <!-- Bullet_Shotgun / Bullet_MiniShotgun -->
   <Gunplay.ProjectilePropDef>
     <defName>wide</defName>
+    
+    <matchKeywords>
+      <li>shotgun</li>
+    </matchKeywords>
     
     <trail>wide</trail>
   </Gunplay.ProjectilePropDef>
 
-  <!-- defName 含 "arrow"（如 Arrow_Recurve / Proj_FireArrow） -->
+  <!-- Arrow_Recurve / Arrow_Short / Arrow_Great / Proj_FireArrow -->
   <Gunplay.ProjectilePropDef>
     <defName>arrow</defName>
+    
+    <matchKeywords>
+      <li>arrow</li>
+    </matchKeywords>
     
     <!-- trail 缺省 -> 继承 default 的 default 轨迹（与原弓配置一致） -->
     <projectileImpactSound>arrow</projectileImpactSound>

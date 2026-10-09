@@ -19,21 +19,6 @@ namespace Gunplay
         static Dictionary<ThingDef, ProjectilePropDef> projectilePropMap = new Dictionary<ThingDef, ProjectilePropDef>();
         static ProjectilePropDef defaultProjectileDef = DefDatabase<ProjectilePropDef>.GetNamed("default", false);
 
-        // 名称匹配规则：投射物 defName 含 keyword（忽略大小写）→ 对应 ProjectilePropDef。
-        // 按顺序匹配，首个命中生效。这是唯一的扩展点：加规则只需加一行 + 补一个 ProjectilePropDef。
-        static readonly (string keyword, string propDefName)[] projectileNameRules =
-        {
-            ("charge", "charge"),         // Bullet_ChargeRifle / ChargeLance / ChargeBlasterHeavy
-            ("incendiary", "incendiary"), // Bullet_IncendiaryLauncher（Bullet_Shell_Incendiary 为弧线，不生成轨迹）
-            ("smoke", "medium"),          // Bullet_SmokeLauncher（Bullet_Shell_Smoke 为弧线，不生成轨迹）
-            ("shotgun", "wide"),          // Bullet_Shotgun / Bullet_MiniShotgun
-            ("arrow", "arrow"),           // Arrow_Recurve / Arrow_Short / Arrow_Great / Proj_FireArrow
-        };
-
-        // 启动时把 propDefName 解析为 ProjectilePropDef，运行期只做字符串 contains。
-        static readonly List<(string keyword, ProjectilePropDef prop)> resolvedProjectileRules
-            = new List<(string keyword, ProjectilePropDef prop)>();
-
         static GunplaySetup()
         {
             var harmony = new Harmony("com.github.automatic1111.gunplay");
@@ -87,7 +72,7 @@ namespace Gunplay
         {
             if (defaultProjectileDef == null)
             {
-                Log.Error("[Gunplay] 缺少 ProjectilePropDef 'default'，投射物轨迹/命中特效已禁用。");
+                Log.Error("[Gunplay] Missing ProjectilePropDef 'default'; projectile trails and impact effects are disabled.");
                 return;
             }
 
@@ -113,17 +98,16 @@ namespace Gunplay
                 if (def.projectileImpactSound == null) def.projectileImpactSound = defaultProjectileDef.projectileImpactSound;
             }
 
-            // 3) 解析名称规则
-            foreach (var (keyword, propDefName) in projectileNameRules)
-            {
-                ProjectilePropDef prop = DefDatabase<ProjectilePropDef>.GetNamed(propDefName, false);
-                if (prop == null)
-                {
-                    Log.Warning("[Gunplay] 投射物规则 '" + keyword + "' 指向的 ProjectilePropDef '" + propDefName + "' 不存在，已跳过。");
-                    continue;
-                }
-                resolvedProjectileRules.Add((keyword, prop));
-            }
+            // 3) 收集名称匹配规则（来自 ProjectilePropDef.matchKeywords，即 XML 声明）
+            //    关键字更长者优先匹配，因此更具体的关键字总能胜出（即：更长者会“覆盖”更短者）。
+            List<(string keyword, ProjectilePropDef prop)> rules =
+                (from def in DefDatabase<ProjectilePropDef>.AllDefs
+                 where def.matchKeywords != null
+                 from keyword in def.matchKeywords
+                 where !string.IsNullOrEmpty(keyword)
+                 select (keyword, prop: def))
+                .OrderByDescending(r => r.keyword.Length)
+                .ToList();
 
             // 4) 扫描全部投射物：未显式配置者按名称规则，仍未命中者套 default
             foreach (ThingDef def in DefDatabase<ThingDef>.AllDefs)
@@ -131,20 +115,37 @@ namespace Gunplay
                 if (def.projectile == null) continue;
                 if (projectilePropMap.ContainsKey(def)) continue;
 
-                ProjectilePropDef prop = null;
+                // 收集 defName 命中的全部关键字；若命中多个，则更短者被更长者覆盖，需要报错提示。
+                ProjectilePropDef matched = null;
+                string winnerKeyword = null;
+                List<string> shadowed = null;
+
                 if (def.defName != null)
                 {
-                    foreach (var (keyword, ruleProp) in resolvedProjectileRules)
+                    foreach (var rule in rules)
                     {
-                        if (def.defName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                        if (def.defName.IndexOf(rule.keyword, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                        if (matched == null)
                         {
-                            prop = ruleProp;
-                            break;
+                            matched = rule.prop;
+                            winnerKeyword = rule.keyword;
+                        }
+                        else if (!string.Equals(rule.keyword, winnerKeyword, StringComparison.OrdinalIgnoreCase))
+                        {
+                            (shadowed ?? (shadowed = new List<string>())).Add(rule.keyword);
                         }
                     }
                 }
 
-                projectilePropMap[def] = prop ?? defaultProjectileDef;
+                if (shadowed != null)
+                {
+                    Log.Warning("[Gunplay] Projectile '" + def.defName + "' matched multiple name-match keywords. "
+                        + "The longer keyword '" + winnerKeyword + "' wins; overridden keyword(s): '"
+                        + string.Join("', '", shadowed) + "'. Adjust ProjectilePropDef.matchKeywords to remove the ambiguity.");
+                }
+
+                projectilePropMap[def] = matched ?? defaultProjectileDef;
             }
         }
 
