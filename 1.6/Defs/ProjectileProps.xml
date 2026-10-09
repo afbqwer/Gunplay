@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+  <!-- 全局默认配置包：所有未显式配置、且未命中名称规则的投射物都套用它 -->
+  <Gunplay.ProjectilePropDef>
+    <defName>default</defName>
+    
+    <trail>default</trail>
+    <projectileImpactEffect>generic</projectileImpactEffect>
+  </Gunplay.ProjectilePropDef>
+
+  <!-- ===== 名称规则目标：由投射物 defName 关键字匹配（见 GunplaySetup.projectileNameRules） ===== -->
+
+  <!-- defName 含 "charge" 的投射物（如 Bullet_ChargeRifle） -->
+  <Gunplay.ProjectilePropDef>
+    <defName>charge</defName>
+    
+    <trail>charge</trail>
+    <!-- projectileImpactEffect 缺省 -> 启动时自动继承 default 的 generic -->
+  </Gunplay.ProjectilePropDef>
+
+  <!-- defName 含 "incendiary"（如 Bullet_IncendiaryLauncher） -->
+  <Gunplay.ProjectilePropDef>
+    <defName>incendiary</defName>
+    
+    <trail>incendiary</trail>
+    <!-- 沿袭原 Gun_IncendiaryLauncher 的 preserveSpeed=true 语义 -->
+    <preserveSpeed>true</preserveSpeed>
+  </Gunplay.ProjectilePropDef>
+
+  <!-- defName 含 "smoke"（如 Bullet_SmokeLauncher） -->
+  <Gunplay.ProjectilePropDef>
+    <defName>medium</defName>
+    
+    <trail>medium</trail>
+  </Gunplay.ProjectilePropDef>
+
+  <!-- defName 含 "shotgun"（如 Bullet_Shotgun） -->
+  <Gunplay.ProjectilePropDef>
+    <defName>wide</defName>
+    
+    <trail>wide</trail>
+  </Gunplay.ProjectilePropDef>
+
+  <!-- defName 含 "arrow"（如 Arrow_Recurve / Proj_FireArrow） -->
+  <Gunplay.ProjectilePropDef>
+    <defName>arrow</defName>
+    
+    <!-- trail 缺省 -> 继承 default 的 default 轨迹（与原弓配置一致） -->
+    <projectileImpactSound>arrow</projectileImpactSound>
+    <projectileImpactEffect>arrow</projectileImpactEffect>
+  </Gunplay.ProjectilePropDef>
+</Defs>

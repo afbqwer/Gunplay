@@ -46,26 +46,28 @@ namespace Gunplay.Patch
                 comp.RotationOffset = (angle + 180) % 360 - 180;
             }
 
-            GunPropDef prop = GunplaySetup.GunProp(equipment);
-            if (launcher as Pawn != null && prop != null)
+            // 枪口前移仍由武器侧 barrelLength 决定
+            GunPropDef gunProp = GunplaySetup.GunProp(equipment);
+            if (launcher as Pawn != null && gunProp != null)
             {
-                ___origin += (___destination - ___origin).normalized * prop.barrelLength;
+                ___origin += (___destination - ___origin).normalized * gunProp.barrelLength;
                 ___ticksToImpact = Mathf.CeilToInt((float) StartingTicksToImpactProp.GetValue(__instance));
                 if (___ticksToImpact < 1) ___ticksToImpact = 1;
             }
 
-            if (Gunplay.settings.enableTrails && __instance.def.projectile.arcHeightFactor <= 0.1f)
+            // 轨迹由投射物 def 决定（与发射武器无关）
+            if (Gunplay.settings.enableTrails && !ProjectileRules.IsArcing(__instance.def))
             {
-                // GunProp(Thing) 对任何有 def 的装备都有默认回退，故 prop == null ⟺ 无武器投射物
-                bool unarmed = prop == null;
+                // 无武器判定口径 = equipment 为 null（Launch 体内执行完后等价于 EquipmentDef == null）
+                bool unarmed = equipment == null;
                 if (!unarmed || UnarmedEffectsAllowed(__instance))
                 {
                     // 投射物在 Launch 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
                     Map map = __instance.Map ?? launcher?.Map;
-                    GunPropDef trailProp = prop ?? GunplaySetup.DefaultProp;
-                    if (map != null && trailProp?.trail != null)
+                    ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
+                    if (map != null && prop?.trail != null)
                     {
-                        ProjectileTrail trail = GenSpawn.Spawn(trailProp.trail, ___origin.ToIntVec3(), map, WipeMode.Vanish) as ProjectileTrail;
+                        ProjectileTrail trail = GenSpawn.Spawn(prop.trail, ___origin.ToIntVec3(), map, WipeMode.Vanish) as ProjectileTrail;
                         if (trail != null)
                         {
                             trail.Initialize(__instance, ___destination, equipment);
@@ -83,8 +85,11 @@ namespace Gunplay.Patch
     {
         static float Postfix(float value, Projectile __instance)
         {
-            GunPropDef prop = GunplaySetup.GunProp(__instance.EquipmentDef);
-            if (prop == null || prop.preserveSpeed) return value;
+            ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def);
+            if (prop != null && prop.preserveSpeed) return value;
+
+            // 独立排除机制：弧线投射物（手雷/炮弹）不受全局速度缩放影响
+            if (!ProjectileRules.ShouldScaleSpeed(__instance.def)) return value;
 
             return value / Gunplay.settings.projectileSpeed;
         }
@@ -106,8 +111,8 @@ namespace Gunplay.Patch
             // 无武器投射物受独立开关控制（与轨迹开关保持同一判定口径）
             if (__instance.EquipmentDef == null && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
 
-            // 无发射者/无装备的投射物（EquipmentDef 为 null 或未配置）回退到默认属性
-            GunPropDef prop = GunplaySetup.GunProp(__instance.EquipmentDef) ?? GunplaySetup.DefaultProp;
+            // 命中特效/音效由投射物 def 决定
+            ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
             if (prop == null) return;
 
             MaterialKind kind = MaterialKind.None;

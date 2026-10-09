@@ -34,9 +34,7 @@
     <Gunplay.GunPropDef>
         <defName>default</defName>
     
-        <trail>default</trail>
         <barrelLength>1.5</barrelLength>
-        <projectileImpactEffect>generic</projectileImpactEffect>
     </Gunplay.GunPropDef>
 
     <Gunplay.GunPropDef>
@@ -61,65 +59,11 @@
     </Gunplay.GunPropDef>
     
     
-    <Gunplay.GunPropDef>
-        <defName>Gun_ChargeRifle</defName>
-        
-        <trail>charge</trail>
-    </Gunplay.GunPropDef>
-    
-    <Gunplay.GunPropDef>
-        <defName>Gun_ChargeLance</defName>
-        
-        <trail>charge</trail>
-    </Gunplay.GunPropDef>
-    
-    <Gunplay.GunPropDef>
-        <defName>Gun_ChargeBlasterHeavy</defName>
-        
-        <trail>charge</trail>
-    </Gunplay.GunPropDef>
-
-    <Gunplay.GunPropDef>
-        <defName>Gun_IncendiaryLauncher</defName>
-        
-        <preserveSpeed>true</preserveSpeed>
-        <trail>incendiary</trail>
-    </Gunplay.GunPropDef>
-    
-    
-    <Gunplay.GunPropDef>
-        <defName>Gun_SmokeLauncher</defName>
-        
-        <trail>medium</trail>
-    </Gunplay.GunPropDef>
-    
-    <Gunplay.GunPropDef>
-        <defName>Gun_PumpShotgun</defName>
-        
-        <trail>wide</trail>
-    </Gunplay.GunPropDef>
-    
-    <Gunplay.GunPropDef>
-        <defName>Gun_ChainShotgun</defName>
-        
-        <trail>wide</trail>
-    </Gunplay.GunPropDef>
-    
     <Gunplay.GunPropDef Name="GunplayArrow" Abstract="True">
         <bow>
             <stretchHorizontal>0.45</stretchHorizontal>
             <stretchVertical>-0.25</stretchVertical>
         </bow>
-        <projectileImpactSound>arrow</projectileImpactSound>
-        <projectileImpactEffect>arrow</projectileImpactEffect>
-    </Gunplay.GunPropDef>
-    
-    <Gunplay.GunPropDef ParentName="GunplayArrow">
-        <defName>Bow_Recurve</defName>
-    </Gunplay.GunPropDef>
-    
-    <Gunplay.GunPropDef ParentName="GunplayArrow">
-        <defName>Bow_Short</defName>
     </Gunplay.GunPropDef>
     
     <Gunplay.GunPropDef ParentName="GunplayArrow">
