@@ -46,7 +46,8 @@ namespace Gunplay
 
             foreach (ThingDef def in DefDatabase<ThingDef>.AllDefs)
             {
-                VerbProperties shoot = def.Verbs.FirstOrDefault(v => typeof(Verb_Shoot).IsAssignableFrom(v.verbClass));
+                VerbProperties shoot = def.Verbs.FirstOrDefault(v => 
+                typeof(Verb_Shoot).IsAssignableFrom(v.verbClass));
                 if (shoot == null) continue;
                 if (!propMap.ContainsKey(def)) propMap[def] = defaultDef;
 

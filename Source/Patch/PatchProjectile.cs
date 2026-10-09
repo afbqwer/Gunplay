@@ -1,8 +1,9 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -18,7 +19,14 @@ namespace Gunplay.Patch
     {
         static PropertyInfo StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        static void Postfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
+        static readonly ConditionalWeakTable<Projectile, ProjectileTrail> trails = new ConditionalWeakTable<Projectile, ProjectileTrail>();
+
+        public static bool TryGetTrail(Projectile proj, out ProjectileTrail trail)
+        {
+            return trails.TryGetValue(proj, out trail);
+        }
+
+        public static void Postfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
         {
             GunPropDef prop = GunplaySetup.GunProp(equipment);
             if (prop == null) return;
@@ -40,10 +48,12 @@ namespace Gunplay.Patch
                 if (___ticksToImpact < 1) ___ticksToImpact = 1;
             }
 
-            if (Gunplay.settings.enableTrails && launcher?.Map!=null)
+            if (Gunplay.settings.enableTrails && launcher?.Map != null && __instance.def.projectile.arcHeightFactor <= 0.1f)
             {
                 ProjectileTrail trail = GenSpawn.Spawn(prop.trail, ___origin.ToIntVec3(), launcher.Map, WipeMode.Vanish) as ProjectileTrail;
                 trail.Initialize(__instance, ___destination, equipment);
+                trails.Remove(__instance);
+                trails.Add(__instance, trail);
             }
         }
     }
@@ -68,6 +78,10 @@ namespace Gunplay.Patch
         {
             Map map = __instance.Map;
             if (map == null) return;
+
+            // Impact 在 Destroy 之前执行，此时投射物仍存活，取到的就是最终落点
+            if (PatchProjectileLaunch.TryGetTrail(__instance, out ProjectileTrail trail))
+                trail.CaptureFinalPosition(__instance.ExactPosition);
 
             GunPropDef prop = GunplaySetup.GunProp(__instance.EquipmentDef);
             if (prop == null) return;

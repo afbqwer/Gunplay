@@ -5,3 +5,5 @@ Source/obj
 0Harmony.xml
 /packages
 /_PublisherPlus.xml
+*.dds
+*.code-workspace

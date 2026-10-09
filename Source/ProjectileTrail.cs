@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,6 +22,9 @@ namespace Gunplay
         Vector3 dir;
         float length;
         float width;
+        float traveled;
+        float altitude;
+        float ticksPerLength;
 
         public void Initialize(Projectile proj, Vector3 destination, Thing equipment)
         {
@@ -30,17 +33,20 @@ namespace Gunplay
             projectile = proj;
             a = projectile.ExactPosition;
             Vector3 b = destination;
-            a.y = b.y = proj.def.Altitude;
+            altitude = proj.def.Altitude;
+            a.y = b.y = altitude;
             speed = proj.def.projectile.SpeedTilesPerTick;
             exactPosition = a;
+            previousPosition = a;
+            traveled = 0f;
 
             length = speed * 15f;
+            ticksPerLength = speed > 0f ? length / speed : 0f;
             dir = (b - a).normalized;
-            width = proj.DamageAmount * 0.006f;
-
+            width = Mathf.Min(proj.DamageAmount, 50f) * 0.006f;
 
             ProjectileTrailDef trailDef = def as ProjectileTrailDef;
-            if(trailDef != null && trailDef.trailWidth != -1) width = trailDef.trailWidth;
+            if (trailDef != null && trailDef.trailWidth != -1) width = trailDef.trailWidth;
         }
 
 
@@ -50,10 +56,16 @@ namespace Gunplay
 
             Scribe_References.Look(ref projectile, "projectile");
             Scribe_Values.Look(ref a, "a");
+            Scribe_Values.Look(ref exactPosition, "exactPosition");
+            Scribe_Values.Look(ref previousPosition, "previousPosition");
             Scribe_Values.Look(ref speed, "speed");
             Scribe_Values.Look(ref dir, "dir");
+            Scribe_Values.Look(ref length, "length");
             Scribe_Values.Look(ref width, "width");
-            Scribe_Values.Look(ref exactPosition, "exactPosition");
+            Scribe_Values.Look(ref traveled, "traveled");
+            Scribe_Values.Look(ref altitude, "altitude");
+            Scribe_Values.Look(ref ticksPerLength, "ticksPerLength");
+            Scribe_Values.Look(ref ticksIdle, "ticksIdle");
             Scribe_Values.Look(ref ticksUtilDeath, "ticksUtilDeath");
         }
 
@@ -65,66 +77,80 @@ namespace Gunplay
             }
         }
 
-        float TicksPerLength => length / speed;
+        void ApplyPosition(Vector3 pos)
+        {
+            pos.y = altitude;
+            Vector3 delta = pos - previousPosition;
+            if (delta.sqrMagnitude > 0.000001f)
+            {
+                traveled += delta.magnitude;
+                dir = delta.normalized;
+            }
+            else
+            {
+                ticksIdle++;
+            }
+            exactPosition = pos;
+        }
 
-        public override void Tick()
+        public void CaptureFinalPosition(Vector3 pos)
+        {
+            if (projectile == null) return;
+
+            ApplyPosition(pos);
+            projectile = null;
+            ticksUtilDeath = Mathf.CeilToInt(ticksPerLength);
+        }
+
+        protected override void Tick()
         {
             base.Tick();
 
             if (projectile != null)
             {
-                exactPosition = projectile.ExactPosition;
-                exactPosition.y = projectile.def.Altitude;
-
-                if (projectile.Destroyed || (ticksUtilDeath == -1 && ticksIdle>10 && previousPosition == exactPosition))
+                if (projectile.Destroyed || (ticksUtilDeath == -1 && ticksIdle > 10))
                 {
                     projectile = null;
-                    ticksUtilDeath = Mathf.CeilToInt(TicksPerLength);
+                    ticksUtilDeath = Mathf.CeilToInt(ticksPerLength);
+                }
+                else
+                {
+                    // 只在投射物存活时读取位置；销毁后不再访问它
+                    ApplyPosition(projectile.ExactPosition);
                 }
             }
 
-            if (previousPosition == exactPosition)
-                ticksIdle++;
-
             previousPosition = exactPosition;
 
-            Position = exactPosition.ToIntVec3();
+            IntVec3 cell = exactPosition.ToIntVec3();
+            if (cell != Position)
+                Position = cell;
 
             if (ticksUtilDeath > 0)
                 ticksUtilDeath--;
-            else if(ticksUtilDeath == 0)
+            else if (ticksUtilDeath == 0)
                 Destroy(DestroyMode.Vanish);
         }
 
         protected override void DrawAt(Vector3 drawLoc, bool flip = false)
         {
-            float traveled = (a - exactPosition).magnitude;
-            float len;
-            Vector3 drawPos;
-            if (traveled < length)
+            if (length <= 0f || dir.sqrMagnitude < 0.000001f)
             {
-                len = traveled;
-                if (ticksUtilDeath == -1)
-                {
-                    drawPos = (a + exactPosition) / 2;
-                }
-                else
-                {
-                    len *= ticksUtilDeath / TicksPerLength;
-                    drawPos = exactPosition - dir * len / 2;
-                }
-            }
-            else if (ticksUtilDeath != -1)
-            {
-                len = length * ticksUtilDeath / TicksPerLength;
-                drawPos = exactPosition - dir * len / 2;
-            }
-            else
-            {
-                len = length;
-                drawPos = exactPosition - dir * len / 2;
+                Comps_PostDraw();
+                return;
             }
 
+            float len = Mathf.Min(traveled, length);
+            if (ticksUtilDeath != -1)
+                len *= ticksUtilDeath / ticksPerLength;
+
+            if (len <= 0f)
+            {
+                Comps_PostDraw();
+                return;
+            }
+
+            Vector3 drawPos = exactPosition - dir * len / 2;
             Vector3 drawingScale = new Vector3(width, 1f, len);
             drawingMatrix.SetTRS(drawPos, Quaternion.LookRotation(dir), drawingScale);
             Graphics.DrawMesh(MeshPool.plane10, drawingMatrix, Graphic.MatSingle, 0);
