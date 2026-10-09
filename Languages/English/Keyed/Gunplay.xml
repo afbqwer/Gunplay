@@ -10,6 +10,10 @@
   <GunplayEnableWeaponAnimationsDesc>Animate weapons like miniguns and bows, and also animate weapon movement for pawns missing their targets.</GunplayEnableWeaponAnimationsDesc>
   <GunplayEnableEffectsName>Enable effects</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>Show visual effects for projectiles impacting targets.</GunplayEnableEffectsDesc>
+  <GunplayShowPuffsName>Show dust puffs</GunplayShowPuffsName>
+  <GunplayShowPuffsDesc>Show dust and smoke puffs spawned when projectiles impact surfaces.</GunplayShowPuffsDesc>
+  <GunplayParticleMultiplierName>Impact particle multiplier</GunplayParticleMultiplierName>
+  <GunplayParticleMultiplierDesc>Multiplies the number of particles spawned by impact effects. Default 100%, range 5% to 400%, in 5% steps.</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedName>Projectile speed</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>Alter speed to specified percentage for all projectiles.</GunplayProjectileSpeedDesc>
   <GunplayTrailWidthModeDesc>Determines how the base trail width is calculated.</GunplayTrailWidthModeDesc>

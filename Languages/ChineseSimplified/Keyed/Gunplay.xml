@@ -10,6 +10,10 @@
   <GunplayEnableWeaponAnimationsDesc>1.更改部分武器贴图2.当小人使用速射机枪和弓箭一类武器射击目标时加上动画（弓箭蓄力和转轮机枪旋转）</GunplayEnableWeaponAnimationsDesc>
   <GunplayEnableEffectsName>显示视觉效果</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>显示子弹击中目标的视觉效果（火花四溅等）.</GunplayEnableEffectsDesc>
+  <GunplayShowPuffsName>显示尘云</GunplayShowPuffsName>
+  <GunplayShowPuffsDesc>子弹击中地面或物体时显示扬起的尘土和烟雾.</GunplayShowPuffsDesc>
+  <GunplayParticleMultiplierName>命中粒子数量倍率</GunplayParticleMultiplierName>
+  <GunplayParticleMultiplierDesc>对命中特效生成的粒子数量进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedName>子弹速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>将所有子弹的速度调整到指定的百分比(默认300%)</GunplayProjectileSpeedDesc>
   <GunplayTrailWidthModeDesc>决定子弹轨迹基础宽度的计算方式.</GunplayTrailWidthModeDesc>

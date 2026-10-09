@@ -10,6 +10,10 @@
   <GunplayEnableWeaponAnimationsDesc>ガトリングや弓のような武器の挙動をアニメ化したり、目標を外したポーンの持つ武器の動きなどもアニメ化します。</GunplayEnableWeaponAnimationsDesc>
   <GunplayEnableEffectsName>視覚効果を有効</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>目標に影響する発射体の視覚的な効果を表示します。</GunplayEnableEffectsDesc>
+  <GunplayShowPuffsName>土煙を表示</GunplayShowPuffsName>
+  <GunplayShowPuffsDesc>発射体が地面や物体に命中した際の土煙を表示します。</GunplayShowPuffsDesc>
+  <GunplayParticleMultiplierName>命中パーティクル数の倍率</GunplayParticleMultiplierName>
+  <GunplayParticleMultiplierDesc>命中エフェクトで発生するパーティクル数の倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedName>発射体速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>全種類の発射体の飛翔速度を指定したパーセンテージに変更します。</GunplayProjectileSpeedDesc>
   <GunplayTrailWidthModeDesc>弾道の基本幅の計算方法を指定します。</GunplayTrailWidthModeDesc>

@@ -63,6 +63,8 @@ namespace Gunplay
                     if (prop.bow != null) def.comps.Add(prop.bow);
                 }
             }
+
+            ImpactEffectTuner.Apply();
         }
 
         public static GunPropDef GunProp(ThingDef equipment)
