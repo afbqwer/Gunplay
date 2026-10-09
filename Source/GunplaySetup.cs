@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿﻿using Gunplay.Patch;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,6 +24,10 @@ namespace Gunplay
         {
             var harmony = new Harmony("com.github.automatic1111.gunplay");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+            // CE 软兼容（反射，无硬依赖）：CE 的 ProjectileCE 不继承原版 Projectile，
+            // 需要把轨迹与命中特效/音效补到 CE 自己的方法上；未安装 CE 时自动跳过
+            PatchCECompat.TryPatch(harmony);
 
             foreach (ProjectileTrailDef def in DefDatabase<ProjectileTrailDef>.AllDefs)
             {

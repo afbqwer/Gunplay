@@ -21,6 +21,8 @@
   <GunplayTrailWidthModeTexture>弾道の幅：発射体のテクスチャサイズに基づく</GunplayTrailWidthModeTexture>
   <GunplayTrailWidthFactorName>弾道の幅の倍率</GunplayTrailWidthFactorName>
   <GunplayTrailWidthFactorDesc>計算された弾道の幅に対する倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayTrailWidthFactorDesc>
+  <GunplayCEStraightTrailsName>CE発射体の直線弾道</GunplayCEStraightTrailsName>
+  <GunplayCEStraightTrailsDesc>Combat Extendedの発射体に直線の弾道を描画します。曲射される発射体（迫撃砲弾・擲弾など）には弾道を表示しません。無効にすると、全てのCE発射体の弾道が実際の飛翔経路に沿った弧状で描画されます。</GunplayCEStraightTrailsDesc>
   <GunplayUnarmedEffectsName>武器なしの発射体にエフェクトを表示</GunplayUnarmedEffectsName>
   <GunplayUnarmedEffectsDesc>武器なしで発射された発射体（タレットの射撃やスクリプト生成物など）に弾道と着弾音/エフェクトを追加します。</GunplayUnarmedEffectsDesc>
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>

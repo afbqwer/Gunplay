@@ -19,15 +19,22 @@ namespace Gunplay.Patch
     {
         static PropertyInfo StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        static readonly ConditionalWeakTable<Projectile, ProjectileTrail> trails = new ConditionalWeakTable<Projectile, ProjectileTrail>();
+        // 原版 Projectile 与 CE 的 ProjectileCE 都可作为键（后者不是 Projectile 子类）
+        static readonly ConditionalWeakTable<Thing, ProjectileTrail> trails = new ConditionalWeakTable<Thing, ProjectileTrail>();
 
-        public static bool TryGetTrail(Projectile proj, out ProjectileTrail trail)
+        public static bool TryGetTrail(Thing proj, out ProjectileTrail trail)
         {
             return trails.TryGetValue(proj, out trail);
         }
 
+        internal static void RegisterTrail(Thing proj, ProjectileTrail trail)
+        {
+            trails.Remove(proj);
+            trails.Add(proj, trail);
+        }
+
         // 无武器投射物的特效开关：总开关 + 仅子弹伤害过滤
-        internal static bool UnarmedEffectsAllowed(Projectile projectile)
+        internal static bool UnarmedEffectsAllowed(Thing projectile)
         {
             if (!Gunplay.settings.unarmedProjectileEffects) return false;
             if (Gunplay.settings.unarmedOnlyBullets && projectile.def.projectile.damageDef != RimWorld.DamageDefOf.Bullet) return false;
@@ -73,8 +80,7 @@ namespace Gunplay.Patch
                         if (trail != null)
                         {
                             trail.Initialize(__instance, ___destination, equipment);
-                            trails.Remove(__instance);
-                            trails.Add(__instance, trail);
+                            RegisterTrail(__instance, trail);
                         }
                     }
                 }
@@ -113,8 +119,17 @@ namespace Gunplay.Patch
             // 无武器投射物受独立开关控制（与轨迹开关保持同一判定口径）
             if (__instance.EquipmentDef == null && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
 
+            PlayImpactEffects(__instance, hitThing, ___origin.ToIntVec3());
+        }
+
+        // 命中特效/音效。原版与 CE 兼容补丁（PatchCECompat）共用；
+        // originCell 为发射点所在格，仅作为特效触发参考。
+        internal static void PlayImpactEffects(Thing projectile, Thing hitThing, IntVec3 originCell)
+        {
+            Map map = projectile.Map;
+
             // 命中特效/音效由投射物 def 决定
-            ProjectilePropDef prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
+            ProjectilePropDef prop = GunplaySetup.ProjectileProp(projectile.def) ?? GunplaySetup.DefaultProjectileProp;
             if (prop == null) return;
 
             MaterialKind kind = MaterialKind.None;
@@ -124,15 +139,16 @@ namespace Gunplay.Patch
                 kind = MaterialKindGetter.Get(hitThing);
             }
 
-            if(kind == MaterialKind.None)
+            if (kind == MaterialKind.None)
             {
-                TerrainDef terrainDef = map.terrainGrid.TerrainAt(CellIndicesUtility.CellToIndex(__instance.Position, map.Size.x));
+                TerrainDef terrainDef = map.terrainGrid.TerrainAt(CellIndicesUtility.CellToIndex(projectile.Position, map.Size.x));
                 kind = MaterialKindGetter.Get(terrainDef);
             }
 
-            if (Gunplay.settings.enableSounds) {
+            if (Gunplay.settings.enableSounds)
+            {
                 SoundDef sound = prop.projectileImpactSound == null ? null : prop.projectileImpactSound.Effect(kind);
-                if (sound != null) sound.PlayOneShot(new TargetInfo(__instance.Position, map, false));
+                if (sound != null) sound.PlayOneShot(new TargetInfo(projectile.Position, map, false));
             }
 
             if (Gunplay.settings.enableEffects)
@@ -141,7 +157,7 @@ namespace Gunplay.Patch
                 if (effecterDef != null)
                 {
                     Effecter effecter = new Effecter(effecterDef);
-                    effecter.Trigger(__instance, new TargetInfo(___origin.ToIntVec3(), __instance.Map));
+                    effecter.Trigger(projectile, new TargetInfo(originCell, map));
                     effecter.Cleanup();
                 }
             }

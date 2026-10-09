@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Gunplay.Patch;
 using UnityEngine;
 using Verse;
 
@@ -27,6 +28,7 @@ namespace Gunplay
         public float projectileSpeed = 3f;
         public TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
         public float trailWidthFactor = 1f;
+        public bool ceStraightTrails = true;
 
 
         override public void ExposeData()
@@ -42,6 +44,7 @@ namespace Gunplay
             Scribe_Values.Look(ref projectileSpeed, "projectileSpeed");
             Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
             Scribe_Values.Look(ref trailWidthFactor, "trailWidthFactor", 1f);
+            Scribe_Values.Look(ref ceStraightTrails, "ceStraightTrails", true);
         }
 
         public void DoSettingsWindowContents(Rect inRect)
@@ -78,6 +81,13 @@ namespace Gunplay
                 trailWidthFactor = Mathf.Round(trailWidthFactor * 20f) / 20f;
                 listing_Standard.SliderLabeled("GunplayTrailWidthFactorName".Translate(), ref trailWidthFactor, "GunplayTrailWidthFactorDesc".Translate(), 0.05f, 4f);
                 trailWidthFactor = Mathf.Round(trailWidthFactor * 20f) / 20f;
+
+                // 仅在显示轨迹且检测到 CE（兼容补丁挂载成功）时显示
+                if (PatchCECompat.Enabled)
+                {
+                    listing_Standard.Gap(4f);
+                    listing_Standard.CheckboxLabeled("GunplayCEStraightTrailsName".Translate(), ref ceStraightTrails, "GunplayCEStraightTrailsDesc".Translate());
+                }
             }
 
             listing_Standard.End();

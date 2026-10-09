@@ -21,6 +21,8 @@
   <GunplayTrailWidthModeTexture>轨迹宽度：基于投射物贴图尺寸</GunplayTrailWidthModeTexture>
   <GunplayTrailWidthFactorName>轨迹宽度倍率</GunplayTrailWidthFactorName>
   <GunplayTrailWidthFactorDesc>对计算出的轨迹宽度进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayTrailWidthFactorDesc>
+  <GunplayCEStraightTrailsName>CE投射物直线轨迹</GunplayCEStraightTrailsName>
+  <GunplayCEStraightTrailsDesc>为CE（战斗扩展）投射物绘制直线轨迹，抛射类投射物（如迫击炮弹、榴弹）不显示轨迹。关闭后，所有CE投射物的轨迹将跟随其实际飞行路径绘制（弧线样式）。</GunplayCEStraightTrailsDesc>
   <GunplayUnarmedEffectsName>为无武器的投射物产生特效</GunplayUnarmedEffectsName>
   <GunplayUnarmedEffectsDesc>为没有武器发射的投射物（如炮塔射击、脚本生成的投射物）添加子弹轨迹和落地音效/特效.</GunplayUnarmedEffectsDesc>
   <GunplayUnarmedBulletsOnlyName>仅限子弹类无武器投射物</GunplayUnarmedBulletsOnlyName>
