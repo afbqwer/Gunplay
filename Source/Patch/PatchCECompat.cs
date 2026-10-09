@@ -193,10 +193,8 @@ namespace Gunplay.Patch
 
         static void SpawnTrailPostfix(Thing __instance, Thing launcher, Thing equipment)
         {
-            if (!Gunplay.settings.enableTrails) return;
-
-            // 单项覆写可在全局开关之上单独关掉某个投射物的轨迹
-            if (!ProjectileOverrides.AllowsTrail(__instance.def)) return;
+            // 是否绘制（全局开关 + 单项覆写 + XML 是否配了 trail）统一由 ProjectileRules.TrailEnabled 决定
+            if (!ProjectileRules.TrailEnabled(__instance.def)) return;
 
             // 无武器投射物判定口径与原版一致：equipment 为 null
             bool unarmed = equipment == null;

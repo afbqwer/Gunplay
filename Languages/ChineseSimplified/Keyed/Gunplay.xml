@@ -31,6 +31,10 @@
   <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹宽度。覆写值是绝对值，不再乘上面的轨迹宽度倍率.</GunplayProjectileOverridesDesc>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全部 Mod</GunplayOverrideAllMods>
+  <GunplayOverrideTrailFilter>轨迹</GunplayOverrideTrailFilter>
+  <GunplayOverrideTrailFilterAll>不限</GunplayOverrideTrailFilterAll>
+  <GunplayOverrideTrailFilterShown>显示轨迹</GunplayOverrideTrailFilterShown>
+  <GunplayOverrideTrailFilterHidden>不显示轨迹</GunplayOverrideTrailFilterHidden>
   <GunplayOverrideOnlyOverridden>仅显示已覆写</GunplayOverrideOnlyOverridden>
   <GunplayOverrideCount>已覆写 {0} / 共 {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>清除全部覆写</GunplayOverrideClearAll>

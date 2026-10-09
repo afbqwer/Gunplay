@@ -31,6 +31,10 @@
   <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅を個別に指定します。上書きした値は絶対値であり、上記の「弾道の幅の倍率」は適用されません。</GunplayProjectileOverridesDesc>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全てのMod</GunplayOverrideAllMods>
+  <GunplayOverrideTrailFilter>弾道</GunplayOverrideTrailFilter>
+  <GunplayOverrideTrailFilterAll>指定なし</GunplayOverrideTrailFilterAll>
+  <GunplayOverrideTrailFilterShown>弾道あり</GunplayOverrideTrailFilterShown>
+  <GunplayOverrideTrailFilterHidden>弾道なし</GunplayOverrideTrailFilterHidden>
   <GunplayOverrideOnlyOverridden>上書き済みのみ</GunplayOverrideOnlyOverridden>
   <GunplayOverrideCount>上書き {0} / 全 {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>全ての上書きを解除</GunplayOverrideClearAll>

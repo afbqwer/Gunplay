@@ -23,5 +23,20 @@ namespace Gunplay
 
             return !IsArcing(projectileDef); // 弧线投射物（手雷/炮弹）不缩放
         }
+
+        // 该投射物「默认」是否会绘制轨迹：全局开关 + XML 是否配了 trail + 单项覆写没关掉。
+        // 这是「是否显示轨迹」的唯一口径：运行时登记轨迹、覆写窗口的轨迹列与过滤都走这里，
+        // 避免同一件事在三处各写一遍后慢慢跑偏。
+        public static bool TrailEnabled(ThingDef projectileDef)
+        {
+            if (projectileDef == null) return false;
+            if (!Gunplay.settings.enableTrails) return false;
+            if (!ProjectileOverrides.AllowsTrail(projectileDef)) return false;
+
+            // 没解析出 ProjectileTrailDef 的投射物根本不会登记轨迹（见两条 Launch 补丁）
+            ProjectilePropDef prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
+
+            return prop?.trail != null;
+        }
     }
 }

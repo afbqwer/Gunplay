@@ -32,8 +32,9 @@ namespace Gunplay
         const float TrailToggleWidth = 60f;
         const float WidthColumnWidth = 110f;
         const float ModButtonWidth = 220f;
+        const float TrailFilterWidth = 190f;
         const float OnlyOverriddenWidth = 180f;
-        const float CountWidth = 220f;
+        const float CountWidth = 200f;
         const float ClearButtonWidth = 150f;
         const float ScrollbarWidth = 16f;
 
@@ -41,6 +42,14 @@ namespace Gunplay
         const float MaxWidth = 2f;
 
         public override Vector2 InitialSize => new Vector2(1280f, 800f);
+
+        // 轨迹列 / 轨迹过滤的取值口径：三选一
+        enum TrailFilter
+        {
+            Any,      // 不过滤
+            Shown,    // 只看会画轨迹的
+            Hidden    // 只看不画轨迹的
+        }
 
         class Row
         {
@@ -70,10 +79,12 @@ namespace Gunplay
         float truncateWidth = -1f;
 
         string modFilter;               // null = 全部
+        TrailFilter trailFilter = TrailFilter.Any;
         bool onlyOverridden;
         Vector2 scrollPosition;
 
         bool visibleDirty = true;
+        bool visibleKeepScroll;   // 重建列表时是否保留滚动位置（只有开关引发的重建才保留）
         int overriddenInFilter;
 
         public ProjectileOverrideWindow()
@@ -228,6 +239,17 @@ namespace Gunplay
             return value.ToString("0.###");
         }
 
+        // ---------------- 是否显示轨迹 ----------------
+
+        // 一行当前是否显示轨迹。有覆写就以覆写为准，否则取默认情况
+        // （全局开关 + XML 是否配了 trail，见 ProjectileRules.TrailEnabled）。
+        // 轨迹列显示什么、轨迹过滤按什么筛，都只认这个方法，保证两者永远一致。
+        static bool TrailShown(Row row)
+        {
+            ProjectileOverride over = ProjectileOverrides.Get(row.projectile);
+            return over != null ? over.trailEnabled : ProjectileRules.TrailEnabled(row.projectile);
+        }
+
         // ---------------- 过滤 ----------------
 
         void RebuildVisible()
@@ -238,6 +260,7 @@ namespace Gunplay
             foreach (Row row in rows)
             {
                 if (modFilter != null && row.modName != modFilter) continue;
+                if (trailFilter != TrailFilter.Any && TrailShown(row) != (trailFilter == TrailFilter.Shown)) continue;
                 if (onlyOverridden && !ProjectileOverrides.Has(row.projectile)) continue;
                 if (!quickSearch.filter.Matches(row.searchText)) continue;
 
@@ -246,7 +269,7 @@ namespace Gunplay
 
             quickSearch.noResultsMatched = visible.Count == 0;
             visibleDirty = false;
-            scrollPosition.y = 0f;
+            if (!visibleKeepScroll) scrollPosition.y = 0f;
             RecountOverridden();
         }
 
@@ -261,9 +284,17 @@ namespace Gunplay
             overriddenInFilter = count;
         }
 
-        void OnSearchChanged()
+        // keepScroll：由行内开关引发的重建传 true，避免每次点开关都跳回列表顶部；
+        // 过滤条件本身变化时传 false（默认），回到顶部更符合预期。
+        void MarkVisibleDirty(bool keepScroll = false)
         {
             visibleDirty = true;
+            visibleKeepScroll = keepScroll;
+        }
+
+        void OnSearchChanged()
+        {
+            MarkVisibleDirty();
         }
 
         // ---------------- 绘制 ----------------
@@ -300,11 +331,17 @@ namespace Gunplay
             if (Widgets.ButtonText(modRect, modLabel)) OpenModMenu();
             curX += ModButtonWidth + Spacing;
 
+            // 轨迹过滤：按「当前是否显示轨迹」筛（口径见 TrailShown）
+            Rect trailRect = new Rect(curX, rect.y, TrailFilterWidth, rect.height);
+            if (Widgets.ButtonText(trailRect, "GunplayOverrideTrailFilter".Translate() + ": " + TrailFilterLabel()))
+                OpenTrailFilterMenu();
+            curX += TrailFilterWidth + Spacing;
+
             // 仅显示已覆写
             Rect onlyRect = new Rect(curX, rect.y, OnlyOverriddenWidth, rect.height);
             bool before = onlyOverridden;
             Widgets.CheckboxLabeled(onlyRect, "GunplayOverrideOnlyOverridden".Translate(), ref onlyOverridden);
-            if (onlyOverridden != before) visibleDirty = true;
+            if (onlyOverridden != before) MarkVisibleDirty();
             curX += OnlyOverriddenWidth + Spacing;
 
             // 计数
@@ -325,7 +362,7 @@ namespace Gunplay
                 new FloatMenuOption("GunplayOverrideAllMods".Translate(), () =>
                 {
                     modFilter = null;
-                    visibleDirty = true;
+                    MarkVisibleDirty();
                 })
             };
 
@@ -335,11 +372,48 @@ namespace Gunplay
                 options.Add(new FloatMenuOption(captured, () =>
                 {
                     modFilter = captured;
-                    visibleDirty = true;
+                    MarkVisibleDirty();
                 }));
             }
 
             Find.WindowStack.Add(new FloatMenu(options));
+        }
+
+        string TrailFilterLabel()
+        {
+            switch (trailFilter)
+            {
+                case TrailFilter.Shown: return "GunplayOverrideTrailFilterShown".Translate();
+                case TrailFilter.Hidden: return "GunplayOverrideTrailFilterHidden".Translate();
+                default: return "GunplayOverrideTrailFilterAll".Translate();
+            }
+        }
+
+        void OpenTrailFilterMenu()
+        {
+            List<FloatMenuOption> options = new List<FloatMenuOption>();
+
+            foreach (TrailFilter option in new[] { TrailFilter.Any, TrailFilter.Shown, TrailFilter.Hidden })
+            {
+                TrailFilter captured = option;
+                options.Add(new FloatMenuOption(TrailFilterLabelFor(captured), () =>
+                {
+                    trailFilter = captured;
+                    MarkVisibleDirty();
+                }));
+            }
+
+            Find.WindowStack.Add(new FloatMenu(options));
+        }
+
+        static string TrailFilterLabelFor(TrailFilter filter)
+        {
+            switch (filter)
+            {
+                case TrailFilter.Shown: return "GunplayOverrideTrailFilterShown".Translate();
+                case TrailFilter.Hidden: return "GunplayOverrideTrailFilterHidden".Translate();
+                default: return "GunplayOverrideTrailFilterAll".Translate();
+            }
         }
 
         void ConfirmClearAll()
@@ -351,7 +425,7 @@ namespace Gunplay
                 () =>
                 {
                     ProjectileOverrides.Clear();
-                    visibleDirty = true;
+                    MarkVisibleDirty();
                     RebuildVisible();
                 },
                 true));
@@ -425,7 +499,7 @@ namespace Gunplay
 
             ProjectileOverride over = ProjectileOverrides.Get(row.projectile);
             bool overridden = over != null;
-            bool trailOn = over == null || over.trailEnabled;
+            bool trailOn = TrailShown(row);   // 未覆写时是默认情况，不再是恒为勾选
 
             DrawToggle(row, overrideX, y, overridden);
             DrawTrailToggle(row, trailX, y, trailOn);
@@ -456,8 +530,9 @@ namespace Gunplay
             }
 
             RecountOverridden();
-            // 「仅显示已覆写」开启时，取消覆写的行应当立即从列表消失
-            if (onlyOverridden) visibleDirty = true;
+
+            // 过滤生效时该行可能已不符合条件，需要重建列表；此时保留滚动位置，避免跳回顶部
+            if (onlyOverridden || trailFilter != TrailFilter.Any) MarkVisibleDirty(true);
         }
 
         void DrawTrailToggle(Row row, float x, float y, bool trailOn)
@@ -480,7 +555,9 @@ namespace Gunplay
 
             ProjectileOverrides.SetTrailEnabled(row.projectile, state);
             RecountOverridden();
-            if (onlyOverridden) visibleDirty = true;
+
+            // 同上：轨迹过滤生效时该行可能已不符合条件
+            if (onlyOverridden || trailFilter != TrailFilter.Any) MarkVisibleDirty(true);
         }
 
         // 名称单元格：图标 + 上排 label（Small）+ 下排 defName（Tiny 灰色）。
