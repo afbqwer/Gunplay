@@ -21,4 +21,8 @@
   <GunplayTrailWidthModeTexture>Trail width: based on projectile texture size</GunplayTrailWidthModeTexture>
   <GunplayTrailWidthFactorName>Trail width multiplier</GunplayTrailWidthFactorName>
   <GunplayTrailWidthFactorDesc>Multiplies the calculated trail width. Default 100%, range 5% to 400%, in 5% steps.</GunplayTrailWidthFactorDesc>
+  <GunplayUnarmedEffectsName>Effects for weapon-less projectiles</GunplayUnarmedEffectsName>
+  <GunplayUnarmedEffectsDesc>Give projectiles fired without a weapon (turret shots, scripted projectiles) bullet trails and impact sounds/effects.</GunplayUnarmedEffectsDesc>
+  <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
+  <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
 </LanguageData>

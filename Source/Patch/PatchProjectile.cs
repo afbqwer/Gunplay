@@ -26,12 +26,17 @@ namespace Gunplay.Patch
             return trails.TryGetValue(proj, out trail);
         }
 
+        // 无武器投射物的特效开关：总开关 + 仅子弹伤害过滤
+        internal static bool UnarmedEffectsAllowed(Projectile projectile)
+        {
+            if (!Gunplay.settings.unarmedProjectileEffects) return false;
+            if (Gunplay.settings.unarmedOnlyBullets && projectile.def.projectile.damageDef != RimWorld.DamageDefOf.Bullet) return false;
+            return true;
+        }
+
         public static void Postfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
         {
-            GunPropDef prop = GunplaySetup.GunProp(equipment);
-            if (prop == null) return;
-
-            CompGun comp = equipment.TryGetComp<CompGun>();
+            CompGun comp = equipment?.TryGetComp<CompGun>();
             if (comp != null)
             {
                 float angle = (___destination - ___origin).AngleFlat() - (intendedTarget.CenterVector3 - ___origin).AngleFlat();
@@ -41,19 +46,34 @@ namespace Gunplay.Patch
                 comp.RotationOffset = (angle + 180) % 360 - 180;
             }
 
-            if (launcher as Pawn != null)
+            GunPropDef prop = GunplaySetup.GunProp(equipment);
+            if (launcher as Pawn != null && prop != null)
             {
                 ___origin += (___destination - ___origin).normalized * prop.barrelLength;
                 ___ticksToImpact = Mathf.CeilToInt((float) StartingTicksToImpactProp.GetValue(__instance));
                 if (___ticksToImpact < 1) ___ticksToImpact = 1;
             }
 
-            if (Gunplay.settings.enableTrails && launcher?.Map != null && __instance.def.projectile.arcHeightFactor <= 0.1f)
+            if (Gunplay.settings.enableTrails && __instance.def.projectile.arcHeightFactor <= 0.1f)
             {
-                ProjectileTrail trail = GenSpawn.Spawn(prop.trail, ___origin.ToIntVec3(), launcher.Map, WipeMode.Vanish) as ProjectileTrail;
-                trail.Initialize(__instance, ___destination, equipment);
-                trails.Remove(__instance);
-                trails.Add(__instance, trail);
+                // GunProp(Thing) 对任何有 def 的装备都有默认回退，故 prop == null ⟺ 无武器投射物
+                bool unarmed = prop == null;
+                if (!unarmed || UnarmedEffectsAllowed(__instance))
+                {
+                    // 投射物在 Launch 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
+                    Map map = __instance.Map ?? launcher?.Map;
+                    GunPropDef trailProp = prop ?? GunplaySetup.DefaultProp;
+                    if (map != null && trailProp?.trail != null)
+                    {
+                        ProjectileTrail trail = GenSpawn.Spawn(trailProp.trail, ___origin.ToIntVec3(), map, WipeMode.Vanish) as ProjectileTrail;
+                        if (trail != null)
+                        {
+                            trail.Initialize(__instance, ___destination, equipment);
+                            trails.Remove(__instance);
+                            trails.Add(__instance, trail);
+                        }
+                    }
+                }
             }
         }
     }
@@ -83,7 +103,11 @@ namespace Gunplay.Patch
             if (PatchProjectileLaunch.TryGetTrail(__instance, out ProjectileTrail trail))
                 trail.CaptureFinalPosition(__instance.ExactPosition);
 
-            GunPropDef prop = GunplaySetup.GunProp(__instance.EquipmentDef);
+            // 无武器投射物受独立开关控制（与轨迹开关保持同一判定口径）
+            if (__instance.EquipmentDef == null && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
+
+            // 无发射者/无装备的投射物（EquipmentDef 为 null 或未配置）回退到默认属性
+            GunPropDef prop = GunplaySetup.GunProp(__instance.EquipmentDef) ?? GunplaySetup.DefaultProp;
             if (prop == null) return;
 
             MaterialKind kind = MaterialKind.None;

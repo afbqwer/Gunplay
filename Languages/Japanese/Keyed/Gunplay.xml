@@ -21,5 +21,9 @@
   <GunplayTrailWidthModeTexture>弾道の幅：発射体のテクスチャサイズに基づく</GunplayTrailWidthModeTexture>
   <GunplayTrailWidthFactorName>弾道の幅の倍率</GunplayTrailWidthFactorName>
   <GunplayTrailWidthFactorDesc>計算された弾道の幅に対する倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayTrailWidthFactorDesc>
+  <GunplayUnarmedEffectsName>武器なしの発射体にエフェクトを表示</GunplayUnarmedEffectsName>
+  <GunplayUnarmedEffectsDesc>武器なしで発射された発射体（タレットの射撃やスクリプト生成物など）に弾道と着弾音/エフェクトを追加します。</GunplayUnarmedEffectsDesc>
+  <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>
+  <GunplayUnarmedBulletsOnlyDesc>有効にすると、ダメージ種別が「弾（Bullet）」の発射体のみこれらのエフェクトを表示します。</GunplayUnarmedBulletsOnlyDesc>
 
 </LanguageData>

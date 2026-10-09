@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,6 +21,8 @@ namespace Gunplay
         public bool enableWeaponAnimations = true;
         public bool enableEffects = true;
         public bool showPuffs = true;
+        public bool unarmedProjectileEffects = true;
+        public bool unarmedOnlyBullets = true;
         public float particleMultiplier = 1f;
         public float projectileSpeed = 3f;
         public TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
@@ -34,6 +36,8 @@ namespace Gunplay
             Scribe_Values.Look(ref enableWeaponAnimations, "enableWeaponAnimations");
             Scribe_Values.Look(ref enableEffects, "enableEffects");
             Scribe_Values.Look(ref showPuffs, "showPuffs", true);
+            Scribe_Values.Look(ref unarmedProjectileEffects, "unarmedProjectileEffects", true);
+            Scribe_Values.Look(ref unarmedOnlyBullets, "unarmedOnlyBullets", true);
             Scribe_Values.Look(ref particleMultiplier, "particleMultiplier", 1f);
             Scribe_Values.Look(ref projectileSpeed, "projectileSpeed");
             Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
@@ -55,6 +59,12 @@ namespace Gunplay
                 listing_Standard.SliderLabeled("GunplayParticleMultiplierName".Translate(), ref particleMultiplier, "GunplayParticleMultiplierDesc".Translate(), 0.2f, 4f);
                 particleMultiplier = Mathf.Round(particleMultiplier * 20f) / 20f;
                 listing_Standard.Gap(4f);
+            }
+            listing_Standard.CheckboxLabeled("GunplayUnarmedEffectsName".Translate(), ref unarmedProjectileEffects, "GunplayUnarmedEffectsDesc".Translate());
+            if (unarmedProjectileEffects)
+            {
+                listing_Standard.Gap(4f);
+                listing_Standard.CheckboxLabeled("GunplayUnarmedBulletsOnlyName".Translate(), ref unarmedOnlyBullets, "GunplayUnarmedBulletsOnlyDesc".Translate());
             }
             if (enableTrails)
             {

@@ -21,5 +21,9 @@
   <GunplayTrailWidthModeTexture>轨迹宽度：基于投射物贴图尺寸</GunplayTrailWidthModeTexture>
   <GunplayTrailWidthFactorName>轨迹宽度倍率</GunplayTrailWidthFactorName>
   <GunplayTrailWidthFactorDesc>对计算出的轨迹宽度进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayTrailWidthFactorDesc>
+  <GunplayUnarmedEffectsName>为无武器的投射物产生特效</GunplayUnarmedEffectsName>
+  <GunplayUnarmedEffectsDesc>为没有武器发射的投射物（如炮塔射击、脚本生成的投射物）添加子弹轨迹和落地音效/特效.</GunplayUnarmedEffectsDesc>
+  <GunplayUnarmedBulletsOnlyName>仅限子弹类无武器投射物</GunplayUnarmedBulletsOnlyName>
+  <GunplayUnarmedBulletsOnlyDesc>开启后，只有伤害类型为子弹（Bullet）的无武器投射物才会产生这些特效.</GunplayUnarmedBulletsOnlyDesc>
 
 </LanguageData>

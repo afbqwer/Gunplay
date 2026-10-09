@@ -80,5 +80,7 @@ namespace Gunplay
 
             return propMap.TryGetValue(equipment.def, defaultDef);
         }
+
+        public static GunPropDef DefaultProp => defaultDef;
     }
 }
