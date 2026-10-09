@@ -16,6 +16,24 @@ namespace Gunplay
     // 只有两处有意的行为变化：
     //   1) 轨迹 Y 加了一个极小负偏移（DepthEpsilon），使轨迹稳定处于弹体之下（见该常量注释）；
     //   2) 剔除改由外部按"整条轨迹包围盒"判定（修复"头出屏、尾在屏内却被整条剔除"的缺陷）。
+    // 相机视野的世界坐标范围。由 CellRect 展开：格 (x,z) 占据世界 [x, x+1) × [z, z+1)。
+    // 每帧只构造一次，避免在逐条剔除里反复访问 CellRect.Min / Max（那是会构造 IntVec3 的属性）。
+    internal readonly struct TrailViewRect
+    {
+        public readonly float MinX;
+        public readonly float MinZ;
+        public readonly float MaxX;
+        public readonly float MaxZ;
+
+        public TrailViewRect(CellRect view)
+        {
+            MinX = view.Min.x;
+            MinZ = view.Min.z;
+            MaxX = view.Max.x + 1;
+            MaxZ = view.Max.z + 1;
+        }
+    }
+
     internal class ProjectileTrailState
     {
         // ---------------- 弧线绘制参数 ----------------
@@ -62,7 +80,12 @@ namespace Gunplay
         float arcHorizontalLength;
         float arcHeight;
         float arcTailFraction;
-        Bounds arcBounds;
+        // 弧线整条的 AABB（初始化时算一次）。存成裸 Vector3 分量，避免逐帧构造 Bounds，
+        // 更避免反复访问 Bounds.min / max —— 那两个属性每次都会做一遍向量加减。
+        Vector3 arcAabbMin;
+        Vector3 arcAabbMax;
+        // 直线轨迹相对头部可能延伸的最大水平距离（length + width），用于 O(1) 快速否定剔除
+        float maxReach;
 
         // ---------------- CE 专用状态 ----------------
         // CE 投射物（直线与弧线）每 tick 都跟踪"绘制位置"（含 CE 的高度屏幕偏移），
@@ -96,6 +119,7 @@ namespace Gunplay
             ticksPerLength = speed > 0f ? length / speed : 0f;
             dir = (b - a).normalized;
             ComputeWidth(proj.def, proj.DamageAmount);
+            maxReach = length + width;
 
             // 只有弧线投射物才需要额外的弧线几何；直线投射物到此为止，不执行任何弧线代码
             arcing = ProjectileRules.IsArcing(proj.def);
@@ -130,6 +154,7 @@ namespace Gunplay
             ticksPerLength = speed > 0f ? length / speed : 0f;
             dir = (b - a).normalized;
             ComputeWidth(proj.def, PatchCECompat.GetDamageAmount(proj));
+            maxReach = length + width;
 
             // CE 轨迹样式由设置开关决定（ceStraightTrails，默认开启）：
             //   * 开启 → CE 投射物绘制直线拖尾（跟随弹体绘制位置）；抛射类投射物
@@ -240,31 +265,44 @@ namespace Gunplay
 
         // ---------------- 剔除 ----------------
 
-        // 包围盒覆盖整条轨迹（而非头部一格），这是修复"头出屏、尾在屏内被整条剔除"的关键。
-        public Bounds CurrentBounds()
+        // 弧线轨迹的 AABB（初始化时算一次）。仅弧线使用——直线走实例化，不需要合并网格的 bounds。
+        public void GetArcAabb(out Vector3 min, out Vector3 max)
+        {
+            min = arcAabbMin;
+            max = arcAabbMax;
+        }
+
+        // 视野剔除。view 是已展开为世界坐标范围的相机视野（见 TrailViewRect）。
+        //
+        // 这里是逐条执行的，也是本系统最热的一段：列表里含全图所有在飞轨迹，
+        // 而 Draw 只对可见的那部分执行，所以剔除一旦写得重，耗时就会远超 Draw，
+        // 且随场景弹量线性波动。因此：
+        //   弧线 —— 用初始化时缓存好的 AABB，四次比较；
+        //   直线 —— 先用头部做两次 O(1) 判定，只有跨在视野边缘的少数轨迹才落到精确求交。
+        public bool IsVisible(TrailViewRect view)
         {
             if (arcing)
             {
-                return arcBounds;
+                return arcAabbMax.x >= view.MinX && arcAabbMin.x <= view.MaxX
+                    && arcAabbMax.z >= view.MinZ && arcAabbMin.z <= view.MaxZ;
             }
 
-            float len = DrawLength();
-            Vector3 head = exactPosition;
-            Vector3 tail = head - dir * len;
-            Vector3 min = Vector3.Min(head, tail);
-            Vector3 max = Vector3.Max(head, tail);
-            float pad = width * 0.5f + 1f;
-            return new Bounds((min + max) * 0.5f, max - min + new Vector3(pad * 2f, 1f, pad * 2f));
-        }
+            float hx = exactPosition.x;
+            float hz = exactPosition.z;
 
-        // 是否需要在视野内绘制。view 为已外扩的相机视野格矩形。
-        // 不做雾判定：战争迷雾本身就会盖住轨迹，逐条查 fogGrid 是纯浪费。
-        public bool IsVisible(CellRect view)
-        {
-            Bounds bounds = CurrentBounds();
-            // 格 (x,z) 占据世界 [x, x+1) × [z, z+1)，故视野矩形的世界范围为 [Min.x, Max.x+1] × [Min.z, Max.z+1]
-            return bounds.max.x >= view.Min.x && bounds.min.x <= view.Max.x + 1
-                && bounds.max.z >= view.Min.z && bounds.min.z <= view.Max.z + 1;
+            // 快速肯定：头部就在视野内 ⇒ 轨迹头段必然可见
+            if (hx >= view.MinX && hx <= view.MaxX && hz >= view.MinZ && hz <= view.MaxZ) return true;
+
+            // 快速否定：头部到视野的距离超过轨迹的最大延伸 ⇒ 整条轨迹必然不可见
+            if (hx < view.MinX - maxReach || hx > view.MaxX + maxReach
+                || hz < view.MinZ - maxReach || hz > view.MaxZ + maxReach) return false;
+
+            // 精确：按实际首尾点求交（只有跨越视野边缘的少数轨迹会走到这里）
+            float len = DrawLength();
+            float tx = hx - dir.x * len;
+            float tz = hz - dir.z * len;
+            return Mathf.Max(hx, tx) + width >= view.MinX && Mathf.Min(hx, tx) - width <= view.MaxX
+                && Mathf.Max(hz, tz) + width >= view.MinZ && Mathf.Min(hz, tz) - width <= view.MaxZ;
         }
 
         // ---------------- 几何生成 ----------------
@@ -425,25 +463,29 @@ namespace Gunplay
         void ComputeAnalyticArcBounds()
         {
             Vector3 mid = (a + dir * (arcHorizontalLength * 0.5f)) + ArcUp * (arcHeight * 0.5f);
-            Vector3 size = new Vector3(
-                Mathf.Abs(dir.x) * arcHorizontalLength + Mathf.Abs(ArcUp.x) * arcHeight + width * 2f + 2f,
-                Mathf.Abs(ArcUp.y) * arcHeight + 2f,
-                Mathf.Abs(dir.z) * arcHorizontalLength + Mathf.Abs(ArcUp.z) * arcHeight + width * 2f + 2f);
-            arcBounds = new Bounds(mid, size);
+            // 等价于原先的 Bounds(mid, size)：half = size * 0.5
+            Vector3 half = new Vector3(
+                (Mathf.Abs(dir.x) * arcHorizontalLength + Mathf.Abs(ArcUp.x) * arcHeight) * 0.5f + width + 1f,
+                Mathf.Abs(ArcUp.y) * arcHeight * 0.5f + 1f,
+                (Mathf.Abs(dir.z) * arcHorizontalLength + Mathf.Abs(ArcUp.z) * arcHeight) * 0.5f + width + 1f);
+            arcAabbMin = mid - half;
+            arcAabbMax = mid + half;
         }
 
         // CE 采样点列的包围盒
         void ComputeSampledArcBounds()
         {
-            Vector3 min = ceArcSamples[0];
-            Vector3 max = ceArcSamples[0];
+            Vector3 lo = ceArcSamples[0];
+            Vector3 hi = ceArcSamples[0];
             for (int i = 1; i < ceArcSamples.Count; i++)
             {
-                min = Vector3.Min(min, ceArcSamples[i]);
-                max = Vector3.Max(max, ceArcSamples[i]);
+                lo = Vector3.Min(lo, ceArcSamples[i]);
+                hi = Vector3.Max(hi, ceArcSamples[i]);
             }
-            Vector3 pad = new Vector3(width * 2f + 2f, 2f, width * 2f + 2f);
-            arcBounds = new Bounds((min + max) * 0.5f, max - min + pad);
+            // 等价于原先的 Bounds((lo+hi)/2, hi-lo+pad)：即外扩 pad 的一半
+            Vector3 pad = new Vector3(width + 1f, 1f, width + 1f);
+            arcAabbMin = lo - pad;
+            arcAabbMax = hi + pad;
         }
     }
 }

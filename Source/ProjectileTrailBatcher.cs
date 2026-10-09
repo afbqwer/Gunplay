@@ -24,7 +24,10 @@ namespace Gunplay
     // 刻意不做实例化失败回退：若材质不支持，DrawMeshInstanced 会直接报错而不是静默退化。
     internal static class ProjectileTrailBatcher
     {
-        // Graphics.DrawMeshInstanced 单次提交的实例上限（Unity 硬限制 1023）
+        // Graphics.DrawMeshInstanced 单次提交的实例上限。Unity 硬限制为 1023
+        // （matrices 数组长度超过 1023 会直接报错，与 count 无关），
+        // RimWorld 自己的 DrawBatch.MaxCountPerBatch 用的也是同一个常量。
+        // 超出时在 InstancedGroup.Add 里分批提交，对调用方透明。
         const int MaxInstancesPerCall = 1023;
 
         // 合并网格上传时跳过 Unity 的包围盒重算与索引校验（包围盒由我们在下面自行设定）
@@ -38,7 +41,7 @@ namespace Gunplay
 
         class InstancedGroup
         {
-            internal ProjectileTrailDef def;
+            internal Material material;   // 创建分组时解析一次；null 表示该 def 无材质，整组跳过
             internal readonly Matrix4x4[] matrices = new Matrix4x4[MaxInstancesPerCall];
             internal int count;
             internal bool touched;
@@ -51,14 +54,13 @@ namespace Gunplay
 
             internal void Add(ProjectileTrailState trail)
             {
+                if (material == null) return;
                 if (!trail.TryGetStraightMatrix(out Matrix4x4 matrix)) return;
 
                 if (!touched)
                 {
                     touched = true;
                     usedInstanced.Add(this);
-                    // 与 DrawBatch.Flush 同样的前置条件：实例化要求材质开启 enableInstancing
-                    def.DrawMatSingle.enableInstancing = true;
                 }
 
                 // 超出单次上限：先把已积累的一批提交掉，再继续
@@ -70,7 +72,7 @@ namespace Gunplay
             internal void Draw()
             {
                 if (count == 0) return;
-                Graphics.DrawMeshInstanced(MeshPool.plane10, 0, def.DrawMatSingle, matrices, count,
+                Graphics.DrawMeshInstanced(MeshPool.plane10, 0, material, matrices, count,
                     sharedProps, ShadowCastingMode.Off, false, 0);
                 count = 0;
             }
@@ -80,7 +82,7 @@ namespace Gunplay
 
         class ArcGroup
         {
-            internal ProjectileTrailDef def;
+            internal Material material;
             internal Mesh mesh;
             internal readonly List<Vector3> verts = new List<Vector3>();
             internal readonly List<Vector2> uvs = new List<Vector2>();
@@ -99,22 +101,24 @@ namespace Gunplay
 
             internal void Add(ProjectileTrailState trail)
             {
+                if (material == null) return;
+
                 int before = tris.Count;
                 trail.AppendArcGeometry(verts, uvs, tris);
                 if (tris.Count == before) return;   // 本帧该轨迹无可绘制内容
 
-                Bounds bounds = trail.CurrentBounds();
+                trail.GetArcAabb(out Vector3 lo, out Vector3 hi);
                 if (!touched)
                 {
                     touched = true;
-                    min = bounds.min;
-                    max = bounds.max;
+                    min = lo;
+                    max = hi;
                     usedArc.Add(this);
                 }
                 else
                 {
-                    min = Vector3.Min(min, bounds.min);
-                    max = Vector3.Max(max, bounds.max);
+                    min = Vector3.Min(min, lo);
+                    max = Vector3.Max(max, hi);
                 }
             }
 
@@ -133,7 +137,7 @@ namespace Gunplay
                 // bounds 只影响 Unity 自身的视锥剔除：内容已按视口逐条剔除过，收紧到并集即可
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 
-                Graphics.DrawMesh(mesh, Matrix4x4.identity, def.DrawMatSingle, 0);
+                Graphics.DrawMesh(mesh, Matrix4x4.identity, material, 0);
             }
         }
 
@@ -151,29 +155,37 @@ namespace Gunplay
             for (int i = 0; i < usedArc.Count; i++) usedArc[i].Reset();
             usedArc.Clear();
 
-            CellRect view = Find.CameraDriver.CurrentViewRect.ExpandedBy(1);
+            // 视野范围每帧只展开一次，避免在逐条剔除里反复访问 CellRect.Min / Max
+            TrailViewRect view = new TrailViewRect(Find.CameraDriver.CurrentViewRect.ExpandedBy(1));
 
             for (int i = 0; i < trails.Count; i++)
             {
                 ProjectileTrailState trail = trails[i];
-                if (trail.def == null || trail.def.DrawMatSingle == null) continue;
+
+                // 先剔除：这一步能淘汰绝大多数（在视野外）的轨迹，后面的工作才不会白做
                 if (!trail.IsVisible(view)) continue;
+
+                ProjectileTrailDef def = trail.def;
+                if (def == null) continue;
 
                 if (trail.IsArc)
                 {
-                    if (!arcGroups.TryGetValue(trail.def, out ArcGroup arc))
+                    if (!arcGroups.TryGetValue(def, out ArcGroup arc))
                     {
-                        arc = new ArcGroup { def = trail.def };
-                        arcGroups[trail.def] = arc;
+                        arc = new ArcGroup { material = def.DrawMatSingle };
+                        arcGroups[def] = arc;
                     }
                     arc.Add(trail);
                 }
                 else
                 {
-                    if (!instancedGroups.TryGetValue(trail.def, out InstancedGroup inst))
+                    if (!instancedGroups.TryGetValue(def, out InstancedGroup inst))
                     {
-                        inst = new InstancedGroup { def = trail.def };
-                        instancedGroups[trail.def] = inst;
+                        Material mat = def.DrawMatSingle;
+                        // 与 DrawBatch.Flush 同样的前置条件：实例化要求材质开启 enableInstancing
+                        if (mat != null) mat.enableInstancing = true;
+                        inst = new InstancedGroup { material = mat };
+                        instancedGroups[def] = inst;
                     }
                     inst.Add(trail);
                 }

@@ -31,18 +31,32 @@ namespace Gunplay.Patch
             return true;
         }
 
+        // 缓存「当前地图 → 组件」。Map.GetComponent<T> 会线性扫描 components 列表，
+        // 放在每帧的绘制路径上不值得；地图切换或组件尚未就绪时才重新解析。
+        static Map cachedMap;
+        static MapComponent_ProjectileTrails cachedComp;
+
         static void Postfix()
         {
             // 与目标方法保持同一开关口径
             if (!DebugViewSettings.drawThingsDynamic) return;
 
             Map map = Find.CurrentMap;
-            if (map == null || map.Disposed) return;
+            if (map == null || map.Disposed)
+            {
+                cachedMap = null;
+                cachedComp = null;
+                return;
+            }
 
-            MapComponent_ProjectileTrails comp = MapComponent_ProjectileTrails.For(map);
-            if (comp == null) return;
+            if (map != cachedMap || cachedComp == null)
+            {
+                cachedMap = map;
+                cachedComp = MapComponent_ProjectileTrails.For(map);
+            }
+            if (cachedComp == null) return;
 
-            ProjectileTrailBatcher.Draw(comp.Trails);
+            ProjectileTrailBatcher.Draw(cachedComp.Trails);
         }
     }
 }
