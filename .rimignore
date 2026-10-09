@@ -11,7 +11,8 @@
 Thumbs.db
 obj
 Source
-
+packages
+*.dds
 *.bak
 *.cache
 *.lnk
