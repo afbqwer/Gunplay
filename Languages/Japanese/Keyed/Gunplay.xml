@@ -27,5 +27,23 @@
   <GunplayUnarmedEffectsDesc>武器なしで発射された発射体（タレットの射撃やスクリプト生成物など）に弾道と着弾音/エフェクトを追加します。</GunplayUnarmedEffectsDesc>
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>有効にすると、ダメージ種別が「弾（Bullet）」の発射体のみこれらのエフェクトを表示します。</GunplayUnarmedBulletsOnlyDesc>
+  <GunplayProjectileOverridesName>発射体ごとの上書き...</GunplayProjectileOverridesName>
+  <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅を個別に指定します。上書きした値は絶対値であり、上記の「弾道の幅の倍率」は適用されません。</GunplayProjectileOverridesDesc>
+  <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
+  <GunplayOverrideAllMods>全てのMod</GunplayOverrideAllMods>
+  <GunplayOverrideOnlyOverridden>上書き済みのみ</GunplayOverrideOnlyOverridden>
+  <GunplayOverrideCount>上書き {0} / 全 {1}</GunplayOverrideCount>
+  <GunplayOverrideClearAll>全ての上書きを解除</GunplayOverrideClearAll>
+  <GunplayOverrideClearAllConfirm>全ての発射体上書きを解除しますか？</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideColEnabled>上書き</GunplayOverrideColEnabled>
+  <GunplayOverrideColTrail>弾道</GunplayOverrideColTrail>
+  <GunplayOverrideTipEnabled>この発射体の弾道設定を上書きします。オフにすると上書きを破棄し、継承値/計算値に戻ります。</GunplayOverrideTipEnabled>
+  <GunplayOverrideTipTrail>この発射体に弾道を描画するかどうか。オフにすると弾道自体が表示されず、幅の上書きも使われません。行が未上書きの状態で操作すると、自動的に上書きが有効になります。</GunplayOverrideTipTrail>
+  <GunplayOverrideColProjectile>発射体</GunplayOverrideColProjectile>
+  <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
+  <GunplayOverrideColWidth>弾道の幅</GunplayOverrideColWidth>
+  <GunplayOverrideNoWeapon>この発射体を使用する武器はありません。</GunplayOverrideNoWeapon>
+  <GunplayOverrideWeaponTipHeader>この発射体を使用する武器：</GunplayOverrideWeaponTipHeader>
+  <GunplayOverrideNoResults>現在の絞り込みに一致する発射体はありません。</GunplayOverrideNoResults>
 
 </LanguageData>

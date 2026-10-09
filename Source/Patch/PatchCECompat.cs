@@ -195,6 +195,9 @@ namespace Gunplay.Patch
         {
             if (!Gunplay.settings.enableTrails) return;
 
+            // 单项覆写可在全局开关之上单独关掉某个投射物的轨迹
+            if (!ProjectileOverrides.AllowsTrail(__instance.def)) return;
+
             // 无武器投射物判定口径与原版一致：equipment 为 null
             bool unarmed = equipment == null;
             if (unarmed && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;

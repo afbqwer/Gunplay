@@ -30,6 +30,9 @@ namespace Gunplay
         public float trailWidthFactor = 1f;
         public bool ceStraightTrails = true;
 
+        // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
+        public Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
+
 
         override public void ExposeData()
         {
@@ -45,6 +48,9 @@ namespace Gunplay
             Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
             Scribe_Values.Look(ref trailWidthFactor, "trailWidthFactor", 1f);
             Scribe_Values.Look(ref ceStraightTrails, "ceStraightTrails", true);
+
+            Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
+            if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
         }
 
         public void DoSettingsWindowContents(Rect inRect)
@@ -87,6 +93,13 @@ namespace Gunplay
                 {
                     listing_Standard.Gap(4f);
                     listing_Standard.CheckboxLabeled("GunplayCEStraightTrailsName".Translate(), ref ceStraightTrails, "GunplayCEStraightTrailsDesc".Translate());
+                }
+
+                listing_Standard.Gap(8f);
+                listing_Standard.Label("GunplayProjectileOverridesDesc".Translate());
+                if (listing_Standard.ButtonText("GunplayProjectileOverridesName".Translate()))
+                {
+                    ProjectileOverrideWindow.Open();
                 }
             }
 

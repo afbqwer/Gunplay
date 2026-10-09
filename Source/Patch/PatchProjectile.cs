@@ -50,7 +50,8 @@ namespace Gunplay.Patch
             // 轨迹由投射物 def 决定（与发射武器无关）。
             // 直线投射物与弧线投射物共用这一条生成路径，具体用哪种绘制方式由
             // ProjectileTrailState 内部按“是否弧线”决定，因此多数（直线）投射物不会执行弧线相关代码。
-            if (Gunplay.settings.enableTrails)
+            // 单项覆写可在全局开关之上单独关掉某个投射物的轨迹
+            if (Gunplay.settings.enableTrails && ProjectileOverrides.AllowsTrail(__instance.def))
             {
                 // 无武器判定口径 = equipment 为 null（Launch 体内执行完后等价于 EquipmentDef == null）
                 bool unarmed = equipment == null;

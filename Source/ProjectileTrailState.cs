@@ -177,23 +177,11 @@ namespace Gunplay
             }
         }
 
-        // 宽度口径：Damage（按伤害）或 Texture（按投射物贴图 drawSize），再乘 trailDef 覆盖与全局系数
+        // 宽度口径统一走 TrailWidth：单项覆写 > ProjectileTrailDef.trailWidth > 伤害/贴图基础宽度。
+        // 覆写是绝对值且完全独立（不再乘全局系数），命中时直接采用。
         void ComputeWidth(ThingDef projDef, float damage)
         {
-            if (Gunplay.settings.trailWidthMode == TrailWidthMode.Texture)
-            {
-                // 投射物贴图经 GridPlane(drawSize) 旋转绘制，drawSize.x 为垂直于飞行方向的横向宽度
-                GraphicData graphicData = projDef.graphicData;
-                width = (graphicData != null ? graphicData.drawSize.x : 1f) * 0.1f;
-            }
-            else
-            {
-                width = Mathf.Min(damage, 50f) * 0.006f;
-            }
-
-            if (def != null && def.trailWidth != -1) width = def.trailWidth;
-
-            width *= Gunplay.settings.trailWidthFactor;
+            width = TrailWidth.Effective(projDef, damage, def);
         }
 
         // ---------------- 运行时推进 ----------------

@@ -27,4 +27,22 @@
   <GunplayUnarmedEffectsDesc>Give projectiles fired without a weapon (turret shots, scripted projectiles) bullet trails and impact sounds/effects.</GunplayUnarmedEffectsDesc>
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
+  <GunplayProjectileOverridesName>Per-projectile overrides...</GunplayProjectileOverridesName>
+  <GunplayProjectileOverridesDesc>Override the trail width of individual projectiles. Overridden values are absolute and ignore the trail width multiplier above.</GunplayProjectileOverridesDesc>
+  <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
+  <GunplayOverrideAllMods>All mods</GunplayOverrideAllMods>
+  <GunplayOverrideOnlyOverridden>Overridden only</GunplayOverrideOnlyOverridden>
+  <GunplayOverrideCount>Overridden {0} / total {1}</GunplayOverrideCount>
+  <GunplayOverrideClearAll>Clear all overrides</GunplayOverrideClearAll>
+  <GunplayOverrideClearAllConfirm>Clear all per-projectile overrides?</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
+  <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
+  <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values.</GunplayOverrideTipEnabled>
+  <GunplayOverrideTipTrail>Draw a trail for this projectile. When off, this projectile gets no trail at all and its width override goes unused. Adjusting this on a row that is not overridden yet will enable the override automatically.</GunplayOverrideTipTrail>
+  <GunplayOverrideColProjectile>Projectile</GunplayOverrideColProjectile>
+  <GunplayOverrideColWeapon>Weapon</GunplayOverrideColWeapon>
+  <GunplayOverrideColWidth>Trail width</GunplayOverrideColWidth>
+  <GunplayOverrideNoWeapon>No weapon fires this projectile.</GunplayOverrideNoWeapon>
+  <GunplayOverrideWeaponTipHeader>Weapons firing this projectile:</GunplayOverrideWeaponTipHeader>
+  <GunplayOverrideNoResults>No projectiles match the current filter.</GunplayOverrideNoResults>
 </LanguageData>
