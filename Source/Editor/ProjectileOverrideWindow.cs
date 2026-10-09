@@ -652,12 +652,5 @@ namespace Gunplay
             row.editWidth = Mathf.Clamp(row.editWidth, MinWidth, MaxWidth);
             ProjectileOverrides.SetTrailWidth(row.projectile, row.editWidth);
         }
-
-        // 本窗口是独立窗口，关闭时不会触发主设置窗口的写盘，这里自己落一次。
-        public override void PostClose()
-        {
-            base.PostClose();
-            GunplaySettings.Save();
-        }
     }
 }

@@ -41,14 +41,12 @@ namespace Gunplay
         // 存档读写句柄。由 Gunplay 构造时注入；在此之前调用 Save() 是空操作。
         internal static GunplaySettings? Handle;
 
-        public static void Save() => Handle?.Write();
-
         override public void ExposeData()
         {
-            Scribe_Values.Look(ref enableTrails, "enableTrails");
-            Scribe_Values.Look(ref enableSounds, "enenableSoundsableTrails");
-            Scribe_Values.Look(ref enableWeaponAnimations, "enableWeaponAnimations");
-            Scribe_Values.Look(ref enableEffects, "enableEffects");
+            Scribe_Values.Look(ref enableTrails, "enableTrails", true);
+            Scribe_Values.Look(ref enableSounds, "enableSounds", true);
+            Scribe_Values.Look(ref enableWeaponAnimations, "enableWeaponAnimations", true);
+            Scribe_Values.Look(ref enableEffects, "enableEffects", true);
             Scribe_Values.Look(ref showPuffs, "showPuffs", true);
             Scribe_Values.Look(ref unarmedProjectileEffects, "unarmedProjectileEffects", true);
             Scribe_Values.Look(ref unarmedOnlyBullets, "unarmedOnlyBullets", true);
@@ -115,6 +113,25 @@ namespace Gunplay
             listing_Standard.End();
 
             ImpactEffectTuner.Apply();
+        }
+    }
+
+    public static class GunplaySettingsHelper
+    {
+        public static void SliderLabeled(this Listing_Standard listing, string label, ref float val, string tooltip, float min, float max)
+        {
+            Rect rect = listing.GetRect(Text.LineHeight);
+
+            TextAnchor anchor = Text.Anchor;
+            Text.Anchor = TextAnchor.MiddleLeft;
+            Widgets.Label(rect.LeftPart(0.5f), label);
+            val = Widgets.HorizontalSlider(rect.RightPart(0.5f).LeftPart(0.8f), val, min, max, true);
+            Text.Anchor = TextAnchor.MiddleRight;
+            Widgets.Label(rect.RightPart(0.1f), val.ToStringPercent());
+            if (!tooltip.NullOrEmpty()) TooltipHandler.TipRegion(rect, tooltip);
+            Text.Anchor = anchor;
+
+            listing.Gap(listing.verticalSpacing);
         }
     }
 
