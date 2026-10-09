@@ -55,8 +55,10 @@ namespace Gunplay.Patch
                 if (___ticksToImpact < 1) ___ticksToImpact = 1;
             }
 
-            // 轨迹由投射物 def 决定（与发射武器无关）
-            if (Gunplay.settings.enableTrails && !ProjectileRules.IsArcing(__instance.def))
+            // 轨迹由投射物 def 决定（与发射武器无关）。
+            // 直线投射物与弧线投射物共用这一条生成路径，具体用哪种绘制方式由
+            // ProjectileTrail 内部按“是否弧线”决定，因此多数（直线）投射物不会执行弧线相关代码。
+            if (Gunplay.settings.enableTrails)
             {
                 // 无武器判定口径 = equipment 为 null（Launch 体内执行完后等价于 EquipmentDef == null）
                 bool unarmed = equipment == null;
