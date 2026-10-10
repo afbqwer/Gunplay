@@ -1041,12 +1041,17 @@ namespace Gunplay
 
             HandleNumberDrag(row, col, hitRect);
 
-            // 手势进行中：输入框一律让开。
-            // 按下那一刻没法预知会不会拖，所以输入框那时已经拿到焦点、甚至开始选字了；
-            // 这里每帧把焦点交还回去（幂等）。不还的话拖拽会被输入框当成"选中文字"处理，
-            // 松手后还留着一个焦点和一段选区。
-            // 放在 HandleNumberDrag 之后：手势确认的那一帧就把焦点还掉，不留那一帧的选字。
-            if (DragPaint.Active)
+            // 这一帧要不要把输入框让开。★ 必须在 MouseDown 那一帧就成立，不能等判定出拖 ★
+            //
+            // 输入框一旦拿到这个 MouseDown，就会把它吃成"聚焦 + 开始选字"，涂抹再也起不来。
+            // 症状很有迷惑性——未聚焦的输入框上 Shift + 拖只聚焦不涂，已聚焦的反而涂得动，
+            // 因为后者不再抢这一次 MouseDown。
+            // 所以条件是「本轮已在涂抹」**或**「按住左键 + Shift 且鼠标正压在本格上」，
+            // 后者覆盖了尚未越过阈值的那几帧，也就是真正要命的那一帧。
+            bool yieldToPaint = (DragPaint.Active && DragPaint.Tag == col.paintTag)
+                || (DragPaint.HasPaintIntent && Mouse.IsOver(hitRect));
+
+            if (yieldToPaint)
             {
                 GUIUtility.keyboardControl = 0;
                 GUIUtility.hotControl = 0;
@@ -1064,6 +1069,14 @@ namespace Gunplay
                 return;
             }
 
+            // 让开的办法很土但有效：这时候干脆不画输入框，只把值显示出来；松手就恢复。
+            if (yieldToPaint)
+            {
+                DrawPaintValue(rect, col.format(editValue));
+                TooltipHandler.TipRegion(rect, col.tipKey.Translate());
+                return;
+            }
+
             float before = editValue;
             Widgets.TextFieldNumeric(rect, ref editValue, ref buffer, col.min, col.max);
             TooltipHandler.TipRegion(rect, col.tipKey.Translate());
@@ -1072,6 +1085,17 @@ namespace Gunplay
 
             editValue = Mathf.Clamp(editValue, col.min, col.max);
             col.apply(row, editValue);
+        }
+
+        // 涂抹期间代替输入框的只读显示。比"未覆写"那档灰值亮一点：
+        // 这一格其实是有覆写值的，只是此刻不让编辑。
+        static void DrawPaintValue(Rect rect, string text)
+        {
+            GUI.color = new Color(0.8f, 0.8f, 0.8f);
+            Text.Anchor = TextAnchor.MiddleLeft;
+            Widgets.Label(rect, text);
+            Text.Anchor = TextAnchor.UpperLeft;
+            GUI.color = Color.white;
         }
 
         // 数值格上的涂抹手势（见 DragPaint.Cell）。

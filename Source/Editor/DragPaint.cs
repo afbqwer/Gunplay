@@ -122,6 +122,15 @@ namespace Gunplay
             Active = false;
         }
 
+        // 本帧是否有「涂抹意图」：左键按着 + 修饰键按着。
+        //
+        // 这是给带输入框的格子用的：它必须在 MouseDown 那一刻就让开，不能等判定出拖再让。
+        // 输入框一旦拿到这个 MouseDown，就会把它吃成"聚焦 + 开始选字"，涂抹再也起不来——
+        // 实测症状正是如此：未聚焦的输入框上 Shift + 拖 = 只聚焦不涂；
+        // 已经聚焦的反而涂得动，因为后者不再抢这一次 MouseDown。
+        // 所以判定不能只看 Active（那时木已成舟），必须提前到"按住左键 + 修饰键"这个更宽的意图上。
+        public static bool HasPaintIntent => Input.GetMouseButton(0) && ModifierHeld;
+
         // 修饰键（Shift）的读法。两处都读：
         //   * Event.current.shift 是本体的口径——UnityGUIBugsFixer.FixShift 就是拿 Input.GetKey
         //     去补它（仅 Linux 生效），说明本体自己也用 Event.current.shift；
