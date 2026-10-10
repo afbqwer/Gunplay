@@ -28,6 +28,24 @@ namespace Gunplay.Patch
 
         public static void Postfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
         {
+            // 异常不许冒出去：Harmony 的前缀/后缀抛异常会中断原方法，而 Launch 是在
+            // Verb_Shoot.TryCastShot 里调用的，异常会顺着 TickList 一路掀掉整个 tick。
+            // 「某个投射物的轨迹材质配错了 → 那把枪打不出子弹」这种耦合不该存在：
+            // 捕获后最坏结果只是这一发没有枪口前移和轨迹。
+            try
+            {
+                RunPostfix(__instance, ___destination, launcher, ref ___origin, intendedTarget, equipment, ref ___ticksToImpact);
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce("[Gunplay] Launch postfix failed for projectile '" + (__instance.def?.defName ?? "?")
+                    + "'; muzzle shift and trail registration were skipped for this shot. " + e,
+                    ("GunplayLaunchPostfix" + __instance.def?.defName).GetHashCode());
+            }
+        }
+
+        static void RunPostfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
+        {
             CompGun? comp = equipment?.TryGetComp<CompGun>();
             if (comp != null)
             {
@@ -96,6 +114,25 @@ namespace Gunplay.Patch
     {
         static void Prefix(Projectile __instance, Thing hitThing, Vector3 ___origin)
         {
+            // 这个前缀绝对不能抛异常。Harmony 前缀抛异常会中断原方法，而 Destroy() 就在原方法里：
+            // 投射物会永远留在原地，ticksToImpact 又不会回退，于是每个 tick 再走一遍这条路径
+            // ——「每 tick 抛一次 + 当 tick 后半张地图不 tick」（TickManager 并没有把
+            // tickListNormal.Tick() 包在 try/catch 里）。捕获后原方法照常执行，最坏结果是
+            // 这一发少了特效/音效，甚至只是少了最终落点捕获。
+            try
+            {
+                RunPrefix(__instance, hitThing, ___origin);
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce("[Gunplay] Impact prefix failed for projectile '" + (__instance.def?.defName ?? "?")
+                    + "'; impact effects and final trail capture were skipped for this hit. " + e,
+                    ("GunplayImpactPrefix" + __instance.def?.defName).GetHashCode());
+            }
+        }
+
+        static void RunPrefix(Projectile __instance, Thing hitThing, Vector3 ___origin)
+        {
             Map map = __instance.Map;
             if (map == null) return;
 
@@ -127,8 +164,18 @@ namespace Gunplay.Patch
 
             if (kind == MaterialKind.None)
             {
-                TerrainDef terrainDef = map.terrainGrid.TerrainAt(CellIndicesUtility.CellToIndex(projectile.Position, map.Size.x));
-                kind = MaterialKindGetter.Get(terrainDef);
+                // CellToIndex 不做边界检查，TerrainAt 是裸数组访问——越界即 IndexOutOfRangeException。
+                // 原版在 TickInterval 开头有 !ExactPosition.InBounds 分支挡着（直接 Destroy、不走
+                // Impact），但 Position 是在 TickInterval 末尾才更新的，中间那段
+                // CheckForFreeInterceptBetween → Impact(thing) 用的还是上一 tick 的格子，
+                // 加上 CE 路径与自己的 barrelLength 原点前移，这个不变量不值得赌。
+                // 越界时保持 MaterialKind.None：不播特效/音效，仅此而已。
+                IntVec3 impactCell = projectile.Position;
+                if (impactCell.InBounds(map))
+                {
+                    TerrainDef terrainDef = map.terrainGrid.TerrainAt(CellIndicesUtility.CellToIndex(impactCell, map.Size.x));
+                    kind = MaterialKindGetter.Get(terrainDef);
+                }
             }
 
             if (GunplaySettings.enableSounds)

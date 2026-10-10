@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 using Verse;
@@ -58,14 +59,148 @@ namespace Gunplay.Patch
         static FieldInfo? ticksToTruePositionField;  // ProjectileCE.ticksToTruePosition : int（出膛渐升 tick 数）
         static FieldInfo? startingTicksToImpactField;// ProjectileCE.startingTicksToImpact : float
 
-        // ExactPosToDrawPos 按 worker 运行时类型缓存（worker 实例随 def 而异，方法随类型固定）
-        static readonly Dictionary<Type, MethodInfo> drawMethodCache = new Dictionary<Type, MethodInfo>();
+        // ---------------- 免装箱访问器（TryPatch 时构建，失败即回落反射）----------------
+        //
+        // 下面这些读取落在「每个 CE 投射物 × 每 tick」上：轨迹每 tick 都要问一次弹体的绘制位置，
+        // 离屏也照跑。而 PropertyInfo.GetValue / FieldInfo.GetValue 每次都要装箱、MethodInfo.Invoke
+        // 每次都要分配 object[]，弹幕密集时是实打实的 GC 压力。一次性编成委托后这条路径
+        // 零分配、零装箱。
+        //
+        // 为什么不用 Delegate.CreateDelegate：开放实例委托要求第一个参数就是成员的声明类型，
+        // 而这里第一个参数只能是基类 Thing —— Mono（RimWorld 的运行时）会直接拒绝并报
+        // "method arguments are incompatible"（CoreCLR 宽松一些，所以这个坑只在游戏里现形）。
+        // 因此自己发一小段带 castclass 的 IL：既跨运行时可用，又让虚属性仍然走虚分派（callvirt）。
+        //
+        // 构建失败一律留 null 并回落反射：优化不能变成新的失败源——CE 改名、或运行时不允许
+        // 动态方法时，行为与优化前完全一致。
+        static Func<Thing, Vector3>? exactPositionGetter;   // ProjectileCE.ExactPosition（虚属性）
+        static Func<Thing, int>? flightTicksGetter;         // ProjectileCE.FlightTicks
+        static Func<Thing, int>? truePosTicksGetter;        // ProjectileCE.ticksToTruePosition
+
+        // worker 的 ExactPosToDrawPos 签名：第 1 个参数是 worker 实例（开放实例委托）
+        delegate Vector3 DrawPosAccessor(object worker, Vector3 exactPos, int flightTicks, int ticksToTruePosition, float altitude);
+
+        // 按 worker 运行时类型缓存（worker 实例随 def 而异，方法随类型固定）。null 值也要缓存：
+        // 它表示「该类型构建不出委托」，避免每次调用都重试一遍并重复打日志。
+        static readonly Dictionary<Type, DrawPosAccessor?> drawAccessorCache = new Dictionary<Type, DrawPosAccessor?>();
+
+        static DrawPosAccessor? GetDrawAccessor(Type workerType)
+        {
+            if (drawAccessorCache.TryGetValue(workerType, out DrawPosAccessor? accessor)) return accessor;
+
+            accessor = BuildDrawAccessor(workerType);
+            drawAccessorCache[workerType] = accessor;
+            return accessor;
+        }
+
+        static DrawPosAccessor? BuildDrawAccessor(Type workerType)
+        {
+            MethodInfo? method = AccessTools.Method(workerType, "ExactPosToDrawPos");
+            if (method == null) return null;
+
+            // 同样绕开 Delegate.CreateDelegate：第一个参数是 object，与 DeclaringType 不同，
+            // Mono 会拒绝。这里显式 castclass 到 worker 的实际类型。
+            try
+            {
+                var accessor = new DynamicMethod(
+                    "GunplayCE_DrawPos", typeof(Vector3),
+                    new[] { typeof(object), typeof(Vector3), typeof(int), typeof(int), typeof(float) },
+                    typeof(Thing).Module, skipVisibility: true);
+
+                ILGenerator il = accessor.GetILGenerator();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Castclass, workerType);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Ldarg_3);
+                il.Emit(OpCodes.Ldarg_S, (byte)4);
+                il.Emit(OpCodes.Callvirt, method);
+                il.Emit(OpCodes.Ret);
+
+                return (DrawPosAccessor)accessor.CreateDelegate(typeof(DrawPosAccessor));
+            }
+            catch (Exception e)
+            {
+                Log.Warning("[Gunplay] Could not build a direct call to " + workerType.Name
+                    + ".ExactPosToDrawPos; CE trail positions will use reflection. " + e.Message);
+                return null;
+            }
+        }
+
+        static Vector3 GetExactPosition(Thing proj)
+        {
+            // 反射取值失败时退回本体绘制位置，而不是在某次版本失配后每 tick 抛异常
+            Func<Thing, Vector3>? fast = exactPositionGetter;
+            if (fast != null) return fast(proj);
+
+            return exactPositionProp?.GetValue(proj) is Vector3 pos ? pos : proj.DrawPos;
+        }
+
+        static int GetFlightTicks(Thing proj)
+        {
+            Func<Thing, int>? fast = flightTicksGetter;
+            if (fast != null) return fast(proj);
+
+            return flightTicksField?.GetValue(proj) is int ticks ? ticks : 0;
+        }
+
+        static int GetTicksToTruePosition(Thing proj)
+        {
+            Func<Thing, int>? fast = truePosTicksGetter;
+            if (fast != null) return fast(proj);
+
+            return ticksToTruePositionField?.GetValue(proj) is int ticks ? ticks : 0;
+        }
 
         // CE 投射物存活期间的实时位置读取器（由轨迹每 tick 调用）
         internal static Func<Vector3> CreateExactPositionGetter(Thing proj)
         {
-            // 反射取值失败时退回本体绘制位置，而不是在某次版本失配后每 tick 抛异常
-            return () => exactPositionProp?.GetValue(proj) is Vector3 pos ? pos : proj.DrawPos;
+            return () => GetExactPosition(proj);
+        }
+
+        // 逐项独立构建：某一项解析不了只影响它自己（回落反射），并在日志里点名是哪一个成员。
+        // 上一次这三个挤在同一个 try/catch 里，一条 "method arguments are incompatible"
+        // 完全看不出是谁的问题。整段都不影响补丁是否挂上。
+        static void BuildFastAccessors()
+        {
+            if (exactPositionProp != null) exactPositionGetter = BuildAccessor<Vector3>(exactPositionProp);
+            if (flightTicksField != null) flightTicksGetter = BuildAccessor<int>(flightTicksField);
+            if (ticksToTruePositionField != null) truePosTicksGetter = BuildAccessor<int>(ticksToTruePositionField);
+        }
+
+        // 把「Thing 参数 → 读成员」编成无装箱委托。成员声明类型与 Thing 之间的那一步由 castclass 完成，
+        // 所以不要求第一个参数等于声明类型（这正是 CreateDelegate 在 Mono 上做不到的）；
+        // 虚属性用 callvirt，分派语义与原来的 GetValue 一致。
+        static Func<Thing, T>? BuildAccessor<T>(MemberInfo member)
+        {
+            Type? declaring = member.DeclaringType;
+            if (declaring == null) return null;
+
+            MethodInfo? getter = member is PropertyInfo prop ? prop.GetGetMethod(true) : null;
+            if (member is PropertyInfo && getter == null) return null;
+            if (member is FieldInfo f && f.IsStatic) return null;
+
+            try
+            {
+                var accessor = new DynamicMethod(
+                    "GunplayCE_" + member.Name, typeof(T), new[] { typeof(Thing) },
+                    typeof(Thing).Module, skipVisibility: true);
+
+                ILGenerator il = accessor.GetILGenerator();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Castclass, declaring);
+                if (member is FieldInfo field) il.Emit(OpCodes.Ldfld, field);
+                else il.Emit(OpCodes.Callvirt, getter!);
+                il.Emit(OpCodes.Ret);
+
+                return (Func<Thing, T>)accessor.CreateDelegate(typeof(Func<Thing, T>));
+            }
+            catch (Exception e)
+            {
+                Log.Warning("[Gunplay] Could not build a direct accessor for " + declaring.Name + "." + member.Name
+                    + "; it will be read via reflection instead. " + e.Message);
+                return null;
+            }
         }
 
         internal static float GetDamageAmount(Thing proj)
@@ -80,36 +215,32 @@ namespace Gunplay.Patch
 
         // ---------------- 绘制位置（CE 高度映射）----------------
 
-        static MethodInfo? GetDrawMethod(Type workerType)
-        {
-            if (!drawMethodCache.TryGetValue(workerType, out MethodInfo? method))
-            {
-                method = AccessTools.Method(workerType, "ExactPosToDrawPos");
-                drawMethodCache[workerType] = method;
-            }
-            return method;
-        }
-
         // 经 worker 的 ExactPosToDrawPos 计算投射物当前的实际绘制位置（y 为 altitude 层，z 含高度偏移）
         internal static Vector3 GetDrawPosition(Thing proj)
         {
-            Vector3 exact = exactPositionProp?.GetValue(proj) is Vector3 pos ? pos : proj.DrawPos;
+            Vector3 exact = GetExactPosition(proj);
             object? worker = trajectoryWorkerProp?.GetValue(proj.def.projectile);
-            int flightTicks = flightTicksField?.GetValue(proj) is int ticks ? ticks : 0;
+            int flightTicks = GetFlightTicks(proj);
             return DrawViaWorker(proj, worker, exact, flightTicks);
         }
 
         static Vector3 DrawViaWorker(Thing proj, object? worker, Vector3 exact, int flightTicks)
         {
             float altitude = proj.def.Altitude;
-            MethodInfo? draw = worker != null ? GetDrawMethod(worker.GetType()) : null;
-            if (draw == null) return new Vector3(exact.x, altitude, exact.z); // 反射失败兜底：地面投影
+            if (worker == null) return new Vector3(exact.x, altitude, exact.z); // 无 worker 兜底：地面投影
+
+            DrawPosAccessor? fast = GetDrawAccessor(worker.GetType());
+            if (fast != null) return fast(worker, exact, flightTicks, GetTicksToTruePosition(proj), altitude);
+
+            // 兜底：委托构建失败时走反射。这条路径正常不会走到，只在 CE 改签名时兜一次
+            MethodInfo? draw = AccessTools.Method(worker.GetType(), "ExactPosToDrawPos");
+            if (draw == null) return new Vector3(exact.x, altitude, exact.z);
 
             object[] args =
             {
                 exact,
                 flightTicks,
-                ticksToTruePositionField?.GetValue(proj) is int trueTicks ? trueTicks : 0,
+                GetTicksToTruePosition(proj),
                 altitude
             };
             return (Vector3)draw.Invoke(worker, args);
@@ -136,7 +267,7 @@ namespace Gunplay.Patch
 
             // 统一为“第 j 个点 = 第 j tick 的绘制位置”（两种 worker 的起点约定不同，统一补发射点）
             List<Vector3> result = new List<Vector3>(tickCount + 2);
-            Vector3 launchExact = exactPositionProp?.GetValue(proj) is Vector3 launch ? launch : proj.DrawPos;
+            Vector3 launchExact = GetExactPosition(proj);
             Vector3 last = DrawViaWorker(proj, worker, launchExact, 0);
             result.Add(last);
 
@@ -187,6 +318,8 @@ namespace Gunplay.Patch
             ticksToTruePositionField = AccessTools.Field(ceType, "ticksToTruePosition");
             startingTicksToImpactField = AccessTools.Field(ceType, "startingTicksToImpact");
 
+            BuildFastAccessors();
+
             MethodBase? launch = AccessTools.Method(ceType, "Launch", new[] { typeof(Thing), typeof(Vector2), typeof(Thing) });
             MethodBase? throwLaunch = AccessTools.Method(ceType, "Throw", new[] { typeof(Thing), typeof(Vector3), typeof(Vector3), typeof(Thing) });
             MethodBase? impact = AccessTools.Method(ceType, "Impact", new[] { typeof(Thing) });
@@ -208,6 +341,22 @@ namespace Gunplay.Patch
         }
 
         static void SpawnTrailPostfix(Thing __instance, Thing launcher, Thing equipment)
+        {
+            // 与 PatchProjectileLaunch.Postfix 同一理由：后缀抛异常会中断 CE 的 Launch/Throw，
+            // 异常会顺着 TickList 掀掉整个 tick。轨迹登记失败只该是「这一发没轨迹」。
+            try
+            {
+                RunSpawnTrail(__instance, launcher, equipment);
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce("[Gunplay] CE trail registration failed for projectile '" + (__instance.def?.defName ?? "?")
+                    + "'; this shot has no trail. " + e,
+                    ("GunplayCESpawnTrail" + __instance.def?.defName).GetHashCode());
+            }
+        }
+
+        static void RunSpawnTrail(Thing __instance, Thing launcher, Thing equipment)
         {
             // 是否绘制（全局开关 + 单项覆写 + XML 是否配了 trail）统一由 ProjectileRules.TrailEnabled 决定
             if (!ProjectileRules.TrailEnabled(__instance.def)) return;
@@ -232,6 +381,22 @@ namespace Gunplay.Patch
         }
 
         static void ImpactPrefix(Thing __instance, Thing hitThing)
+        {
+            // 与 PatchProjectileImpact.Prefix 同一理由：前缀抛异常会中断 CE 的 Impact，
+            // Destroy() 就写在里面，投射物会永生且每 tick 再抛一次。
+            try
+            {
+                RunImpact(__instance, hitThing);
+            }
+            catch (Exception e)
+            {
+                Log.ErrorOnce("[Gunplay] CE impact prefix failed for projectile '" + (__instance.def?.defName ?? "?")
+                    + "'; impact effects and final trail capture were skipped for this hit. " + e,
+                    ("GunplayCEImpactPrefix" + __instance.def?.defName).GetHashCode());
+            }
+        }
+
+        static void RunImpact(Thing __instance, Thing hitThing)
         {
             Map map = __instance.Map;
             if (map == null) return;

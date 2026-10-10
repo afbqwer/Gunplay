@@ -48,14 +48,17 @@ namespace Gunplay
             };
         }
 
+        // 复用的像素缓冲：Fill 在「轨迹材质」窗口拖滑块时会被每帧调用（参数变了就重建），
+        // 逐次 new 出 64KB 是白扔给 GC 的垃圾——与 GeometryBuffer 那边避免临时分配的取向一致。
+        // 只在主线程调用（窗口 OnGUI 与轨迹登记都在主线程）。
+        static readonly Color32[] pixels = new Color32[Width * Height];
+
         // 按参数写像素。参数改动时就地重填同一张贴图而不是新建：材质持有的是这张贴图，
         // 换实例就得同时去改材质（还要处理旧贴图的销毁），原地重写最省事也最安全。
         // 因此贴图必须保持可读（见下面的 Apply）——一旦 makeNoLongerReadable，
         // 下次 SetPixels32 就会抛 "texture data is either not readable"。
         public static void Fill(Texture2D tex, TrailMaterialParams p)
         {
-            Color32[] pixels = new Color32[Width * Height];
-
             // 两端取较大者归一化：最宽端恒为 1，轮廓必然贴住四边形边缘。
             // 于是"可见宽度"与"四边形宽度"两种口径恒等，trailWidth 的含义无须改变。
             float maxWidth = Mathf.Max(0.0001f, Mathf.Max(p.headWidth, p.tailWidth));

@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using HarmonyLib;
 using Verse;
@@ -32,12 +33,19 @@ namespace Gunplay.Patch
         }
 
         // 缓存「当前地图 → 组件」。Map.GetComponent<T> 会线性扫描 components 列表，
-        // 放在每帧的绘制路径上不值得；地图切换或组件尚未就绪时才重新解析。
+        // 放在每帧的绘制路径上不值得；只在切换地图时重新解析。
         static Map? cachedMap;
         static MapComponent_ProjectileTrails? cachedComp;
 
+        // 绘制一旦出错就整体禁用。几何/上传的错误是确定性的（同一份数据每帧走同一条路径），
+        // 继续跑只会每帧抛一次；而这里是 Map.MapUpdate 内部，异常会连标记、覆盖层、微粒
+        // 一起中断。与 TryPatch 失败即禁用轨迹是同一口径。
+        static bool disabled;
+
         static void Postfix()
         {
+            if (disabled) return;
+
             // 与目标方法保持同一开关口径
             if (!DebugViewSettings.drawThingsDynamic) return;
 
@@ -49,14 +57,24 @@ namespace Gunplay.Patch
                 return;
             }
 
-            if (map != cachedMap || cachedComp == null)
+            // 组件在 Map 构造时由 FillComponents 创建，已构造的地图必有它——解析一次就够。
+            // 取不到只可能是这张地图确实没有，不必每帧重扫一遍 components 列表。
+            if (map != cachedMap)
             {
                 cachedMap = map;
                 cachedComp = MapComponent_ProjectileTrails.For(map);
             }
             if (cachedComp == null) return;
 
-            ProjectileTrailBatcher.Draw(cachedComp.Trails);
+            try
+            {
+                ProjectileTrailBatcher.Draw(cachedComp.Trails);
+            }
+            catch (Exception e)
+            {
+                disabled = true;
+                Log.Error("[Gunplay] Projectile trail draw failed; trails are disabled for this session. " + e);
+            }
         }
     }
 }

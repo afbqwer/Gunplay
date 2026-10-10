@@ -159,6 +159,12 @@ namespace Gunplay
             }
         }
 
+        // 分组缓存：刻意不清理，规模本身有界——键是 (材质实例, 颜色)，颜色来自 def / 单项覆写，
+        // 材质来自 TrailMaterial 的按 def 缓存，组合数被 def 与颜色数约束，不随飞行中的轨迹数增长。
+        //
+        // 隐含前提：同一个 def 的材质实例必须稳定。生成档走 MaterialPool.MatFrom，相同请求返回
+        // 同一实例，所以 Invalidate / InvalidateAll（读档、改参数）不会产生新组；哪天改成自建材质
+        // 实例，这个字典就会随每次重建持续累积 Mesh 与顶点缓冲——届时必须补一个清理点。
         static readonly Dictionary<TrailMaterialKey, MeshGroup> groups = new Dictionary<TrailMaterialKey, MeshGroup>();
         static readonly List<MeshGroup> used = new List<MeshGroup>();
 
