@@ -281,21 +281,10 @@ namespace Gunplay
 
         // 判停阈值：「位置连续不变」达到多少个 tick 才算投射物真的停住了。
         //
-        // 取 17 = 15 + 2。15 是原版 Projectile 在视野外限流位置更新的间隔（它的 UpdateRateTicks
+        // 15 是原版 Projectile 在视野外限流位置更新的间隔（它的 UpdateRateTicks
         // 只有两档：视野内 1、其余一律 15），而 Thing.DoTick 保证每 15 tick 至少调一次 TickInterval，
-        // 于是两次位置更新之间位置不变的连续读数最多 14 个（15 - 1）。门槛取 15 以上即安全，
-        // 这里取 17：比上界高 3，再算上「> 17」自身要 +1，实际是第 18 个静止 tick 才动手；
-        // 多出来的余量留给边界情况，不是推导出来的。
-        //
-        // 刻意写死而不读 projectile.UpdateRateTicks：那是「此刻」的瞬时值，而 ticksIdle 是
-        // 「一段时间攒出来的」计数，两个量不在同一时刻，混用会误判——弹体在屏幕外攒到 11~14 个
-        // 静止 tick 时，只要镜头平移/缩放把它带进视野（弹体自己没动，是镜头动了），
-        // UpdateRateTicks 会立刻从 15 变成 1，阈值跟着塌成 3，还在正常飞行的轨迹当场被判死。
-        // 固定阈值与镜头状态无关。
-        //
-        // 代价：屏内落地待引爆的弹丸（手雷，explosionDelay = 100）比原先晚 7 tick（约 0.12 秒）
-        // 才开始淡出，看不出差别。
-        const int StationaryTicksBeforeDrop = 17;
+        // 于是两次位置更新之间位置不变的连续读数最多 14 个（15 - 1）。门槛取 15 以上即安全
+        const int StationaryTicksBeforeDrop = 15;
 
         // 由 MapComponent_ProjectileTrails.MapComponentTick 每 tick 调用
         public void Tick()

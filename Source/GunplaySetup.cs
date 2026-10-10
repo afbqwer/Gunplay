@@ -146,9 +146,9 @@ namespace Gunplay
 
                 if (shadowed != null)
                 {
-                    Log.Message("[Gunplay] Projectile '" + def.defName + "' matched multiple name-match keywords. "
-                        + "The longer keyword '" + winnerKeyword + "' wins; overridden keyword(s): '"
-                        + string.Join("', '", shadowed) + "'. Adjust ProjectilePropDef.matchKeywords to remove the ambiguity.");
+                    //Log.Message("[Gunplay] Projectile '" + def.defName + "' matched multiple name-match keywords. "
+                    //    + "The longer keyword '" + winnerKeyword + "' wins; overridden keyword(s): '"
+                    //    + string.Join("', '", shadowed) + "'. Adjust ProjectilePropDef.matchKeywords to remove the ambiguity.");
                 }
 
                 projectilePropMap[def] = matched ?? defaultProjectileDef;
