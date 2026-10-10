@@ -33,6 +33,9 @@ namespace Gunplay
             // 轨迹批量绘制：显式挂载（目标方法缺失时只报错并禁用轨迹，不抛异常）
             PatchDynamicDrawTrails.TryPatch(harmony);
 
+            // 拖拽涂抹的光标图标：同样是可缺省的装饰，指标丢了不影响功能
+            PatchDrawDragPaintIcon.TryPatch(harmony);
+
             foreach (GunPropDef def in DefDatabase<GunPropDef>.AllDefs)
             {
                 ThingDef? target = null;

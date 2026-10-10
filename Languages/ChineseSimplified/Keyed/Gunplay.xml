@@ -76,6 +76,7 @@
   <GunplayPickerCurrent>当前</GunplayPickerCurrent>
   <GunplayPickerNone>无</GunplayPickerNone>
   <GunplayPickerMisc>其他</GunplayPickerMisc>
+  <GunplayPickerAlpha>不透明度：{0}%</GunplayPickerAlpha>
   <GunplayTrailTextureGroupLength>沿飞行方向（纵向）</GunplayTrailTextureGroupLength>
   <GunplayTrailTextureGroupWidth>轨迹宽度方向（横向）</GunplayTrailTextureGroupWidth>
   <GunplayTrailTexturePeakAlpha>峰值不透明度</GunplayTrailTexturePeakAlpha>
@@ -118,9 +119,9 @@
   <GunplayOverrideColWidth>轨迹宽度</GunplayOverrideColWidth>
   <GunplayOverrideColLength>长度</GunplayOverrideColLength>
   <GunplayOverrideColFade>淡出</GunplayOverrideColFade>
-  <GunplayOverrideTipWidth>轨迹宽度，世界单位。绝对值，既不看宽度模式也不乘全局倍率.</GunplayOverrideTipWidth>
-  <GunplayOverrideTipLength>长度 = 该值 × 投射物自身的（未缩放）弹速。绝对值，不受全局轨迹长度影响.</GunplayOverrideTipLength>
-  <GunplayOverrideTipFade>弹体消失后，拖尾收缩到零所需的 tick 数（60 tick = 1 秒）。绝对值，不受全局淡出时长影响.</GunplayOverrideTipFade>
+  <GunplayOverrideTipWidth>轨迹宽度，世界单位。绝对值，既不看宽度模式也不乘全局倍率.按住 Shift 拖动可把本行的值涂到扫过的行.</GunplayOverrideTipWidth>
+  <GunplayOverrideTipLength>长度 = 该值 × 投射物自身的（未缩放）弹速。绝对值，不受全局轨迹长度影响.按住 Shift 拖动可把本行的值涂到扫过的行.</GunplayOverrideTipLength>
+  <GunplayOverrideTipFade>弹体消失后，拖尾收缩到零所需的 tick 数（60 tick = 1 秒）。绝对值，不受全局淡出时长影响.按住 Shift 拖动可把本行的值涂到扫过的行.</GunplayOverrideTipFade>
   <GunplayOverrideNoWeapon>没有武器使用该投射物.</GunplayOverrideNoWeapon>
   <GunplayOverrideWeaponTipHeader>使用该投射物的武器：</GunplayOverrideWeaponTipHeader>
   <GunplayOverrideNoResults>没有符合当前过滤条件的投射物.</GunplayOverrideNoResults>

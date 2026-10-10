@@ -34,11 +34,15 @@ namespace Gunplay
     //              会顺带开启覆写，但**只**记材质一项，不会把当时的宽度/长度/淡出一起固化（见 SetTrailMaterial）。
     //   「颜色」—— 该投射物的轨迹颜色。它比材质自带的颜色更具体，因此排在材质列之后。
     //
-    // 开关 / 材质 / 颜色三类格子都支持拖拽批量修改（drag-paint）：在某一行按下左键后上下拖动，
-    // 鼠标扫过的行会被涂成同一个值——开关取「按下那一行切换后的状态」（与本体复选框的涂抹一致，
-    // 见 Widgets.ToggleInvisibleDraggable 的 paintable 分支），材质与颜色取「按下那一行当时的值」。
-    // 材质 / 颜色的单击仍是打开选择窗口，两者不冲突：拖拽结束时鼠标不在原来那个按钮上，
-    // 按钮不会触发点击。实现见 DragPaint。
+    // 开关 / 材质 / 颜色 / 数值四类格子都支持拖拽修改（实现见 DragPaint）：
+    //   开关 · 材质 · 颜色 —— 直接拖动（方向不限），扫过的行被涂成同一个值
+    //     （开关取「按下那一行切换后的状态」，与本体复选框的涂抹一致，见
+    //      Widgets.ToggleInvisibleDraggable 的 paintable 分支；材质与颜色取「按下那一行当时的值」）。
+    //   数值三列 —— Shift + 拖动（方向不限），把本行的值涂到扫过的行。
+    //     唯独它多要一个 Shift：在数值输入框上直接拖是"选中文字"（拖过数字就能全选替换），
+    //     抢掉是净损失；按住 Shift 才是用户明确表态"我要涂"，此时方向也不必再限制。
+    // 单击都仍是原来的行为（开选择窗口 / 聚焦输入框），与拖拽不冲突：没越过 4.5 像素阈值就不算拖拽，
+    // 越过了则拖拽结束、鼠标松开时也已经不在原来那个控件上。
     //
     // 列表可能有数百行（装 CE 或大型武器包之后更多），因此走虚拟滚动：只为可见区间建 Rect，
     // 但输入框的字符串缓冲必须挂在行对象上跨帧保留，否则滚出视野再滚回来会丢焦点/丢输入。
@@ -78,10 +82,15 @@ namespace Gunplay
 
         const float ToggleSize = 24f;
 
-        // 拖拽涂抹的格子种类（见 DragPaint.Sweep 的 tag）。材质列与颜色列相邻，
+        // 拖拽涂抹的格子种类（见 DragPaint.Cell 的 tag）。材质列与颜色列相邻，
         // 横向拖出去时要靠它把「涂材质」挡在材质列内，否则颜色格会拿到一个 ProjectileTrailDef 转不成 Color。
-        const int MaterialPaintTag = 1;
-        const int ColorPaintTag = 2;
+        // 数值三列各一个，免得 Shift 涂抹横着划过去时把宽度涂到长度列上。
+        // 全部 internal：顶层的光标图标补丁按它决定画什么，见 PatchDrawDragPaintIcon。
+        internal const int MaterialPaintTag = 1;
+        internal const int ColorPaintTag = 2;
+        internal const int WidthPaintTag = 3;
+        internal const int LengthPaintTag = 4;
+        internal const int FadePaintTag = 5;
 
         public override Vector2 InitialSize => new Vector2(1280f, 720f);
 
@@ -122,17 +131,21 @@ namespace Gunplay
             internal readonly float width;
             internal readonly float min;
             internal readonly float max;
+            internal readonly bool integer;   // 长度 / 淡出是整数刻度，涂过去的值要取整
+            internal readonly int paintTag;   // Shift + 拖拽涂抹的格子种类（见 DragPaint.Cell）
             internal readonly Func<float, string> format;
             internal readonly string tipKey;
             internal readonly Func<Row, float> effective;   // 该行当前生效值（未覆写时也用它做只读显示）
             internal readonly Action<Row, float> apply;     // 写入覆写
 
-            internal NumberColumn(float width, float min, float max, Func<float, string> format,
-                string tipKey, Func<Row, float> effective, Action<Row, float> apply)
+            internal NumberColumn(float width, float min, float max, bool integer, int paintTag,
+                Func<float, string> format, string tipKey, Func<Row, float> effective, Action<Row, float> apply)
             {
                 this.width = width;
                 this.min = min;
                 this.max = max;
+                this.integer = integer;
+                this.paintTag = paintTag;
                 this.format = format;
                 this.tipKey = tipKey;
                 this.effective = effective;
@@ -142,17 +155,17 @@ namespace Gunplay
 
         // 宽度是绝对值（0~2 世界单位，3 位小数）；长度系数与淡出是整数刻度（tick）
         static readonly NumberColumn WidthColumn = new NumberColumn(
-            WidthColumnWidth, MinWidth, MaxWidth, Format, "GunplayOverrideTipWidth",
+            WidthColumnWidth, MinWidth, MaxWidth, false, WidthPaintTag, Format, "GunplayOverrideTipWidth",
             row => TrailWidth.EffectiveForDef(row.projectile),
             (row, v) => ProjectileOverrides.SetTrailWidth(row.projectile, v));
 
         static readonly NumberColumn LengthColumn = new NumberColumn(
-            LengthColumnWidth, TrailLength.Min, TrailLength.Max, FormatInt, "GunplayOverrideTipLength",
+            LengthColumnWidth, TrailLength.Min, TrailLength.Max, true, LengthPaintTag, FormatInt, "GunplayOverrideTipLength",
             row => TrailLength.Effective(row.projectile, row.trailDef),
             (row, v) => ProjectileOverrides.SetTrailLength(row.projectile, v));
 
         static readonly NumberColumn FadeColumn = new NumberColumn(
-            FadeColumnWidth, TrailFade.Min, TrailFade.Max, FormatInt, "GunplayOverrideTipFade",
+            FadeColumnWidth, TrailFade.Min, TrailFade.Max, true, FadePaintTag, FormatInt, "GunplayOverrideTipFade",
             row => TrailFade.Effective(row.projectile, row.trailDef),
             (row, v) => ProjectileOverrides.SetTrailFade(row.projectile, v));
 
@@ -192,6 +205,15 @@ namespace Gunplay
         public static void Open()
         {
             Find.WindowStack.Add(new ProjectileOverrideWindow());
+        }
+
+        // 拖到一半关窗（按 Esc、点关闭按钮、点窗外）会让"正在涂抹"的状态卡住：
+        // 之后没有行再调 Sweep 去推进它，而顶层画光标图标的地方只看 Active，
+        // 于是那个图标会一直粘在鼠标上。这里兜一次底。
+        public override void PostClose()
+        {
+            base.PostClose();
+            DragPaint.Reset();
         }
 
         // ---------------- 数据构建 ----------------
@@ -707,7 +729,7 @@ namespace Gunplay
 
             Rect rect = new Rect(x, y, OverrideToggleWidth, RowHeight);
             DrawToggleBox(x + (OverrideToggleWidth - ToggleSize) * 0.5f, y, state);
-            Widgets.ToggleInvisibleDraggable(rect, ref state, MouseoverSoundAllowed, true);
+            Widgets.ToggleInvisibleDraggable(rect, ref state, true, true);
             TooltipHandler.TipRegion(rect, "GunplayOverrideTipEnabled".Translate());
 
             if (state == before) return;
@@ -739,11 +761,6 @@ namespace Gunplay
             Widgets.CheckboxDraw(iconX, y + (RowHeight - ToggleSize) * 0.5f, state, false, ToggleSize);
         }
 
-        // 鼠标悬停音。按住左键期间一律关掉：涂抹一次要扫过几十行，逐行"嘀"一声很难听。
-        // 判断用「左键是否按着」而不是 DragPaint.Active —— 后者要等位移越过阈值才算数，
-        // 而第一行的音早在按下那一瞬就发出去了，那时再静音已经晚了。
-        static bool MouseoverSoundAllowed => !Input.GetMouseButton(0);
-
         // 拖动期间（左键按着）冻结 visible 列表的重建。
         //
         // 起因：过滤生效时（仅显示已覆写 / 轨迹过滤），把一行涂成不符合条件就会让它从 visible 里
@@ -760,7 +777,7 @@ namespace Gunplay
 
             Rect rect = new Rect(x, y, TrailToggleWidth, RowHeight);
             DrawToggleBox(x + (TrailToggleWidth - ToggleSize) * 0.5f, y, state);
-            Widgets.ToggleInvisibleDraggable(rect, ref state, MouseoverSoundAllowed, true);
+            Widgets.ToggleInvisibleDraggable(rect, ref state, true, true);
             TooltipHandler.TipRegion(rect, "GunplayOverrideTipTrail".Translate());
 
             if (state == before) return;
@@ -784,7 +801,7 @@ namespace Gunplay
             // 单独指定过时勾选框的悬浮区让出右侧那一段给「×」。
             Rect boxRect = new Rect(x, y, SpeedColumnWidth - (picked ? ResetButtonWidth : 0f), RowHeight);
             DrawToggleBox(x + 6f, y, state);
-            Widgets.ToggleInvisibleDraggable(boxRect, ref state, MouseoverSoundAllowed, true);
+            Widgets.ToggleInvisibleDraggable(boxRect, ref state, true, true);
             TooltipHandler.TipRegion(boxRect, "GunplayOverrideTipSpeed".Translate());
 
             if (state != speedOn)
@@ -915,7 +932,7 @@ namespace Gunplay
             Widgets.DrawBox(swatchRect, 1);
             TooltipHandler.TipRegion(swatchRect, "GunplayOverrideTipColor".Translate());
 
-            if (Widgets.ButtonInvisible(swatchRect, MouseoverSoundAllowed))
+            if (Widgets.ButtonInvisible(swatchRect))
             {
                 if (EnsureOverridden(row)) AfterOverrideChanged();
 
@@ -938,7 +955,7 @@ namespace Gunplay
             // 起始格若本来就是继承色（hasColor=false），涂出去的是那个继承色的具体值 ——
             // 也就是被涂的行会多出一条自定义色记录。这是有意的：用户拖的是「这个颜色」，
             // 不是「跟着那个材质走」，否则目标行的材质与起始行不同时涂出来的色就不一样了。
-            if (DragPaint.Sweep(cellRect, ColorPaintTag, color))
+            if (DragPaint.Cell(cellRect, ColorPaintTag, color))
             {
                 ProjectileOverrides.SetTrailColor(row.projectile, (Color)DragPaint.Value!);
                 AfterOverrideChanged();
@@ -967,7 +984,7 @@ namespace Gunplay
             string label = row.trailDef != null ? row.trailDef.defName : "—";
             Rect buttonRect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, MaterialColumnWidth - 8f), RowHeight - 10f);
 
-            if (Widgets.ButtonText(buttonRect, label, true, MouseoverSoundAllowed))
+            if (Widgets.ButtonText(buttonRect, label))
             {
                 TrailMaterialPicker.Open(row.trailDef, def =>
                 {
@@ -988,7 +1005,7 @@ namespace Gunplay
             // 那表示起始格用的是继承材质，涂出去就是让目标行也回到继承 —— 与单击「清除」同一个结果）。
             // 单击仍由上面的 ButtonText 负责：拖拽结束时鼠标不在原来那个按钮上，Unity 的
             // GUI.Button 不会触发；反过来，只是点一下时 DragPaint 也判不出拖动，两边互不干扰。
-            if (DragPaint.Sweep(cellRect, MaterialPaintTag, row.trailDef))
+            if (DragPaint.Cell(cellRect, MaterialPaintTag, row.trailDef))
             {
                 ProjectileOverrides.SetTrailMaterial(row.projectile, DragPaint.Value as ProjectileTrailDef);
 
@@ -1001,17 +1018,38 @@ namespace Gunplay
         // 数值列（宽度 / 长度 / 淡出）的统一渲染。三列流程完全一致：
         //   轨迹关掉 → 占位符；未覆写 → 只读显示当前生效值；覆写 → 可编辑输入框。
         // 差异全部来自 col，见 NumberColumn 与三个静态实例。
+        //
+        // 数值格也接涂抹手势：Shift + 拖动（方向不限）→ 把本行的值涂到扫过的行。
+        // 未覆写的行也能起拖：它的"值"就是当前生效值，涂一下即把它固化成一项覆写。
+        //
         // editValue / buffer 走 ref 是因为它们必须长期挂在 Row 上：缓冲跨帧保留，
         // 否则滚出视野再滚回来会丢焦点、丢正在输入的内容。
         void DrawNumberCell(Row row, in NumberColumn col, float x, float y, bool overridden, bool trailOn,
             ref float editValue, ref string? buffer)
         {
+            // 命中区是整个格子（与材质 / 颜色列同规矩，见指南 8.1）。
+            // 不能图省事直接拿下面那个内缩 5px 的绘制矩形：行高 40、绘制高 30，
+            // 于是行与行之间留了 10 像素的空隙，起拖十有八九落在那段空隙里，判定直接落空。
+            Rect hitRect = new Rect(x, y, col.width, RowHeight);
             Rect rect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, col.width - 8f), RowHeight - 10f);
 
             if (overridden && !trailOn)
             {
                 DrawDash(rect);
                 return;
+            }
+
+            HandleNumberDrag(row, col, hitRect);
+
+            // 手势进行中：输入框一律让开。
+            // 按下那一刻没法预知会不会拖，所以输入框那时已经拿到焦点、甚至开始选字了；
+            // 这里每帧把焦点交还回去（幂等）。不还的话拖拽会被输入框当成"选中文字"处理，
+            // 松手后还留着一个焦点和一段选区。
+            // 放在 HandleNumberDrag 之后：手势确认的那一帧就把焦点还掉，不留那一帧的选字。
+            if (DragPaint.Active)
+            {
+                GUIUtility.keyboardControl = 0;
+                GUIUtility.hotControl = 0;
             }
 
             if (!overridden)
@@ -1034,6 +1072,38 @@ namespace Gunplay
 
             editValue = Mathf.Clamp(editValue, col.min, col.max);
             col.apply(row, editValue);
+        }
+
+        // 数值格上的涂抹手势（见 DragPaint.Cell）。
+        void HandleNumberDrag(Row row, in NumberColumn col, Rect rect)
+        {
+            // requireShift：在数值输入框上直接拖是"选中文字"（拖过数字就能全选替换），抢掉是净损失；
+            // 按住 Shift 才是用户明确表态"我要涂"，此时方向也不再限制。
+            if (DragPaint.Cell(rect, col.paintTag, col.effective(row), requireShift: true))
+            {
+                WriteNumber(row, col, (float)DragPaint.Value!);
+            }
+        }
+
+        // 把一个值写进某行。缓冲那一半交给 SyncEditValue —— 它本来就是
+        // 「按当前生效值重算本行所有输入框绑定值」的收尾函数，正好复用。
+        // （本行的 editValue / buffer 与 Row 上的字段是同一份，所以本帧的输入框会立刻显示新值。）
+        //
+        // 与输入框打字的收尾不同，这里必须走 AfterOverrideChanged：打字只发生在已覆写的行上，
+        // 而涂抹可以从"未覆写"的行起手，会新建记录、从而改变已覆写计数与过滤结果。
+        void WriteNumber(Row row, in NumberColumn col, float value)
+        {
+            col.apply(row, Snap(col, value));
+            SyncEditValue(row);
+            AfterOverrideChanged();
+        }
+
+        // 涂过去的值也要夹进列区间；整数列（长度 / 淡出）取整，
+        // 否则源行是 15.37 时会涂出一堆显示成 15、实际按 15.37 生效的行。
+        static float Snap(in NumberColumn col, float value)
+        {
+            value = Mathf.Clamp(value, col.min, col.max);
+            return col.integer ? Mathf.Round(value) : value;
         }
 
         // 「无意义」占位符：该行的轨迹被关掉时，宽度 / 长度 / 淡出都不生效

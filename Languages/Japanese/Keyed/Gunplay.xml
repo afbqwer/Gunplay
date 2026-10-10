@@ -76,6 +76,7 @@
   <GunplayPickerCurrent>現在</GunplayPickerCurrent>
   <GunplayPickerNone>なし</GunplayPickerNone>
   <GunplayPickerMisc>その他</GunplayPickerMisc>
+  <GunplayPickerAlpha>不透明度: {0}%</GunplayPickerAlpha>
   <GunplayTrailTextureGroupLength>飛翔方向（縦）</GunplayTrailTextureGroupLength>
   <GunplayTrailTextureGroupWidth>弾道の幅方向（横）</GunplayTrailTextureGroupWidth>
   <GunplayTrailTexturePeakAlpha>最大不透明度</GunplayTrailTexturePeakAlpha>
@@ -118,9 +119,9 @@
   <GunplayOverrideColWidth>弾道の幅</GunplayOverrideColWidth>
   <GunplayOverrideColLength>長さ</GunplayOverrideColLength>
   <GunplayOverrideColFade>消滅</GunplayOverrideColFade>
-  <GunplayOverrideTipWidth>弾道の幅（ワールド単位）。絶対値であり、幅の計算方法や全体的な倍率は適用されません。</GunplayOverrideTipWidth>
-  <GunplayOverrideTipLength>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになります。絶対値であり、全体的な弾道の長さの影響を受けません。</GunplayOverrideTipLength>
-  <GunplayOverrideTipFade>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。絶対値であり、全体的な消滅時間の影響を受けません。</GunplayOverrideTipFade>
+  <GunplayOverrideTipWidth>弾道の幅（ワールド単位）。絶対値であり、幅の計算方法や全体的な倍率は適用されません。Shift を押しながらドラッグすると、なぞった行に同じ値を塗れます。</GunplayOverrideTipWidth>
+  <GunplayOverrideTipLength>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになります。絶対値であり、全体的な弾道の長さの影響を受けません。Shift を押しながらドラッグすると、なぞった行に同じ値を塗れます。</GunplayOverrideTipLength>
+  <GunplayOverrideTipFade>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。絶対値であり、全体的な消滅時間の影響を受けません。Shift を押しながらドラッグすると、なぞった行に同じ値を塗れます。</GunplayOverrideTipFade>
   <GunplayOverrideNoWeapon>この発射体を使用する武器はありません。</GunplayOverrideNoWeapon>
   <GunplayOverrideWeaponTipHeader>この発射体を使用する武器：</GunplayOverrideWeaponTipHeader>
   <GunplayOverrideNoResults>現在の絞り込みに一致する発射体はありません。</GunplayOverrideNoResults>

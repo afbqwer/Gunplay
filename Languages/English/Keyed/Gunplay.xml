@@ -76,6 +76,7 @@
   <GunplayPickerCurrent>Current</GunplayPickerCurrent>
   <GunplayPickerNone>None</GunplayPickerNone>
   <GunplayPickerMisc>Misc</GunplayPickerMisc>
+  <GunplayPickerAlpha>Opacity: {0}%</GunplayPickerAlpha>
   <GunplayTrailTextureGroupLength>Along flight (length)</GunplayTrailTextureGroupLength>
   <GunplayTrailTextureGroupWidth>Across the trail (width)</GunplayTrailTextureGroupWidth>
   <GunplayTrailTexturePeakAlpha>Peak opacity</GunplayTrailTexturePeakAlpha>
@@ -118,9 +119,9 @@
   <GunplayOverrideColWidth>TrailW</GunplayOverrideColWidth>
   <GunplayOverrideColLength>Length</GunplayOverrideColLength>
   <GunplayOverrideColFade>Fade</GunplayOverrideColFade>
-  <GunplayOverrideTipWidth>Trail width in world units. Absolute value, ignores both the width mode and the width multiplier.</GunplayOverrideTipWidth>
-  <GunplayOverrideTipLength>Trail length is this value multiplied by the projectile's own (unscaled) speed. Absolute value, ignores the global trail length.</GunplayOverrideTipLength>
-  <GunplayOverrideTipFade>How many ticks the trail takes to shrink away after the projectile is gone, in ticks (60 ticks = 1 second). Absolute value, ignores the global fade duration.</GunplayOverrideTipFade>
+  <GunplayOverrideTipWidth>Trail width in world units. Absolute value, ignores both the width mode and the width multiplier. Hold Shift and drag to paint this row's value onto the rows you sweep over.</GunplayOverrideTipWidth>
+  <GunplayOverrideTipLength>Trail length is this value multiplied by the projectile's own (unscaled) speed. Absolute value, ignores the global trail length. Hold Shift and drag to paint this row's value onto the rows you sweep over.</GunplayOverrideTipLength>
+  <GunplayOverrideTipFade>How many ticks the trail takes to shrink away after the projectile is gone, in ticks (60 ticks = 1 second). Absolute value, ignores the global fade duration. Hold Shift and drag to paint this row's value onto the rows you sweep over.</GunplayOverrideTipFade>
   <GunplayOverrideNoWeapon>No weapon fires this projectile.</GunplayOverrideNoWeapon>
   <GunplayOverrideWeaponTipHeader>Weapons firing this projectile:</GunplayOverrideWeaponTipHeader>
   <GunplayOverrideNoResults>No projectiles match the current filter.</GunplayOverrideNoResults>
