@@ -33,6 +33,8 @@ namespace Gunplay
             ProjectileTrailState state = new ProjectileTrailState();
             state.LookupKey = proj;
             state.Initialize(proj, destination, trailDef);
+            // 分组在这里解析一次（材质与颜色此时已确定），之后每帧绘制不再做字典查找
+            state.drawGroup = ProjectileTrailBatcher.ResolveGroup(state);
             trails.Add(state);
             byProjectile[proj] = state;
         }
@@ -43,6 +45,7 @@ namespace Gunplay
             ProjectileTrailState state = new ProjectileTrailState();
             state.LookupKey = proj;
             state.InitializeCE(proj, destination, trailDef);
+            state.drawGroup = ProjectileTrailBatcher.ResolveGroup(state);
             trails.Add(state);
             byProjectile[proj] = state;
         }

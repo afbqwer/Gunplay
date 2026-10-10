@@ -70,7 +70,10 @@ namespace Gunplay
         // ---------------- 合并网格分组 ----------------
 
         // 一组同（材质 + 颜色）的轨迹：几何逐帧重建进一张可复用网格，单次 DrawMesh 提交。
-        class MeshGroup
+        //
+        // 从 private 放开为 internal：轨迹（ProjectileTrailState）要持有指向自己所属分组的引用，
+        // 好让分组在登记时解析一次，之后每帧直接追加几何、不再做字典查找（见 ResolveGroup）。
+        internal class MeshGroup
         {
             internal Material? material;   // 创建分组时解析一次；null 表示该 def 无材质，整组跳过
             internal Color color = Color.white;
@@ -82,6 +85,15 @@ namespace Gunplay
             internal Vector3 min;
             internal Vector3 max;
             internal bool touched;
+
+            internal MeshGroup(Material? material, Color color)
+            {
+                this.material = material;
+                this.color = color;
+                // 颜色是建组键的一半，建组后恒不变，所以这里设一次即可。
+                // 不必每帧在 UploadAndDraw 里重复设——那是每帧每组一次多余的托管→原生调用。
+                props.SetColor(ShaderPropertyIDs.Color, color);
+            }
 
             internal void Reset()
             {
@@ -142,13 +154,41 @@ namespace Gunplay
                 // bounds 只影响 Unity 自身的视锥剔除；外扩一格避免边缘轨迹被剔
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 
-                props.SetColor(ShaderPropertyIDs.Color, color);
+                // 颜色已在建组时写进 props，这里不再重复设
                 Graphics.DrawMesh(mesh, Matrix4x4.identity, material, 0, null, 0, props);
             }
         }
 
         static readonly Dictionary<TrailMaterialKey, MeshGroup> groups = new Dictionary<TrailMaterialKey, MeshGroup>();
         static readonly List<MeshGroup> used = new List<MeshGroup>();
+
+        // 解析该轨迹所属的绘制分组（同 (材质, 颜色) 复用同一组），由登记流程调用一次，
+        // 结果存到 trail.drawGroup 上。返回 null 表示无 def（该轨迹不绘制）。
+        //
+        // 为什么从 Draw 里挪出来：Draw 每帧要跑全图所有轨迹，而这里的 Material 解析与字典查找
+        // 都是"每条轨迹 × 每帧"的固定开销（TrailMaterial.For 内部还有一次字典查找）。材质与颜色
+        // 在轨迹登记后就固定了，算一次存起来即可，于是 Draw 只剩剔除 + 追加几何两件事。
+        //
+        // 唯一的取舍：若某 def 的材质「实例」发生变化（在生成贴图与文件贴图之间切换来源），
+        // 已在飞的轨迹会继续用旧实例直到消亡。注意「就地重填生成贴图」不属此类——那是实例不变、
+        // 贴图内容变，所有轨迹照旧立刻跟着更新（见 TrailMaterial.Build）。
+        internal static MeshGroup? ResolveGroup(ProjectileTrailState trail)
+        {
+            ProjectileTrailDef def = trail.def;
+            if (def == null) return null;
+
+            // 材质来源（运行时生成贴图 / def 自己的文件贴图）由 TrailMaterial 处理；
+            // 绘制键 = (材质, 颜色)，同材质同颜色的轨迹合并进同一张网格、同一次绘制调用
+            Material? material = TrailMaterial.For(def);
+            TrailMaterialKey key = new TrailMaterialKey(material, trail.color);
+
+            if (!groups.TryGetValue(key, out MeshGroup group))
+            {
+                group = new MeshGroup(material, trail.color);
+                groups[key] = group;
+            }
+            return group;
+        }
 
         public static void Draw(List<ProjectileTrailState> trails)
         {
@@ -167,19 +207,10 @@ namespace Gunplay
                 // 先剔除：这一步能淘汰绝大多数（在视野外）的轨迹，后面的工作才不会白做
                 if (!trail.IsVisible(view)) continue;
 
-                ProjectileTrailDef def = trail.def;
-                if (def == null) continue;
+                // 分组在登记时已解析好（ResolveGroup），这里不再做任何字典查找
+                MeshGroup? group = trail.drawGroup;
+                if (group == null) continue;
 
-                // 材质来源（运行时生成贴图 / def 自己的文件贴图）由 TrailMaterial 处理；
-                // 绘制键 = (材质, 颜色)，同材质同颜色的轨迹合并进同一张网格、同一次绘制调用
-                Material? material = TrailMaterial.For(def);
-                TrailMaterialKey key = new TrailMaterialKey(material, trail.color);
-
-                if (!groups.TryGetValue(key, out MeshGroup group))
-                {
-                    group = new MeshGroup { material = material, color = trail.color };
-                    groups[key] = group;
-                }
                 group.Add(trail);
             }
 
