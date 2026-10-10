@@ -76,18 +76,17 @@ namespace Gunplay
             internal Color color = Color.white;
             internal readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
             internal Mesh? mesh;          // 首帧惰性创建
-            internal readonly List<Vector3> verts = new List<Vector3>();
-            internal readonly List<Vector2> uvs = new List<Vector2>();
-            internal readonly List<int> tris = new List<int>();
+            // 顶点/UV/索引缓冲：预分配数组 + 手写计数（见 GeometryBuffer），取代原先三个 List。
+            // 非 readonly：要按 ref 传给 AppendGeometry 以支持扩容。
+            internal GeometryBuffer buffer = new GeometryBuffer(64);
             internal Vector3 min;
             internal Vector3 max;
             internal bool touched;
 
             internal void Reset()
             {
-                verts.Clear();
-                uvs.Clear();
-                tris.Clear();
+                // 只清计数，数组容量留到下一帧复用（扩容是稳态下唯一的一次性成本）
+                buffer.Clear();
                 touched = false;
             }
 
@@ -95,21 +94,11 @@ namespace Gunplay
             {
                 if (material == null) return;
 
-                int firstVert = verts.Count;
-                trail.AppendGeometry(verts, uvs, tris);
-                if (verts.Count == firstVert) return;   // 本帧该轨迹无可绘制内容
-
-                // 包围盒直接由本帧实际写入的顶点求出：直线/弧线同一套，且紧贴所画内容。
-                // 只影响 Unity 自身的视锥剔除——可见性已在外面逐条判过。
-                Vector3 lo = verts[firstVert];
-                Vector3 hi = lo;
-                for (int i = firstVert + 1; i < verts.Count; i++)
-                {
-                    Vector3 v = verts[i];
-                    if (v.x < lo.x) lo.x = v.x; else if (v.x > hi.x) hi.x = v.x;
-                    if (v.y < lo.y) lo.y = v.y; else if (v.y > hi.y) hi.y = v.y;
-                    if (v.z < lo.z) lo.z = v.z; else if (v.z > hi.z) hi.z = v.z;
-                }
+                // 几何写进本组缓冲，并顺带带回这段几何的 AABB（out 参数），直接合并进本组包围盒。
+                // 旧写法是「先写入 List，再从头回读整段顶点求 min/max」——那次回读要对 List
+                // 逐顶点调 get_Item / get_Count；顶点在生成时本就在寄存器里，顺手比较更便宜。
+                if (!trail.AppendGeometry(ref buffer, out Vector3 lo, out Vector3 hi))
+                    return;   // 本帧该轨迹无可绘制内容
 
                 if (!touched)
                 {
@@ -136,9 +125,10 @@ namespace Gunplay
                 }
 
                 mesh.Clear(true);
-                mesh.SetVertices(verts, 0, verts.Count, MeshFlags);
-                mesh.SetUVs(0, uvs, 0, uvs.Count, MeshFlags);
-                mesh.SetTriangles(tris, 0, false);
+                // 数组重载 + 显式区间：只上传 [0, count) 的有效段，尾部的陈旧数据不参与
+                mesh.SetVertices(buffer.verts, 0, buffer.vertCount, MeshFlags);
+                mesh.SetUVs(0, buffer.uvs, 0, buffer.vertCount, MeshFlags);
+                mesh.SetTriangles(buffer.tris, 0, 0, buffer.triCount, false);
                 // bounds 只影响 Unity 自身的视锥剔除；外扩一格避免边缘轨迹被剔
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 

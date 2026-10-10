@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Gunplay.Patch;
 using UnityEngine;
 using Verse;
@@ -43,6 +44,70 @@ namespace Gunplay
         internal const int Default = 16;
         internal const int Min = 2;
         internal const int Max = 64;
+    }
+
+    // 逐顶点/逐索引写入的几何缓冲：预分配数组 + 手写计数，取代 List<T>。
+    //
+    // 为什么不用 List<T>：List.Add 每次都要比一次容量、自增一次 _version，再对底层数组做一次
+    // 带边界检查的写入——在"每条轨迹 × 每个顶点"的路径上是纯固定开销，弹幕密集时正好是热点。
+    // 这里 AddVert/AddTri 直接写数组、自增计数，函数体小到可被内联，且只在数组真写满时才扩容；
+    // 容量跨帧保留（见 MeshGroup.Reset 只清计数），稳态下扩容基本不再发生。
+    //
+    // 顶点与 UV 一一对应，共用 vertCount；三角形索引单独 triCount。
+    internal struct GeometryBuffer
+    {
+        internal Vector3[] verts;
+        internal Vector2[] uvs;
+        internal int[] tris;
+        internal int vertCount;
+        internal int triCount;
+
+        internal GeometryBuffer(int initialVerts)
+        {
+            verts = new Vector3[initialVerts];
+            uvs = new Vector2[initialVerts];
+            // 索引数上限约是顶点数的 3 倍（弧线每段 2 顶点 / 6 索引，最坏趋近 3.0），一次留足
+            tris = new int[initialVerts * 3];
+            vertCount = 0;
+            triCount = 0;
+        }
+
+        // 清空计数、保留数组容量，供下一帧复用
+        internal void Clear()
+        {
+            vertCount = 0;
+            triCount = 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void AddVert(Vector3 v, Vector2 uv)
+        {
+            if (vertCount == verts.Length) GrowVerts();
+            verts[vertCount] = v;
+            uvs[vertCount] = uv;
+            vertCount++;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void AddTri(int index)
+        {
+            if (triCount == tris.Length) GrowTris();
+            tris[triCount] = index;
+            triCount++;
+        }
+
+        void GrowVerts()
+        {
+            int cap = verts.Length == 0 ? 64 : verts.Length * 2;
+            Array.Resize(ref verts, cap);
+            Array.Resize(ref uvs, cap);
+        }
+
+        void GrowTris()
+        {
+            int cap = tris.Length == 0 ? 192 : tris.Length * 2;
+            Array.Resize(ref tris, cap);
+        }
     }
 
     internal class ProjectileTrailState
@@ -310,11 +375,15 @@ namespace Gunplay
         // ---------------- 几何生成 ----------------
 
         // 追加本帧要绘制的几何。直线/弧线共用这一入口，由 batcher 统一合并进
-        // 按 (材质, 颜色) 分桶的网格；调用方据顶点数是否增长判断本帧有无内容。
-        public void AppendGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
+        // 按 (材质, 颜色) 分桶的网格。
+        //
+        // 几何写进调用方的 GeometryBuffer（ref 传入，可扩容）；同时用 out 带出这段几何的 AABB：
+        // 顶点在生成时就在寄存器里，顺手比较出包围盒，省掉了「写入后再逐顶点回读」那一趟。
+        // 返回 false 表示本帧该轨迹无可绘制内容（未写入任何顶点，min/max 无意义）。
+        public bool AppendGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max)
         {
-            if (arcing) AppendArcGeometry(verts, uvs, tris);
-            else AppendStraightGeometry(verts, uvs, tris);
+            if (arcing) return AppendArcGeometry(ref buffer, out min, out max);
+            return AppendStraightGeometry(ref buffer, out min, out max);
         }
 
         // 直线轨迹的几何：一个四边形，与 MeshPool.plane10 逐顶点/逐 UV/缠绕一致。
@@ -322,26 +391,36 @@ namespace Gunplay
         //   TRS(exactPosition - dir * len / 2, LookRotation(dir), (width, 1, len))
         // 变换到世界；这里把该变换展开成分量、直接写出世界坐标顶点（外观逐像素不变）：
         //   局部 +Z → dir（沿飞行方向），局部 +X → right = (dir.z, 0, -dir.x)（宽度方向）。
-        void AppendStraightGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
+        bool AppendStraightGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max)
         {
-            if (length <= 0f || dir.sqrMagnitude < 0.000001f) return;
+            min = default;
+            max = default;
+            if (length <= 0f || dir.sqrMagnitude < 0.000001f) return false;
 
             float len = DrawLength();
-            if (len <= 0f) return;
+            if (len <= 0f) return false;
 
             Vector3 right = new Vector3(dir.z, 0f, -dir.x) * (width * 0.5f);
             Vector3 head = exactPosition;                   // 头部恒在弹体当前绘制位置
             Vector3 tail = exactPosition - dir * len;
 
-            int b = verts.Count;
+            int b = buffer.vertCount;
             // 顶点顺序与 plane10 相同：(-x,-z)(-x,+z)(+x,+z)(+x,-z)，UV 的 v 从尾到头
-            verts.Add(tail - right); uvs.Add(new Vector2(0f, 0f));
-            verts.Add(head - right); uvs.Add(new Vector2(0f, 1f));
-            verts.Add(head + right); uvs.Add(new Vector2(1f, 1f));
-            verts.Add(tail + right); uvs.Add(new Vector2(1f, 0f));
+            buffer.AddVert(tail - right, new Vector2(0f, 0f));
+            buffer.AddVert(head - right, new Vector2(0f, 1f));
+            buffer.AddVert(head + right, new Vector2(1f, 1f));
+            buffer.AddVert(tail + right, new Vector2(1f, 0f));
 
-            tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
-            tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+            buffer.AddTri(b); buffer.AddTri(b + 1); buffer.AddTri(b + 2);
+            buffer.AddTri(b); buffer.AddTri(b + 2); buffer.AddTri(b + 3);
+
+            // 包围盒直接由 head/tail 与半宽推得，不回读刚写入的 4 个顶点：
+            // 宽度方向 ±right 只在 X/Z 上张开（right.y 恒为 0），各轴取 |right| 即两端极值。
+            float rx = Mathf.Abs(right.x);
+            float rz = Mathf.Abs(right.z);
+            min = new Vector3(Mathf.Min(head.x, tail.x) - rx, Mathf.Min(head.y, tail.y), Mathf.Min(head.z, tail.z) - rz);
+            max = new Vector3(Mathf.Max(head.x, tail.x) + rx, Mathf.Max(head.y, tail.y), Mathf.Max(head.z, tail.z) + rz);
+            return true;
         }
 
         // 当前实际拖尾长度（含投掷物消亡后的收缩）
@@ -356,9 +435,11 @@ namespace Gunplay
         }
 
         // 弧线轨迹的几何：沿弹道路径在尾部窗口内生成一串四边形。
-        void AppendArcGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
+        bool AppendArcGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max)
         {
-            if (arcHorizontalLength <= 0.0001f) return;
+            min = default;
+            max = default;
+            if (arcHorizontalLength <= 0.0001f) return false;
 
             // traveled 即沿飞行方向已经过的距离，可直接换算成弧线比例
             float head = Mathf.Clamp01(traveled / arcHorizontalLength);
@@ -372,10 +453,16 @@ namespace Gunplay
             }
 
             tail = Mathf.Clamp01(tail);
-            if (head - tail <= 0.0001f) return;
+            if (head - tail <= 0.0001f) return false;
 
             float halfWidth = width * 0.5f;
-            int baseIndex = verts.Count;
+            int baseIndex = buffer.vertCount;
+
+            // 段中心的围盒（不是顶点围盒）。顶点 = 中心 ± arcSide*halfWidth，宽度方向是常量偏移，
+            // 所以逐段只维护中心的 min/max，循环结束后一次性外扩半宽即得顶点 AABB。
+            // 这样每段只比较 3 个分量，且完全不必回读刚写入缓冲的顶点。
+            float cLoX = float.PositiveInfinity, cLoY = float.PositiveInfinity, cLoZ = float.PositiveInfinity;
+            float cHiX = float.NegativeInfinity, cHiY = float.NegativeInfinity, cHiZ = float.NegativeInfinity;
 
             // CE 采样点列存在时沿绘制路径取点，否则按解析抛物线取点
             int seg = 0;
@@ -400,18 +487,27 @@ namespace Gunplay
                     center = a + dir * (arcHorizontalLength * t) + ArcUp * height;
                 }
 
-                verts.Add(center - arcSide * halfWidth);
-                verts.Add(center + arcSide * halfWidth);
-                uvs.Add(new Vector2(0f, f));
-                uvs.Add(new Vector2(1f, f));
+                buffer.AddVert(center - arcSide * halfWidth, new Vector2(0f, f));
+                buffer.AddVert(center + arcSide * halfWidth, new Vector2(1f, f));
+
+                if (center.x < cLoX) cLoX = center.x; else if (center.x > cHiX) cHiX = center.x;
+                if (center.y < cLoY) cLoY = center.y; else if (center.y > cHiY) cHiY = center.y;
+                if (center.z < cLoZ) cLoZ = center.z; else if (center.z > cHiZ) cHiZ = center.z;
             }
 
             for (int i = 0; i < ArcSegmentCount; i++)
             {
                 int v = baseIndex + i * 2;
-                tris.Add(v + 0); tris.Add(v + 1); tris.Add(v + 3);
-                tris.Add(v + 0); tris.Add(v + 3); tris.Add(v + 2);
+                buffer.AddTri(v + 0); buffer.AddTri(v + 1); buffer.AddTri(v + 3);
+                buffer.AddTri(v + 0); buffer.AddTri(v + 3); buffer.AddTri(v + 2);
             }
+
+            // 由中心围盒外扩半宽（arcSide.y 恒为 0，Y 不受影响）
+            float ox = Mathf.Abs(arcSide.x) * halfWidth;
+            float oz = Mathf.Abs(arcSide.z) * halfWidth;
+            min = new Vector3(cLoX - ox, cLoY, cLoZ - oz);
+            max = new Vector3(cHiX + ox, cHiY, cHiZ + oz);
+            return true;
         }
 
         // ---------------- 弧线几何预计算 ----------------
