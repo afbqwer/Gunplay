@@ -109,8 +109,14 @@ namespace Gunplay
                 }
                 else
                 {
-                    min = Vector3.Min(min, lo);
-                    max = Vector3.Max(max, hi);
+                    // 手写分量取最小/最大：Vector3.Min/Max 内部各调三对 Mathf.Min/Max，
+                    // 而 Mathf.* 在 Mono 下不会内联，逐条轨迹都是一串真实调用。
+                    if (lo.x < min.x) min.x = lo.x;
+                    if (lo.y < min.y) min.y = lo.y;
+                    if (lo.z < min.z) min.z = lo.z;
+                    if (hi.x > max.x) max.x = hi.x;
+                    if (hi.y > max.y) max.y = hi.y;
+                    if (hi.z > max.z) max.z = hi.z;
                 }
             }
 
@@ -125,10 +131,14 @@ namespace Gunplay
                 }
 
                 mesh.Clear(true);
-                // 数组重载 + 显式区间：只上传 [0, count) 的有效段，尾部的陈旧数据不参与
+                // 数组重载 + 显式区间：只上传 [0, count) 的有效段，尾部的陈旧数据不参与。
+                // SetVertices/SetUVs 的区间是 (start, length, flags)，顺序与直觉一致。
                 mesh.SetVertices(buffer.verts, 0, buffer.vertCount, MeshFlags);
                 mesh.SetUVs(0, buffer.uvs, 0, buffer.vertCount, MeshFlags);
-                mesh.SetTriangles(buffer.tris, 0, 0, buffer.triCount, false);
+                // 注意 SetTriangles 的参数顺序与上面两个不同：(triangles, start, length, submesh, ...)。
+                // 写成 (tris, submesh, start, length, ...) 会因 baseVertex 有默认值而静默编译通过，
+                // 结果 length 变成 0、submesh 变成脏值——不报错但一个三角形都不上传。务必按此顺序。
+                mesh.SetTriangles(buffer.tris, 0, buffer.triCount, 0, false);
                 // bounds 只影响 Unity 自身的视锥剔除；外扩一格避免边缘轨迹被剔
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 

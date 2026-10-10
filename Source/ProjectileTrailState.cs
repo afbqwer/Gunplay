@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using Gunplay.Patch;
 using UnityEngine;
 using Verse;
@@ -46,14 +45,18 @@ namespace Gunplay
         internal const int Max = 64;
     }
 
-    // 逐顶点/逐索引写入的几何缓冲：预分配数组 + 手写计数，取代 List<T>。
+    // 顶点/UV/索引的写入缓冲：预分配数组 + 手写计数，取代 List<T>。
     //
     // 为什么不用 List<T>：List.Add 每次都要比一次容量、自增一次 _version，再对底层数组做一次
     // 带边界检查的写入——在"每条轨迹 × 每个顶点"的路径上是纯固定开销，弹幕密集时正好是热点。
-    // 这里 AddVert/AddTri 直接写数组、自增计数，函数体小到可被内联，且只在数组真写满时才扩容；
-    // 容量跨帧保留（见 MeshGroup.Reset 只清计数），稳态下扩容基本不再发生。
     //
-    // 顶点与 UV 一一对应，共用 vertCount；三角形索引单独 triCount。
+    // 这里只提供 Ensure（一次性预留容量，仅在不足时扩容），顶点/索引的写入由调用方用局部数组
+    // 引用直接完成（见 AppendStraightGeometry / AppendArcGeometry）。之所以不再提供逐顶点的
+    // AddVert/AddTri：Mono 不内联这类带分支的小方法，逐顶点一次调用本身就是可观的固定开销，
+    // 写成真方法反而把方法调用搬到了热路径上。
+    //
+    // 顶点与 UV 一一对应，共用 vertCount；三角形索引单独 triCount。容量跨帧保留
+    //（MeshGroup.Reset 只清计数），稳态下扩容基本不再发生。
     internal struct GeometryBuffer
     {
         internal Vector3[] verts;
@@ -79,41 +82,33 @@ namespace Gunplay
             triCount = 0;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void AddVert(Vector3 v, Vector2 uv)
+        // 为"接下来要写 extraVerts 个顶点、extraTris 个索引"预留容量，仅在不足时按 2 倍扩容。
+        // 每条轨迹只调一次（不是每个顶点一次），调用开销可忽略。
+        internal void Ensure(int extraVerts, int extraTris)
         {
-            if (vertCount == verts.Length) GrowVerts();
-            verts[vertCount] = v;
-            uvs[vertCount] = uv;
-            vertCount++;
-        }
+            int needV = vertCount + extraVerts;
+            if (needV > verts.Length)
+            {
+                int cap = verts.Length == 0 ? 64 : verts.Length;
+                while (cap < needV) cap *= 2;
+                Array.Resize(ref verts, cap);
+                Array.Resize(ref uvs, cap);
+            }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void AddTri(int index)
-        {
-            if (triCount == tris.Length) GrowTris();
-            tris[triCount] = index;
-            triCount++;
-        }
-
-        void GrowVerts()
-        {
-            int cap = verts.Length == 0 ? 64 : verts.Length * 2;
-            Array.Resize(ref verts, cap);
-            Array.Resize(ref uvs, cap);
-        }
-
-        void GrowTris()
-        {
-            int cap = tris.Length == 0 ? 192 : tris.Length * 2;
-            Array.Resize(ref tris, cap);
+            int needT = triCount + extraTris;
+            if (needT > tris.Length)
+            {
+                int cap = tris.Length == 0 ? 192 : tris.Length;
+                while (cap < needT) cap *= 2;
+                Array.Resize(ref tris, cap);
+            }
         }
     }
 
     internal class ProjectileTrailState
     {
-        // 当前生效段数（全局设置 + 夹取）。做成属性而非常量，是为了让 AppendArcGeometry
-        // 的三处循环保持原样；夹取放在这里，设置项即使被外部改成越界值也不会炸几何。
+        // 当前生效段数（全局设置 + 夹取）。夹取放在这里，设置项即使被外部改成越界值也不会炸几何。
+        // 代价是每次求值都走一遍属性 + Mathf.Clamp，所以调用方（AppendArcGeometry）先取一次存局部再用。
         static int ArcSegmentCount => Mathf.Clamp(GunplaySettings.arcSegmentCount, ArcSegments.Min, ArcSegments.Max);
 
         // 尾部至少占整段弧线的比例，避免低速抛射物（如手雷）的轨迹过短而不明显。
@@ -123,6 +118,13 @@ namespace Gunplay
         // 世界 +Y 只承担深度/排序，在屏幕上不可见；屏幕竖直方向对应世界 +Z（北）。
         // 必须与 Vanilla 保持一致：Projectile.DrawAt 用 (0,0,1)，PawnFlyer 用 Vector3.forward。
         static readonly Vector3 ArcUp = new Vector3(0f, 0f, 1f);
+
+        // 直线四边形四角的 UV（顺序与 plane10 一致，v 从尾到头）。做成静态常量直接复用：
+        // 这些值固定不变，没必要在逐条轨迹的热路径上反复构造 Vector2。
+        static readonly Vector2 UvTailLeft = new Vector2(0f, 0f);
+        static readonly Vector2 UvHeadLeft = new Vector2(0f, 1f);
+        static readonly Vector2 UvHeadRight = new Vector2(1f, 1f);
+        static readonly Vector2 UvTailRight = new Vector2(1f, 0f);
 
         // 深度微调。轨迹与投射物同处 Projectile 高度层（同一个 Y），深度测试无法区分先后，
         // 平局由同深度下的绘制规则决定；让轨迹 Y 略小于投射物即可稳定地"轨迹在弹体之下"。
@@ -404,34 +406,53 @@ namespace Gunplay
             Vector3 head = exactPosition;                   // 头部恒在弹体当前绘制位置
             Vector3 tail = exactPosition - dir * len;
 
-            int b = buffer.vertCount;
-            // 顶点顺序与 plane10 相同：(-x,-z)(-x,+z)(+x,+z)(+x,-z)，UV 的 v 从尾到头
-            buffer.AddVert(tail - right, new Vector2(0f, 0f));
-            buffer.AddVert(head - right, new Vector2(0f, 1f));
-            buffer.AddVert(head + right, new Vector2(1f, 1f));
-            buffer.AddVert(tail + right, new Vector2(1f, 0f));
+            // 一次性预留 4 顶点 / 6 索引，随后用局部数组引用直接写入：不逐顶点走方法调用。
+            buffer.Ensure(4, 6);
+            Vector3[] verts = buffer.verts;
+            Vector2[] uvs = buffer.uvs;
+            int[] tris = buffer.tris;
+            int v = buffer.vertCount;
+            int t = buffer.triCount;
+            int b = v;
 
-            buffer.AddTri(b); buffer.AddTri(b + 1); buffer.AddTri(b + 2);
-            buffer.AddTri(b); buffer.AddTri(b + 2); buffer.AddTri(b + 3);
+            // 顶点顺序与 plane10 相同：(-x,-z)(-x,+z)(+x,+z)(+x,-z)，UV 的 v 从尾到头
+            verts[v] = tail - right; uvs[v] = UvTailLeft;  v++;
+            verts[v] = head - right; uvs[v] = UvHeadLeft;  v++;
+            verts[v] = head + right; uvs[v] = UvHeadRight; v++;
+            verts[v] = tail + right; uvs[v] = UvTailRight; v++;
+
+            tris[t] = b; tris[t + 1] = b + 1; tris[t + 2] = b + 2; t += 3;
+            tris[t] = b; tris[t + 1] = b + 2; tris[t + 2] = b + 3; t += 3;
+
+            buffer.vertCount = v;
+            buffer.triCount = t;
 
             // 包围盒直接由 head/tail 与半宽推得，不回读刚写入的 4 个顶点：
             // 宽度方向 ±right 只在 X/Z 上张开（right.y 恒为 0），各轴取 |right| 即两端极值。
-            float rx = Mathf.Abs(right.x);
-            float rz = Mathf.Abs(right.z);
-            min = new Vector3(Mathf.Min(head.x, tail.x) - rx, Mathf.Min(head.y, tail.y), Mathf.Min(head.z, tail.z) - rz);
-            max = new Vector3(Mathf.Max(head.x, tail.x) + rx, Mathf.Max(head.y, tail.y), Mathf.Max(head.z, tail.z) + rz);
+            // Min/Max/Abs 一律展开成三元式：这些 Mathf 方法在 Mono 下不会被内联，逐次都是真实调用。
+            float rx = right.x < 0f ? -right.x : right.x;
+            float rz = right.z < 0f ? -right.z : right.z;
+            min = new Vector3(
+                (head.x < tail.x ? head.x : tail.x) - rx,
+                head.y < tail.y ? head.y : tail.y,
+                (head.z < tail.z ? head.z : tail.z) - rz);
+            max = new Vector3(
+                (head.x > tail.x ? head.x : tail.x) + rx,
+                head.y > tail.y ? head.y : tail.y,
+                (head.z > tail.z ? head.z : tail.z) + rz);
             return true;
         }
 
         // 当前实际拖尾长度（含投掷物消亡后的收缩）
         float DrawLength()
         {
-            float len = Mathf.Min(traveled, length);
+            // Mathf.Min/Max 展开成三元式，理由同 AppendStraightGeometry（Mono 不内联 Mathf）
+            float len = traveled < length ? traveled : length;
             if (ticksUtilDeath != -1)
             {
                 len *= fadeTicks > 0f ? ticksUtilDeath / fadeTicks : 0f;
             }
-            return Mathf.Max(0f, len);
+            return len > 0f ? len : 0f;
         }
 
         // 弧线轨迹的几何：沿弹道路径在尾部窗口内生成一串四边形。
@@ -441,24 +462,42 @@ namespace Gunplay
             max = default;
             if (arcHorizontalLength <= 0.0001f) return false;
 
-            // traveled 即沿飞行方向已经过的距离，可直接换算成弧线比例
-            float head = Mathf.Clamp01(traveled / arcHorizontalLength);
+            // 段数先取一次存局部：ArcSegmentCount 是带 Mathf.Clamp 的属性，而下面有三处都要用它，
+            // 若写在循环条件/循环体里，每次迭代都会重算一遍属性并连带一次 Clamp。
+            int segCount = ArcSegmentCount;
+
+            // traveled 即沿飞行方向已经过的距离，可直接换算成弧线比例。
+            // Clamp01 展开成三元式：Mathf.* 在 Mono 下都是真实调用。
+            float head = traveled / arcHorizontalLength;
+            head = head < 0f ? 0f : (head > 1f ? 1f : head);
             float tail = head - arcTailFraction;
 
             if (ticksUtilDeath != -1)
             {
                 // 投射物已消失：尾部向前收缩，模拟淡出（与直线轨迹一致）
-                float k = fadeTicks > 0f ? Mathf.Clamp01(ticksUtilDeath / fadeTicks) : 0f;
+                float k = fadeTicks > 0f ? ticksUtilDeath / fadeTicks : 0f;
+                k = k < 0f ? 0f : (k > 1f ? 1f : k);
                 tail = head - (head - tail) * k;
             }
 
-            tail = Mathf.Clamp01(tail);
+            tail = tail < 0f ? 0f : (tail > 1f ? 1f : tail);
             if (head - tail <= 0.0001f) return false;
 
             float halfWidth = width * 0.5f;
-            int baseIndex = buffer.vertCount;
+            float headMinusTail = head - tail;
+            Vector3 side = arcSide * halfWidth;   // 循环不变量（每段两次用到），移出循环
 
-            // 段中心的围盒（不是顶点围盒）。顶点 = 中心 ± arcSide*halfWidth，宽度方向是常量偏移，
+            // 一次性预留 (段数+1)*2 顶点 / 段数*6 索引，随后用局部数组引用直接写入
+            buffer.Ensure((segCount + 1) * 2, segCount * 6);
+            Vector3[] verts = buffer.verts;
+            Vector2[] uvs = buffer.uvs;
+            int[] tris = buffer.tris;
+            int v = buffer.vertCount;
+            int t = buffer.triCount;
+            int baseIndex = v;
+            float invSeg = 1f / segCount;
+
+            // 段中心的围盒（不是顶点围盒）。顶点 = 中心 ± side，宽度方向是常量偏移，
             // 所以逐段只维护中心的 min/max，循环结束后一次性外扩半宽即得顶点 AABB。
             // 这样每段只比较 3 个分量，且完全不必回读刚写入缓冲的顶点。
             float cLoX = float.PositiveInfinity, cLoY = float.PositiveInfinity, cLoZ = float.PositiveInfinity;
@@ -466,45 +505,57 @@ namespace Gunplay
 
             // CE 采样点列存在时沿绘制路径取点，否则按解析抛物线取点
             int seg = 0;
-            for (int i = 0; i <= ArcSegmentCount; i++)
+            for (int i = 0; i <= segCount; i++)
             {
-                float f = i / (float)ArcSegmentCount;
-                float t = Mathf.Lerp(tail, head, f);
+                float f = i * invSeg;
+                // 等价于 Mathf.Lerp(tail, head, f)：f 本就在 [0,1]，省掉 Clamp01 与一次方法调用
+                float tt = tail + headMinusTail * f;
 
                 Vector3 center;
                 if (ceArcSamples != null && ceArcCumLen != null)
                 {
-                    // 按绘制路径累计长度在采样点间插值（t 单调递增，段指针只前进）
-                    float d = Mathf.Clamp01(t) * ceArcTotalLen;
+                    // 按绘制路径累计长度在采样点间插值（tt 单调递增，段指针只前进）
+                    float d = tt * ceArcTotalLen;
                     while (seg < ceArcCumLen.Length - 2 && ceArcCumLen[seg + 1] < d) seg++;
                     float span = ceArcCumLen[seg + 1] - ceArcCumLen[seg];
-                    float k = span > 0.000001f ? Mathf.Clamp01((d - ceArcCumLen[seg]) / span) : 0f;
-                    center = Vector3.Lerp(ceArcSamples[seg], ceArcSamples[seg + 1], k);
+                    float k = 0f;
+                    if (span > 0.000001f)
+                    {
+                        k = (d - ceArcCumLen[seg]) / span;
+                        k = k < 0f ? 0f : (k > 1f ? 1f : k);
+                    }
+                    // 展开 Vector3.Lerp（其内部会调 Mathf.Clamp01，同样不内联）
+                    Vector3 p0 = ceArcSamples[seg];
+                    Vector3 p1 = ceArcSamples[seg + 1];
+                    center = new Vector3(p0.x + (p1.x - p0.x) * k, p0.y + (p1.y - p0.y) * k, p0.z + (p1.z - p0.z) * k);
                 }
                 else
                 {
-                    float height = arcHeight * 4f * t * (1f - t);
-                    center = a + dir * (arcHorizontalLength * t) + ArcUp * height;
+                    float height = arcHeight * 4f * tt * (1f - tt);
+                    center = a + dir * (arcHorizontalLength * tt) + ArcUp * height;
                 }
 
-                buffer.AddVert(center - arcSide * halfWidth, new Vector2(0f, f));
-                buffer.AddVert(center + arcSide * halfWidth, new Vector2(1f, f));
+                verts[v] = center - side; uvs[v] = new Vector2(0f, f); v++;
+                verts[v] = center + side; uvs[v] = new Vector2(1f, f); v++;
 
                 if (center.x < cLoX) cLoX = center.x; else if (center.x > cHiX) cHiX = center.x;
                 if (center.y < cLoY) cLoY = center.y; else if (center.y > cHiY) cHiY = center.y;
                 if (center.z < cLoZ) cLoZ = center.z; else if (center.z > cHiZ) cHiZ = center.z;
             }
 
-            for (int i = 0; i < ArcSegmentCount; i++)
+            for (int i = 0; i < segCount; i++)
             {
-                int v = baseIndex + i * 2;
-                buffer.AddTri(v + 0); buffer.AddTri(v + 1); buffer.AddTri(v + 3);
-                buffer.AddTri(v + 0); buffer.AddTri(v + 3); buffer.AddTri(v + 2);
+                int i0 = baseIndex + i * 2;
+                tris[t] = i0;     tris[t + 1] = i0 + 1; tris[t + 2] = i0 + 3; t += 3;
+                tris[t] = i0;     tris[t + 1] = i0 + 3; tris[t + 2] = i0 + 2; t += 3;
             }
 
+            buffer.vertCount = v;
+            buffer.triCount = t;
+
             // 由中心围盒外扩半宽（arcSide.y 恒为 0，Y 不受影响）
-            float ox = Mathf.Abs(arcSide.x) * halfWidth;
-            float oz = Mathf.Abs(arcSide.z) * halfWidth;
+            float ox = (arcSide.x < 0f ? -arcSide.x : arcSide.x) * halfWidth;
+            float oz = (arcSide.z < 0f ? -arcSide.z : arcSide.z) * halfWidth;
             min = new Vector3(cLoX - ox, cLoY, cLoZ - oz);
             max = new Vector3(cHiX + ox, cHiY, cHiZ + oz);
             return true;
