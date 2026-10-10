@@ -1,27 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ModMetaData>
-	<name>Gunplay (Continued)</name>
+	<name>Gunplay (Forked)</name>
 	<author>AUTOMATIC</author>
 	<supportedVersions>
 		<li>1.6</li>
 	</supportedVersions>
 	<packageId>assssssqwww.gunplay</packageId>
 	<description>
-[url="https://steamcommunity.com/sharedfiles/filedetails/?id=2034896549"]original Gunplay[/url]
+[url="https://steamcommunity.com/sharedfiles/filedetails/?id=2034896549"]original Gunplay[/url]Author: AUTOMATIC
 [url="https://github.com/afbqwer/Gunplay"]Github[/url]
-fix: custom projectile display cause exception
-fix: incendiary launcher like projectile display issue
 
-original description:
+修复了mod投射物导致空引用异常的问题
+修复了特殊投射物不显示轨迹以及命中特效的问题
+重构且改善了轨迹绘制的性能
+增加弧线轨迹的绘制功能
+轨迹颜色可自定义
+可单独配置投射物的轨迹
+增加了大量配置选项
 
-Adds more cinematic effects to ranged weapons:
-- long trails for projectiles
-- weapon animations for miniguns and bows
-- projectiles comes from thew barrel of the gun and not from inside of the colonist.
-- weapon movement animation for pawns missing their targets
-- different sounds for some weapons
-- visual effects for particle collision
-- faster projectile speed for all projectiles
 
-You can choose which changes you want in mod settings.</description>
+todo:补全中文、英文、日文的ProjectileTrailDef的DefInjected的本地化内容。
+todo:审查投射物单项覆写的错误处理，特别是def未找到的情况下需考虑如何处理。
+</description>
 </ModMetaData>

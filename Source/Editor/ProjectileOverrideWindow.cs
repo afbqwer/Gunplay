@@ -12,7 +12,8 @@ namespace Gunplay
 {
     // 投射物单项覆写窗口。
     //
-    // 结构：上方过滤区（搜索框 + mod 下拉 + 仅显示已覆写 + 计数 + 清除全部），下方列表区（表头 + 虚拟滚动）。
+    // 结构：上方过滤区（搜索框 + mod 下拉 + 轨迹过滤 + 仅显示已覆写 + 仅显示有武器 + 计数 + 清除全部），
+    // 下方列表区（表头 + 虚拟滚动）。
     // 一行 = 一个投射物 ThingDef；武器列只是上下文（轨迹本身只由投射物 def 决定，见 PatchProjectileLaunch），
     // 多个武器共用同一投射物时显示第一个并在 defName 后加「+N」，悬浮列出全部。
     //
@@ -51,10 +52,10 @@ namespace Gunplay
         const float Spacing = 6f;
         const float FilterRowHeight = 30f;
         const float HeaderHeight = 24f;
-        const float RowHeight = 40f;
+        const float RowHeight = 36f;
         const float IconSize = 32f;
         const float OverrideToggleWidth = 60f;
-        const float TrailToggleWidth = 60f;
+        const float TrailToggleWidth = 40f;
         const float SpeedColumnWidth = 60f;
         const float ColorColumnWidth = 70f;
         const float SwatchWidth = 50f;
@@ -64,9 +65,10 @@ namespace Gunplay
         const float WidthColumnWidth = 80f;
         const float LengthColumnWidth = 80f;
         const float FadeColumnWidth = 80f;
-        const float ModButtonWidth = 220f;
+        const float ModButtonWidth = 200f;
         const float TrailFilterWidth = 190f;
-        const float OnlyOverriddenWidth = 180f;
+        const float OnlyOverriddenWidth = 130f;
+        const float OnlyWithWeaponWidth = 130f;
         const float CountWidth = 200f;
         const float ClearButtonWidth = 150f;
         const float ScrollbarWidth = 16f;
@@ -194,6 +196,7 @@ namespace Gunplay
         string? modFilter;              // null = 全部
         TrailFilter trailFilter = TrailFilter.Any;
         bool onlyOverridden;
+        bool onlyWithWeapon;            // 只看「有武器发射」的投射物（weapons.Count > 0）
         Vector2 scrollPosition;
 
         bool visibleDirty = true;
@@ -343,7 +346,7 @@ namespace Gunplay
 
             foreach (ThingDef weapon in weapons)
             {
-                sb.AppendLine("  " + weapon.defName + (weapon.label.NullOrEmpty() ? "" : " — " + weapon.label));
+                sb.AppendLine("  " + weapon.defName + (weapon.label.NullOrEmpty() ? "" : "\n    " + weapon.label));
             }
 
             return sb.ToString().TrimEnd();
@@ -413,6 +416,7 @@ namespace Gunplay
                 if (modFilter != null && row.modName != modFilter) continue;
                 if (trailFilter != TrailFilter.Any && TrailShown(row) != (trailFilter == TrailFilter.Shown)) continue;
                 if (onlyOverridden && !ProjectileOverrides.Has(row.projectile)) continue;
+                if (onlyWithWeapon && row.weapons.Count == 0) continue;
                 if (!quickSearch.filter.Matches(row.searchText)) continue;
 
                 visible.Add(row);
@@ -480,7 +484,7 @@ namespace Gunplay
             Rect modRect = new Rect(curX, rect.y, ModButtonWidth, rect.height);
             string? currentMod = modFilter;
             if (currentMod == null) currentMod = "GunplayOverrideAllMods".Translate();
-            string modLabel = "GunplayOverrideModFilter".Translate() + ": " + currentMod;
+            string modLabel = currentMod;
             if (Widgets.ButtonText(modRect, modLabel)) OpenModMenu();
             curX += ModButtonWidth + Spacing;
 
@@ -493,9 +497,17 @@ namespace Gunplay
             // 仅显示已覆写
             Rect onlyRect = new Rect(curX, rect.y, OnlyOverriddenWidth, rect.height);
             bool before = onlyOverridden;
-            Widgets.CheckboxLabeled(onlyRect, "GunplayOverrideOnlyOverridden".Translate(), ref onlyOverridden);
+            FilterCheckboxLabeled(onlyRect, "GunplayOverrideOnlyOverridden".Translate(), ref onlyOverridden);
             if (onlyOverridden != before) MarkVisibleDirty();
             curX += OnlyOverriddenWidth + Spacing;
+
+            // 仅显示有武器发射的投射物（weapons.Count > 0）。炮塔 / 动物远程攻击 / 脚本投射物
+            // 这些「无武器」的投射物在列表里通常占大多数却没有可配的武器上下文，据此把它们滤掉。
+            Rect weaponRect = new Rect(curX, rect.y, OnlyWithWeaponWidth, rect.height);
+            bool weaponBefore = onlyWithWeapon;
+            FilterCheckboxLabeled(weaponRect, "GunplayOverrideOnlyWithWeapon".Translate(), ref onlyWithWeapon);
+            if (onlyWithWeapon != weaponBefore) MarkVisibleDirty();
+            curX += OnlyWithWeaponWidth + Spacing;
 
             // 计数
             Rect countRect = new Rect(curX, rect.y, CountWidth, rect.height);
@@ -506,6 +518,25 @@ namespace Gunplay
             // 清除全部
             Rect clearRect = new Rect(rect.xMax - ClearButtonWidth, rect.y, ClearButtonWidth, rect.height);
             if (Widgets.ButtonText(clearRect, "GunplayOverrideClearAll".Translate())) ConfirmClearAll();
+        }
+
+        // 过滤区那两个开关的绘制。与 Widgets.CheckboxLabeled 唯一的差别：标签文字右对齐、紧贴方框。
+        // CheckboxLabeled 把方框画在**整格右端**，文字却按 MiddleLeft 留在**整格最左端**
+        // （源码：rect2.xMax -= 24f; Label(rect2, label); CheckboxDraw(rect.x + rect.width - 24f, ...)），
+        // 于是字与自己的方框之间空出一大段，反而挨着前一个开关的方框，容易被读成属于上一个开关。
+        static void FilterCheckboxLabeled(Rect rect, string label, ref bool state)
+        {
+            Rect labelRect = rect;
+            labelRect.xMax -= ToggleSize;
+
+            TextAnchor anchor = Text.Anchor;
+            Text.Anchor = TextAnchor.MiddleRight;
+            Widgets.Label(labelRect, label);
+            Text.Anchor = anchor;
+
+            // 与 CheckboxLabeled 内部同款分工：整格负责点击，方框只画不处理，避免同一次点击被算两遍
+            Widgets.ToggleInvisibleDraggable(rect, ref state, true, false);
+            Widgets.CheckboxDraw(rect.xMax - ToggleSize - 4f, rect.y + (rect.height - ToggleSize) * 0.5f, state, false, ToggleSize);
         }
 
         void OpenModMenu()
@@ -571,10 +602,11 @@ namespace Gunplay
 
         void ConfirmClearAll()
         {
-            if (ProjectileOverrides.Count == 0) return;
+            int count = ProjectileOverrides.Count;
+            if (count == 0) return;
 
             Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation(
-                "GunplayOverrideClearAllConfirm".Translate(),
+                "GunplayOverrideClearAllConfirm".Translate(count),
                 () =>
                 {
                     ProjectileOverrides.Clear();
@@ -586,7 +618,8 @@ namespace Gunplay
                     MarkVisibleDirty();
                     RebuildVisible();
                 },
-                true));
+                true,
+                "GunplayOverrideClearAll".Translate()));
         }
 
         void DrawHeader(Rect rect)
@@ -596,10 +629,15 @@ namespace Gunplay
             Text.Anchor = TextAnchor.MiddleLeft;
             GUI.color = new Color(0.75f, 0.75f, 0.75f);
 
+            // 三个开关列（覆写 / 轨迹 / 弹速）的图标在格子里居中（见 DrawToggleBox），表头也居中才对得上；
+            // 其余列的内容都是左对齐（按钮 / 色块 / 输入框统一内缩 4px），表头保持左对齐。
+            Text.Anchor = TextAnchor.MiddleCenter;
             Widgets.Label(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
             Widgets.Label(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
             if (SpeedColumnShown)
                 Widgets.Label(new Rect(layout.speedX, rect.y, SpeedColumnWidth, rect.height), "GunplayOverrideColSpeed".Translate());
+
+            Text.Anchor = TextAnchor.MiddleLeft;
             Widgets.Label(new Rect(layout.materialX, rect.y, MaterialColumnWidth, rect.height), "GunplayOverrideColMaterial".Translate());
             Widgets.Label(new Rect(layout.colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
             Widgets.Label(new Rect(layout.projX, rect.y, layout.projW, rect.height), "GunplayOverrideColProjectile".Translate());
@@ -864,7 +902,7 @@ namespace Gunplay
             bool state = speedOn;
 
             Rect boxRect = new Rect(x, y, SpeedColumnWidth, RowHeight);
-            DrawToggleBox(x + 6f, y, state);
+            DrawToggleBox(x + (SpeedColumnWidth - ToggleSize) * 0.5f, y, state);
             Widgets.ToggleInvisibleDraggable(boxRect, ref state, true, true);
             TooltipHandler.TipRegion(boxRect, "GunplayOverrideTipSpeed".Translate());
 

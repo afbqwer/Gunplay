@@ -201,14 +201,14 @@ namespace Gunplay
                 }
 
                 listing_Standard.Gap(8f);
-                listing_Standard.Label("GunplayTrailMaterialDesc".Translate());
+                //listing_Standard.Label("GunplayTrailMaterialDesc".Translate());
                 if (listing_Standard.ButtonText("GunplayTrailMaterialName".Translate()))
                 {
                     Find.WindowStack.Add(new TrailMaterialWindow());
                 }
 
                 listing_Standard.Gap(8f);
-                listing_Standard.Label("GunplayProjectileOverridesDesc".Translate());
+                //listing_Standard.Label("GunplayProjectileOverridesDesc".Translate());
                 if (listing_Standard.ButtonText("GunplayProjectileOverridesName".Translate()))
                 {
                     ProjectileOverrideWindow.Open();

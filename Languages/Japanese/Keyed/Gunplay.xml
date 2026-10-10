@@ -91,16 +91,16 @@
   <GunplayTrailTexturePreviewTail>末端</GunplayTrailTexturePreviewTail>
   <GunplayTrailTexturePreviewActual>ディテール</GunplayTrailTexturePreviewActual>
   <GunplayTrailTexturePreviewShape>実際の形状</GunplayTrailTexturePreviewShape>
-  <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全てのMod</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>弾道</GunplayOverrideTrailFilter>
   <GunplayOverrideTrailFilterAll>指定なし</GunplayOverrideTrailFilterAll>
   <GunplayOverrideTrailFilterShown>弾道あり</GunplayOverrideTrailFilterShown>
   <GunplayOverrideTrailFilterHidden>弾道なし</GunplayOverrideTrailFilterHidden>
   <GunplayOverrideOnlyOverridden>上書き済みのみ</GunplayOverrideOnlyOverridden>
+  <GunplayOverrideOnlyWithWeapon>武器ありのみ</GunplayOverrideOnlyWithWeapon>
   <GunplayOverrideCount>上書き {0} / 全 {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>全ての上書きを解除</GunplayOverrideClearAll>
-  <GunplayOverrideClearAllConfirm>全ての発射体上書きを解除しますか？</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideClearAllConfirm>発射体の上書き {0} 件をすべて解除しますか？この操作は元に戻せません。</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>上書き</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>弾道</GunplayOverrideColTrail>
   <GunplayOverrideColSpeed>速度</GunplayOverrideColSpeed>

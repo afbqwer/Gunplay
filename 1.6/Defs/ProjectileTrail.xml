@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <Defs>
 
   <!-- 轨迹材质。一个 ProjectileTrailDef = 一种材质（材质类型就是它本身），谁用哪种材质由
@@ -20,8 +20,9 @@
 
   <Gunplay.ProjectileTrailDef Name="GunplayProjectileTrailDefault">
     <defName>default</defName>
-    <label>projectile trail</label>
-    <description>Uniform trail: the runtime-generated texture with equal width at the head and the tail.</description>
+    <label>default trail</label>
+    <description>Uniform trail: the runtime-generated texture with equal width at the head and the
+      tail.</description>
 
     <!-- <material> 整块省略 = 全部取数据类的字段默认值（等宽、纯白、宽度/长度/淡出均未设定）。
          下面的 graphicData 只是回退项：仅当 material.useGeneratedTexture 为 false 时才被读取。 -->
@@ -35,7 +36,7 @@
   <!-- 充能武器轨迹：等宽，仅换色（#A7EAFF）。颜色可在设置窗口的「轨迹颜色」中进一步覆写。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>charge</defName>
-
+    <label>charge trail</label>
     <material>
       <trailColor>(0.655, 0.918, 1, 0.7)</trailColor>
     </material>
@@ -44,6 +45,7 @@
   <!-- 燃烧武器轨迹：等宽换色（#FFB316）。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>incendiary</defName>
+    <label>incendiary trail</label>
     <description>Uniform trail in an orange tone.</description>
 
     <material>
@@ -54,7 +56,7 @@
 
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>medium</defName>
-
+    <label>medium trail</label>
     <material>
       <trailWidth>0.15</trailWidth>
     </material>
@@ -62,7 +64,7 @@
 
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>wide</defName>
-
+    <label>wide trail</label>
     <material>
       <trailWidth>0.25</trailWidth>
     </material>

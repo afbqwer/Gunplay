@@ -91,16 +91,16 @@
   <GunplayTrailTexturePreviewTail>尾</GunplayTrailTexturePreviewTail>
   <GunplayTrailTexturePreviewActual>细节</GunplayTrailTexturePreviewActual>
   <GunplayTrailTexturePreviewShape>实际形态</GunplayTrailTexturePreviewShape>
-  <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全部 Mod</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>轨迹</GunplayOverrideTrailFilter>
   <GunplayOverrideTrailFilterAll>不限</GunplayOverrideTrailFilterAll>
   <GunplayOverrideTrailFilterShown>显示轨迹</GunplayOverrideTrailFilterShown>
   <GunplayOverrideTrailFilterHidden>不显示轨迹</GunplayOverrideTrailFilterHidden>
   <GunplayOverrideOnlyOverridden>仅显示已覆写</GunplayOverrideOnlyOverridden>
+  <GunplayOverrideOnlyWithWeapon>仅显示有武器</GunplayOverrideOnlyWithWeapon>
   <GunplayOverrideCount>已覆写 {0} / 共 {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>清除全部覆写</GunplayOverrideClearAll>
-  <GunplayOverrideClearAllConfirm>确定要清除全部投射物覆写吗？</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideClearAllConfirm>确定要清除全部 {0} 项投射物覆写吗？此操作无法撤销。</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>覆写</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>轨迹</GunplayOverrideColTrail>
   <GunplayOverrideColSpeed>弹速</GunplayOverrideColSpeed>

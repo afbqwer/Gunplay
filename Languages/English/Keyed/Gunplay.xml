@@ -91,16 +91,16 @@
   <GunplayTrailTexturePreviewTail>Tail</GunplayTrailTexturePreviewTail>
   <GunplayTrailTexturePreviewActual>Detail</GunplayTrailTexturePreviewActual>
   <GunplayTrailTexturePreviewShape>In-game shape</GunplayTrailTexturePreviewShape>
-  <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>All mods</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>Trail</GunplayOverrideTrailFilter>
   <GunplayOverrideTrailFilterAll>Any</GunplayOverrideTrailFilterAll>
   <GunplayOverrideTrailFilterShown>Trail shown</GunplayOverrideTrailFilterShown>
   <GunplayOverrideTrailFilterHidden>Trail hidden</GunplayOverrideTrailFilterHidden>
   <GunplayOverrideOnlyOverridden>Overridden only</GunplayOverrideOnlyOverridden>
+  <GunplayOverrideOnlyWithWeapon>With weapon only</GunplayOverrideOnlyWithWeapon>
   <GunplayOverrideCount>Overridden {0} / total {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>Clear all overrides</GunplayOverrideClearAll>
-  <GunplayOverrideClearAllConfirm>Clear all per-projectile overrides?</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideClearAllConfirm>Clear all {0} per-projectile overrides? This cannot be undone.</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
   <GunplayOverrideColSpeed>Speed</GunplayOverrideColSpeed>

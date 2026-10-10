@@ -1,10 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
 
-  <default.label>発射物の軌跡</default.label>
-  <charge.label>発射物の軌跡</charge.label>
-  <incendiary.label>発射物の軌跡</incendiary.label>
-  <medium.label>発射物の軌跡</medium.label>
-  <wide.label>発射物の軌跡</wide.label>
+  <default.label>既定の弾道</default.label>
+  <default.description>等幅の弾道：実行時に生成されるテクスチャで、先端と末端の幅が同じです。</default.description>
+
+  <charge.label>チャージ弾道</charge.label>
+  <charge.description>淡い青色の等幅の弾道。チャージ系の武器向けです。</charge.description>
+
+  <incendiary.label>焼夷弾道</incendiary.label>
+  <incendiary.description>オレンジ色の等幅の弾道。</incendiary.description>
+
+  <medium.label>中幅の弾道</medium.label>
+  <medium.description>中程度の幅の等幅の弾道。</medium.description>
+
+  <wide.label>幅広の弾道</wide.label>
+  <wide.description>通常より太い等幅の弾道。</wide.description>
+
+  <taper.label>先細り弾道</taper.label>
+  <taper.description>末端が先細り：先端は最大幅で、末端に向かって細くなります。</taper.description>
+
+  <flare.label>末広がり弾道</flare.label>
+  <flare.description>末端が広がる：先端は細く、末端に向かって噴煙状に広がります。</flare.description>
 
 </LanguageData>
