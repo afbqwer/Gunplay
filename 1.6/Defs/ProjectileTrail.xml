@@ -37,7 +37,7 @@
     <defName>charge</defName>
 
     <material>
-      <trailColor>(0.655, 0.918, 1, 1)</trailColor>
+      <trailColor>(0.655, 0.918, 1, 0.7)</trailColor>
     </material>
   </Gunplay.ProjectileTrailDef>
 
@@ -47,7 +47,7 @@
     <description>Uniform trail in an orange tone.</description>
 
     <material>
-      <trailColor>(1, 0.702, 0.086, 1)</trailColor>
+      <trailColor>(1, 0.702, 0.086, 0.7)</trailColor>
       <trailWidth>0.15</trailWidth>
     </material>
   </Gunplay.ProjectileTrailDef>

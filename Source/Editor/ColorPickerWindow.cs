@@ -1,14 +1,52 @@
 using System;
 using System.Collections.Generic;
-using RimWorld;
 using UnityEngine;
 using Verse;
 
 namespace ASQPicker;
 
-public class ColorPickerWindow : Dialog_ColorPickerBase
+/// <summary>自带完整布局的取色窗：色轮 + 预设色板 + RGB 文本框 + 透明度滑条。
+/// 不继承 Dialog_ColorPickerBase（其读回行为私有绘制），以便给「当前颜色 / 旧颜色」等所有色块加棋盘格透明底纹。</summary>
+public class ColorPickerWindow : Window
 {
+    private const int ContextHash = 195906069; // 布局哈希，任意恒定值即可
+    private const float AlphaRowHeight = 30f;
+    private static readonly Vector2 ButSize = new Vector2(150f, 38f);
+
     private readonly Action<Color> onSave;
+    private readonly Color oldColor;
+    private Color color;
+    private float alpha;
+
+    private bool hsvColorWheelDragging;
+    private string[] textfieldBuffers = new string[6];
+    private Color textfieldColorBuffer;
+    private string? previousFocusedControlName;
+
+    // 棋盘格底纹：铺在所有半透明色块下面，让透明效果可见。
+    // 懒加载：Unity 纹理必须在主线程创建，静态初始化时机不可控，首次绘制时再生成。
+    private static Texture2D? alphaCheckerTex;
+
+    private static Texture2D AlphaCheckerTex => alphaCheckerTex ??= MakeAlphaCheckerTex();
+
+    private static Texture2D MakeAlphaCheckerTex()
+    {
+        // 8x8 像素，每格 4px；点过滤 + 平铺，缩放时不发虚。
+        Texture2D tex = new Texture2D(8, 8, TextureFormat.RGBA32, mipChain: false);
+        tex.name = "GunplayAlphaChecker";
+        tex.filterMode = FilterMode.Point;
+        tex.wrapMode = TextureWrapMode.Repeat;
+        for (int y = 0; y < 8; y++)
+        {
+            for (int x = 0; x < 8; x++)
+            {
+                bool alt = ((x >> 2) + (y >> 2)) % 2 == 1;
+                tex.SetPixel(x, y, alt ? new Color32(140, 140, 140, 255) : new Color32(224, 224, 224, 255));
+            }
+        }
+        tex.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+        return tex;
+    }
 
     private static readonly List<Color> pickableColors = new List<Color>
     {
@@ -29,27 +67,150 @@ public class ColorPickerWindow : Dialog_ColorPickerBase
         Color.magenta,
     };
 
-    protected override Color DefaultColor => oldColor;
-    protected override bool ShowDarklight => false;
-    protected override List<Color> PickableColors => pickableColors;
-    protected override float ForcedColorValue => -1f;
-    protected override bool ShowColorTemperatureBar => false;
     public override Vector2 InitialSize => new Vector2(600f, 520f);
 
     public ColorPickerWindow(Color initialColor, Action<Color> onSave)
-        : base(
-            Widgets.ColorComponents.All,
-            Widgets.ColorComponents.Red | Widgets.ColorComponents.Green | Widgets.ColorComponents.Blue)
     {
+        forcePause = true;
+        absorbInputAroundWindow = true;
+        closeOnClickedOutside = true;
+        closeOnAccept = false;
         color = initialColor;
         oldColor = initialColor;
+        alpha = initialColor.a;
         this.onSave = onSave;
     }
 
-    protected override void SaveColor(Color color)
+    public override void DoWindowContents(Rect inRect)
     {
-        // 取色器不编辑透明度，保存时保留原有 alpha。
-        onSave(new Color(color.r, color.g, color.b, oldColor.a));
+        // 色轮 / 调色板 / 文本框选色都会把 alpha 重置为 1，先把滑条值写回。
+        color.a = alpha;
+
+        using (TextBlock.Default())
+        {
+            RectDivider layout = new RectDivider(inRect, ContextHash);
+
+            // 底部锚定，自下而上堆叠：按钮行 → 透明度行 → 当前/旧颜色读回行。
+            RectDivider buttonRow = layout.NewRow(ButSize.y, VerticalJustification.Bottom);
+            RectDivider alphaRow = layout.NewRow(AlphaRowHeight + 4f, VerticalJustification.Bottom);
+            RectDivider readbackRow = layout.NewRow(Text.LineHeight * 2f + 6f, VerticalJustification.Bottom);
+
+            // 标题
+            using (new TextBlock(GameFont.Medium))
+            {
+                TaggedString title = "ChooseAColor".Translate().CapitalizeFirst();
+                RectDivider titleRect = layout.NewRow(Text.CalcHeight(title, layout.Rect.width));
+                Rect rect = titleRect.Rect;
+                rect.y -= 5f;
+                Widgets.Label(rect, title);
+            }
+            layout.NewRow(0f);
+
+            // 预设色板（右列）与 R/G/B 文本框（左侧），都画在色轮行区域里
+            float paletteHeight = DrawColorPalette(layout);
+            Vector2 textfieldSize = DrawColorTextfields(layout);
+
+            // 色轮：挖掉左侧文本框列与右侧色板列，画在中间剩余区域（与原版一致，避免压住色板）
+            float wheelRowHeight = Mathf.Max(paletteHeight, 128f, textfieldSize.y);
+            RectDivider wheelRow = layout.NewRow(wheelRowHeight);
+            wheelRow.NewCol(textfieldSize.x);
+            wheelRow.NewCol(250f, HorizontalJustification.Right);
+            Rect wheelRect = wheelRow.Rect.ContractedBy(
+                (wheelRow.Rect.width - 128f) / 2f,
+                (wheelRow.Rect.height - 128f) / 2f);
+            Widgets.HSVColorWheel(wheelRect, ref color, ref hsvColorWheelDragging);
+
+            // 读回 + 透明度 + 按钮
+            DrawReadback(readbackRow);
+            DrawAlphaRow(alphaRow);
+
+            if (Widgets.ButtonText(buttonRow.NewCol(ButSize.x), "GunplayPickerCancel".Translate()))
+            {
+                Close();
+            }
+            if (Widgets.ButtonText(buttonRow.NewCol(ButSize.x, HorizontalJustification.Right), "GunplayPickerConfirm".Translate()))
+            {
+                onSave(new Color(color.r, color.g, color.b, alpha));
+                Close();
+            }
+
+            if (Event.current.type == EventType.Layout)
+            {
+                previousFocusedControlName = GUI.GetNameOfFocusedControl();
+            }
+        }
+    }
+
+    private float DrawColorPalette(RectDivider layout)
+    {
+        // layout 是按值传入的 struct 副本，从这里切出右侧色板列不影响外层的布局状态。
+        RectDivider paletteCol = layout.NewCol(250f, HorizontalJustification.Right);
+
+        // 默认颜色块
+        const float boxSize = 26f;
+        RectDivider boxRow = paletteCol.NewRow(boxSize);
+        boxRow.Rect.SplitVertically(4f * (boxSize + 2f), out Rect left, out Rect _);
+        RectDivider boxLayout = new RectDivider(left, ContextHash, new Vector2(10f, 2f));
+        Color defaultColor = oldColor;
+        defaultColor.a = 1f;
+        Widgets.ColorBox(boxLayout.NewCol(boxSize), ref color, defaultColor);
+        Widgets.Label(boxLayout, "Default".Translate().CapitalizeFirst());
+
+        // 预设色
+        Widgets.ColorSelector(paletteCol, ref color, pickableColors, out float selectorHeight);
+        return selectorHeight + boxSize + 2f;
+    }
+
+    private Vector2 DrawColorTextfields(RectDivider layout)
+    {
+        RectAggregator aggregator = new RectAggregator(new Rect(layout.Rect.position, new Vector2(125f, 0f)), ContextHash);
+        Widgets.ColorTextfields(ref aggregator, ref color, ref textfieldBuffers, ref textfieldColorBuffer, previousFocusedControlName, "colorTextfields",
+            Widgets.ColorComponents.Red | Widgets.ColorComponents.Green | Widgets.ColorComponents.Blue,
+            Widgets.ColorComponents.All);
+        return aggregator.Rect.size;
+    }
+
+    private void DrawReadback(RectDivider row)
+    {
+        TaggedString currentLabel = "CurrentColor".Translate().CapitalizeFirst();
+        TaggedString oldLabel = "OldColor".Translate().CapitalizeFirst();
+        float labelWidth = Mathf.Max(100f, currentLabel.GetWidthCached(), oldLabel.GetWidthCached());
+
+        RectDivider line = row.NewRow(Text.LineHeight);
+        Widgets.Label(line.NewCol(labelWidth), currentLabel);
+        DrawCheckerSwatch(line.Rect, new Color(color.r, color.g, color.b, alpha));
+
+        line = row.NewRow(Text.LineHeight);
+        Widgets.Label(line.NewCol(labelWidth), oldLabel);
+        DrawCheckerSwatch(line.Rect, oldColor);
+    }
+
+    private void DrawAlphaRow(RectDivider row)
+    {
+        Rect rect = row.Rect;
+        Rect swatchRect = new Rect(rect.x, rect.y + (rect.height - 22f) / 2f, 22f, 22f);
+        Rect labelRect = new Rect(swatchRect.xMax + 6f, rect.y, 110f, rect.height);
+        Rect sliderRect = new Rect(labelRect.xMax + 8f, rect.y, rect.xMax - labelRect.xMax - 8f, rect.height);
+
+        DrawCheckerSwatch(swatchRect, new Color(color.r, color.g, color.b, alpha));
+
+        using (new TextBlock(TextAnchor.MiddleLeft))
+        {
+            Widgets.Label(labelRect, "GunplayPickerAlpha".Translate(Mathf.RoundToInt(alpha * 100f)));
+        }
+
+        alpha = Widgets.HorizontalSlider(sliderRect, alpha, 0f, 1f, middleAlignment: true, roundTo: 0.01f);
+        color.a = alpha;
+    }
+
+    /// <summary>带棋盘格底纹的色块：底纹 + 颜色 + 描边（供其他窗口的色块复用）。</summary>
+    public static void DrawCheckerSwatch(Rect rect, Color displayed)
+    {
+        // UV 按 8px 一格平铺（配合 wrapMode = Repeat），点过滤下格纹清晰不发虚。
+        Rect uv = new Rect(0f, 0f, rect.width / 8f, rect.height / 8f);
+        GUI.DrawTextureWithTexCoords(rect, AlphaCheckerTex, uv);
+        Widgets.DrawBoxSolid(rect, displayed);
+        Widgets.DrawBox(rect);
     }
 
     /// <summary>以 HTML 十六进制字符串形式读写颜色（颜色无法直接用 Scribe_Values 序列化）。

@@ -999,10 +999,7 @@ namespace Gunplay
             Rect swatchRect = new Rect(swatchX, y + (RowHeight - SwatchHeight) * 0.5f,
                 Mathf.Min(SwatchWidth, Mathf.Max(0f, ColorColumnWidth - (hasColor ? ResetButtonWidth + 12f : 8f))), SwatchHeight);
 
-            GUI.color = color;
-            GUI.DrawTexture(swatchRect, BaseContent.WhiteTex);
-            GUI.color = Color.white;
-            Widgets.DrawBox(swatchRect, 1);
+            ColorPickerWindow.DrawCheckerSwatch(swatchRect, color);
             TooltipHandler.TipRegion(swatchRect, "GunplayOverrideTipColor".Translate());
 
             if (Widgets.ButtonInvisible(swatchRect))

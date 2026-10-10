@@ -75,7 +75,7 @@ namespace Gunplay
         // ---------------- 几何与颜色 ----------------
 
         // 轨迹染色。生成贴图的本体是纯白，颜色完全由该字段乘出（经材质 _Color 逐组传入）。
-        public Color trailColor = Color.white;
+        public Color trailColor = new Color(1f, 1f, 1f, 0.7f);
 
         // 轨迹宽度（四边形宽度，世界单位）。-1 = 未设定，回落基础宽度（伤害/贴图口径）× 全局系数。
         public float trailWidth = -1f;
