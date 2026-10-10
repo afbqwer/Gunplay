@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -7,7 +8,7 @@ namespace Gunplay
 {
     // 把当前地图所有可见轨迹压到最少的绘制调用。
     //
-    // 两条绘制路径，都按 trail def（材质）分桶，因此绘制调用数 = 本帧用到的材质种类数：
+    // 两条绘制路径，都按（trail def + 颜色）分桶，因此绘制调用数 = 本帧用到的「材质×颜色」种类数：
     //   * 直线轨迹（绝大多数）：网格固定为 MeshPool.plane10，逐条只提供 TRS 矩阵，
     //     用 Graphics.DrawMeshInstanced 一次提交 → 每帧不重建网格、不碰索引缓冲、不重算包围盒；
     //   * 弧线轨迹（手雷/炮弹等）：几何逐帧变化、无法用矩阵表达，合并进一张可复用网格后单次 DrawMesh。
@@ -34,14 +35,52 @@ namespace Gunplay
         const MeshUpdateFlags MeshFlags =
             MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices;
 
-        // 实例化提交用的空属性块（与 DrawBatch.Flush 一致）
-        static readonly MaterialPropertyBlock sharedProps = new MaterialPropertyBlock();
+        // ---------------- 绘制键：轨迹 def + 颜色 ----------------
+
+        // 颜色经 MaterialPropertyBlock 的 _Color 传入（与原版 DrawBatch.Flush 给微粒上色的同一机制，
+        // Mote 系 shader 均支持），因此同 def 不同颜色不能共用分组，绘制键必须是 (def, color) 二元组。
+        // 颜色默认白时与不设色完全等价，不产生额外开销。
+        readonly struct TrailMaterialKey : IEquatable<TrailMaterialKey>
+        {
+            internal readonly ProjectileTrailDef def;
+            internal readonly Color color;
+
+            internal TrailMaterialKey(ProjectileTrailDef def, Color color)
+            {
+                this.def = def;
+                this.color = color;
+            }
+
+            public bool Equals(TrailMaterialKey other)
+            {
+                return def == other.def
+                    && color.r == other.color.r && color.g == other.color.g
+                    && color.b == other.color.b && color.a == other.color.a;
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return obj is TrailMaterialKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (def?.GetHashCode() ?? 0)
+                        ^ ((color.r.GetHashCode() * 397) ^ (color.g.GetHashCode() * 31))
+                        ^ ((color.b.GetHashCode() * 7) ^ (color.a.GetHashCode() * 3));
+                }
+            }
+        }
 
         // ---------------- 直线轨迹：按材质实例化 ----------------
 
         class InstancedGroup
         {
             internal Material? material;   // 创建分组时解析一次；null 表示该 def 无材质，整组跳过
+            internal Color color = Color.white;
+            internal readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
             internal readonly Matrix4x4[] matrices = new Matrix4x4[MaxInstancesPerCall];
             internal int count;
             internal bool touched;
@@ -72,8 +111,10 @@ namespace Gunplay
             internal void Draw()
             {
                 if (count == 0 || material == null) return;
+
+                props.SetColor(ShaderPropertyIDs.Color, color);
                 Graphics.DrawMeshInstanced(MeshPool.plane10, 0, material, matrices, count,
-                    sharedProps, ShadowCastingMode.Off, false, 0);
+                    props, ShadowCastingMode.Off, false, 0);
                 count = 0;
             }
         }
@@ -83,6 +124,8 @@ namespace Gunplay
         class ArcGroup
         {
             internal Material? material;
+            internal Color color = Color.white;
+            internal readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
             internal Mesh? mesh;          // 首帧惰性创建（常规 Maps 上几乎不会走到弧线路径）
             internal readonly List<Vector3> verts = new List<Vector3>();
             internal readonly List<Vector2> uvs = new List<Vector2>();
@@ -139,12 +182,13 @@ namespace Gunplay
                 // bounds 只影响 Unity 自身的视锥剔除：内容已按视口逐条剔除过，收紧到并集即可
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 
-                Graphics.DrawMesh(mesh, Matrix4x4.identity, material, 0);
+                props.SetColor(ShaderPropertyIDs.Color, color);
+                Graphics.DrawMesh(mesh, Matrix4x4.identity, material, 0, null, 0, props);
             }
         }
 
-        static readonly Dictionary<ProjectileTrailDef, InstancedGroup> instancedGroups = new Dictionary<ProjectileTrailDef, InstancedGroup>();
-        static readonly Dictionary<ProjectileTrailDef, ArcGroup> arcGroups = new Dictionary<ProjectileTrailDef, ArcGroup>();
+        static readonly Dictionary<TrailMaterialKey, InstancedGroup> instancedGroups = new Dictionary<TrailMaterialKey, InstancedGroup>();
+        static readonly Dictionary<TrailMaterialKey, ArcGroup> arcGroups = new Dictionary<TrailMaterialKey, ArcGroup>();
         static readonly List<InstancedGroup> usedInstanced = new List<InstancedGroup>();
         static readonly List<ArcGroup> usedArc = new List<ArcGroup>();
 
@@ -170,24 +214,25 @@ namespace Gunplay
                 ProjectileTrailDef def = trail.def;
                 if (def == null) continue;
 
+                // 绘制键 = (def, 颜色)：同 def 不同颜色的轨迹分属不同组、不同绘制调用
+                TrailMaterialKey key = new TrailMaterialKey(def, trail.color);
+
                 if (trail.IsArc)
                 {
-                    if (!arcGroups.TryGetValue(def, out ArcGroup arc))
+                    if (!arcGroups.TryGetValue(key, out ArcGroup arc))
                     {
-                        arc = new ArcGroup { material = def.DrawMatSingle };
-                        arcGroups[def] = arc;
+                        arc = new ArcGroup { material = TrailMaterial.For(def), color = trail.color };
+                        arcGroups[key] = arc;
                     }
                     arc.Add(trail);
                 }
                 else
                 {
-                    if (!instancedGroups.TryGetValue(def, out InstancedGroup inst))
+                    if (!instancedGroups.TryGetValue(key, out InstancedGroup inst))
                     {
-                        Material mat = def.DrawMatSingle;
-                        // 与 DrawBatch.Flush 同样的前置条件：实例化要求材质开启 enableInstancing
-                        if (mat != null) mat.enableInstancing = true;
-                        inst = new InstancedGroup { material = mat };
-                        instancedGroups[def] = inst;
+                        // 材质来源（运行时生成贴图 / def 自己的文件贴图）与 enableInstancing 都由 TrailMaterial 处理
+                        inst = new InstancedGroup { material = TrailMaterial.For(def), color = trail.color };
+                        instancedGroups[key] = inst;
                     }
                     inst.Add(trail);
                 }

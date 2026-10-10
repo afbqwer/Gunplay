@@ -1,9 +1,11 @@
 using System.Collections.Generic;
+using ASQPicker;
+using UnityEngine;
 using Verse;
 
 namespace Gunplay
 {
-    // 单个投射物的覆写记录。目前两项：是否绘制轨迹 + 轨迹宽度。
+    // 单个投射物的覆写记录。目前三项：是否绘制轨迹 + 轨迹宽度 + 轨迹颜色。
     // 后续要加覆写项（轨迹材质、拖尾长度、速度缩放等）时，只在这里加字段 +
     // 在 ProjectileOverrideWindow 加一列即可，存档格式向后兼容（缺失字段走默认值）。
     public class ProjectileOverride : IExposable
@@ -14,10 +16,18 @@ namespace Gunplay
         // 轨迹宽度，绝对值且完全独立：既不看伤害/贴图，也不乘全局系数。
         public float trailWidth;
 
+        // 自定义轨迹颜色。hasColor = false 表示继承该投射物所用轨迹 def 的颜色（见 TrailColor）。
+        // 颜色本身经 ColorPickerWindow.LookColor 以 "#RRGGBBAA" 字符串序列化。
+        public bool hasColor;
+        public Color trailColor = Color.white;
+
         public void ExposeData()
         {
             Scribe_Values.Look(ref trailEnabled, "trailEnabled", true);
             Scribe_Values.Look(ref trailWidth, "trailWidth", 0f);
+
+            Scribe_Values.Look(ref hasColor, "hasColor", false);
+            ColorPickerWindow.LookColor(ref trailColor, "trailColor", Color.white);
         }
     }
 
@@ -53,6 +63,17 @@ namespace Gunplay
             return over != null;
         }
 
+        // 自定义颜色是否命中。未设（记录不存在或 hasColor=false）时返回 false。
+        public static bool TryGetTrailColor(ThingDef? projectileDef, out Color color)
+        {
+            color = Color.white;
+            ProjectileOverride? over = Get(projectileDef);
+            if (over == null || !over.hasColor) return false;
+
+            color = over.trailColor;
+            return true;
+        }
+
         // 开启覆写：以当前计算出的宽度为起点，用户从「现状」开始调，不会看到轨迹突然变粗/变细。
         public static void Enable(ThingDef? projectileDef)
         {
@@ -78,6 +99,35 @@ namespace Gunplay
             ProjectileOverride? over = Get(projectileDef);
             if (over != null) over.trailEnabled = enabled;
             else Set(projectileDef, enabled, TrailWidth.EffectiveForDef(projectileDef));
+        }
+
+        // 设置自定义颜色。记录不存在时按「顺带开启覆写」处理（与轨迹开关同约定）。
+        public static void SetTrailColor(ThingDef? projectileDef, Color color)
+        {
+            if (projectileDef == null) return;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over != null)
+            {
+                over.hasColor = true;
+                over.trailColor = color;
+                return;
+            }
+
+            Map[projectileDef.defName] = new ProjectileOverride
+            {
+                trailEnabled = true,
+                trailWidth = TrailWidth.EffectiveForDef(projectileDef),
+                hasColor = true,
+                trailColor = color
+            };
+        }
+
+        // 清除自定义颜色 = 回到「继承该投射物所用轨迹 def 的颜色」。覆写记录本身保留。
+        public static void ClearTrailColor(ThingDef? projectileDef)
+        {
+            ProjectileOverride? over = Get(projectileDef);
+            if (over != null) over.hasColor = false;
         }
 
         static void Set(ThingDef projectileDef, bool trailEnabled, float trailWidth)

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Defs>
 
+  <!-- 默认使用运行时生成的轨迹贴图（纯白，形状参数见 TrailTexture），颜色由 trailColor / 设置 / 单项覆写乘出。
+       下面的 texPath 只是回退项：仅当某个 def 显式写 <useGeneratedTexture>false</useGeneratedTexture>
+       时才改用它自己的文件贴图（Textures 下的 Guntrail.png 因此只在回退时被读取）。 -->
   <Gunplay.ProjectileTrailDef Name="GunplayProjectileTrailDefault">
     <defName>default</defName>
     <category>Projectile</category>
@@ -18,25 +21,20 @@
     </graphicData>
   </Gunplay.ProjectileTrailDef>
   
+  <!-- 充能武器轨迹：与 default 共用 Guntrail 贴图，仅按 trailColor 换色（#A7EAFF）。
+       颜色可在设置窗口的「轨迹颜色」中进一步覆写。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>charge</defName>
 
-    <graphicData>
-      <shaderType>Mote</shaderType>
-      <texPath>Gunplay/Effects/GuntrailCharge</texPath>
-      <graphicClass>Graphic_Single</graphicClass>
-    </graphicData>
+    <trailColor>(0.655, 0.918, 1, 1)</trailColor>
   </Gunplay.ProjectileTrailDef>
 
+  <!-- 燃烧武器轨迹：同一贴图换色（#FFB316）。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>incendiary</defName>
 
-    <graphicData>
-      <shaderType>Mote</shaderType>
-      <texPath>Gunplay/Effects/GuntrailIncendiary</texPath>
-      <graphicClass>Graphic_Single</graphicClass>
-    </graphicData>
-    
+    <trailColor>(1, 0.702, 0.086, 1)</trailColor>
+
     <trailWidth>0.15</trailWidth>
   </Gunplay.ProjectileTrailDef>
 

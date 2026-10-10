@@ -36,9 +36,14 @@ namespace Gunplay
 
             foreach (ProjectileTrailDef def in DefDatabase<ProjectileTrailDef>.AllDefs)
             {
-                if (!def.DrawMatSingle || !def.DrawMatSingle.mainTexture) continue;
+                // 走运行时生成贴图的 def 不需要这一步（贴图由 TrailTexture 自行设定 wrap 模式），
+                // 且不去碰 DrawMatSingle 就不会装载 Textures 下的参考贴图 Guntrail.png。
+                if (def.useGeneratedTexture) continue;
 
-                def.DrawMatSingle.mainTexture.wrapMode = TextureWrapMode.Clamp;
+                Material? mat = def.DrawMatSingle;
+                if (!mat || !mat.mainTexture) continue;
+
+                mat.mainTexture.wrapMode = TextureWrapMode.Clamp;
             }
 
             foreach (GunPropDef def in DefDatabase<GunPropDef>.AllDefs)

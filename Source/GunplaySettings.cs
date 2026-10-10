@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ASQPicker;
 using Gunplay.Patch;
 using UnityEngine;
 using Verse;
@@ -38,8 +39,16 @@ namespace Gunplay
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
         public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
-        // 存档读写句柄。由 Gunplay 构造时注入；在此之前调用 Save() 是空操作。
-        internal static GunplaySettings? Handle;
+        // 轨迹 def 颜色覆写（设置窗口「轨迹颜色」编辑）：键为 ProjectileTrailDef.defName，值为颜色。
+        // 运行时直接以 Color 存储；持久化经 ColorPickerWindow.LookColorDictionary 做 HTML 字符串中转。
+        // 缺失条目 = 使用 ProjectileTrailDef.trailColor（XML）。解析统一走 TrailColor。
+        public static Dictionary<string, Color> trailColors = new Dictionary<string, Color>();
+
+        // 运行时生成贴图的形状参数（设置窗口「轨迹贴图」编辑，见 TrailTextureParams）。
+        public static TrailTextureParams trailTextureParams = new TrailTextureParams();
+
+
+
 
         override public void ExposeData()
         {
@@ -58,6 +67,16 @@ namespace Gunplay
 
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
+
+            ColorPickerWindow.LookColorDictionary(ref trailColors, "trailColors");
+            if (trailColors == null) trailColors = new Dictionary<string, Color>();
+
+            Scribe_Deep.Look(ref trailTextureParams, "trailTextureParams");
+            if (trailTextureParams == null) trailTextureParams = new TrailTextureParams();
+
+            // 读档后参数可能已变：贴图已生成的话就地重填（未生成则下次取用时按新参数生成）。
+            // 只在读档时做——存档时参数没变，没必要去重写贴图像素。
+            if (Scribe.mode == LoadSaveMode.LoadingVars) TrailTexture.Invalidate();
         }
 
         public static void DoSettingsWindowContents(Rect inRect)
@@ -100,6 +119,20 @@ namespace Gunplay
                 {
                     listing_Standard.Gap(4f);
                     listing_Standard.CheckboxLabeled("GunplayCEStraightTrailsName".Translate(), ref ceStraightTrails, "GunplayCEStraightTrailsDesc".Translate());
+                }
+
+                listing_Standard.Gap(8f);
+                listing_Standard.Label("GunplayTrailColorsDesc".Translate());
+                if (listing_Standard.ButtonText("GunplayTrailColorsName".Translate()))
+                {
+                    Find.WindowStack.Add(new TrailColorWindow());
+                }
+
+                listing_Standard.Gap(8f);
+                listing_Standard.Label("GunplayTrailTextureDesc".Translate());
+                if (listing_Standard.ButtonText("GunplayTrailTextureName".Translate()))
+                {
+                    Find.WindowStack.Add(new TrailTextureWindow());
                 }
 
                 listing_Standard.Gap(8f);

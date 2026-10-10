@@ -5,7 +5,7 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 
-namespace ASQDefPicker;
+namespace ASQPicker;
 
 /// <summary>
 /// 独立单文件 Def 选择窗口：仅依赖游戏本体程序集（UnityEngine / Verse / RimWorld），

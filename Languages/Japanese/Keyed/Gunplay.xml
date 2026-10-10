@@ -28,7 +28,31 @@
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>有効にすると、ダメージ種別が「弾（Bullet）」の発射体のみこれらのエフェクトを表示します。</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>発射体ごとの上書き...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅を個別に指定します。上書きした値は絶対値であり、上記の「弾道の幅の倍率」は適用されません。</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅と色を個別に指定します。上書きした幅は絶対値であり、上記の「弾道の幅の倍率」は適用されません。</GunplayProjectileOverridesDesc>
+  <GunplayTrailColorsName>弾道の色...</GunplayTrailColorsName>
+  <GunplayTrailColorsDesc>弾道テクスチャの色を種類ごとに設定します。変更は即時反映されますが、以後に発射される発射体にのみ適用されます。</GunplayTrailColorsDesc>
+  <GunplayTrailColorsWindowTitle>弾道の色</GunplayTrailColorsWindowTitle>
+  <GunplayTrailColorResetTip>この弾道の既定の色に戻します。</GunplayTrailColorResetTip>
+  <GunplayTrailTextureName>弾道テクスチャ...</GunplayTrailTextureName>
+  <GunplayTrailTextureDesc>実行時に生成する弾道テクスチャの形状（先端・末端・両側の半透明ぼかし）を調整します。変更は即時反映されます。</GunplayTrailTextureDesc>
+  <GunplayTrailTextureWindowTitle>弾道テクスチャ</GunplayTrailTextureWindowTitle>
+  <GunplayTrailTextureReset>既定値に戻す</GunplayTrailTextureReset>
+  <GunplayTrailTextureGroupLength>飛翔方向（縦）</GunplayTrailTextureGroupLength>
+  <GunplayTrailTextureGroupWidth>弾道の幅方向（横）</GunplayTrailTextureGroupWidth>
+  <GunplayTrailTexturePeakAlpha>最大不透明度</GunplayTrailTexturePeakAlpha>
+  <GunplayTrailTextureTopAlpha>先端の不透明度</GunplayTrailTextureTopAlpha>
+  <GunplayTrailTextureTopFade>先端ぼかしの長さ</GunplayTrailTextureTopFade>
+  <GunplayTrailTextureTopFadeCurve>先端ぼかしのカーブ</GunplayTrailTextureTopFadeCurve>
+  <GunplayTrailTextureTailFalloff>末端の減衰</GunplayTrailTextureTailFalloff>
+  <GunplayTrailTextureFlatCore>中央の平坦部</GunplayTrailTextureFlatCore>
+  <GunplayTrailTextureEdgeAlpha>側端の不透明度</GunplayTrailTextureEdgeAlpha>
+  <GunplayTrailTextureEdgeFalloff>側端ぼかしのカーブ</GunplayTrailTextureEdgeFalloff>
+  <GunplayTrailTexturePreviewHead>先端（発射体側）</GunplayTrailTexturePreviewHead>
+  <GunplayTrailTexturePreviewTail>末端</GunplayTrailTexturePreviewTail>
+  <GunplayTrailTexturePreviewActual>ディテール</GunplayTrailTexturePreviewActual>
+  <GunplayTrailTexturePreviewShape>実際の形状</GunplayTrailTexturePreviewShape>
+  <GunplayTrailTexturePreviewColor>プレビュー色</GunplayTrailTexturePreviewColor>
+  <GunplayTrailTexturePreviewCustom>カスタム...</GunplayTrailTexturePreviewCustom>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全てのMod</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>弾道</GunplayOverrideTrailFilter>
@@ -41,6 +65,9 @@
   <GunplayOverrideClearAllConfirm>全ての発射体上書きを解除しますか？</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>上書き</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>弾道</GunplayOverrideColTrail>
+  <GunplayOverrideColColor>色</GunplayOverrideColColor>
+  <GunplayOverrideTipColor>この発射体の弾道の色を設定します。行が未上書きの状態でクリックすると、自動的に上書きが有効になります。×で継承した弾道の色に戻ります。</GunplayOverrideTipColor>
+  <GunplayOverrideColorResetTip>カスタム色を解除し、継承した弾道の色に戻します。</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>この発射体の弾道設定を上書きします。オフにすると上書きを破棄し、継承値/計算値に戻ります。</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>この発射体に弾道を描画するかどうか。オフにすると弾道自体が表示されず、幅の上書きも使われません。行が未上書きの状態で操作すると、自動的に上書きが有効になります。</GunplayOverrideTipTrail>
   <GunplayOverrideColProjectile>発射体</GunplayOverrideColProjectile>

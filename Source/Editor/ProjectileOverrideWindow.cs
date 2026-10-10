@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using ASQPicker;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -30,6 +31,10 @@ namespace Gunplay
         const float IconSize = 32f;
         const float OverrideToggleWidth = 60f;
         const float TrailToggleWidth = 60f;
+        const float ColorColumnWidth = 90f;
+        const float SwatchWidth = 50f;
+        const float SwatchHeight = 24f;
+        const float ResetButtonWidth = 24f;
         const float WidthColumnWidth = 110f;
         const float ModButtonWidth = 220f;
         const float TrailFilterWidth = 190f;
@@ -63,6 +68,7 @@ namespace Gunplay
             public string modName = null!;
             public string searchText = null!;   // 参与搜索的文本：投射物 + 全部武器 的 defName/label
             public string weaponTip = null!;    // 武器列的悬浮内容
+            public ProjectileTrailDef? trailDef;    // 该投射物解析出的轨迹 def（颜色继承的来源）
             public float editWidth;         // 输入框绑定的当前值
             public string? widthBuffer;     // 输入框字符串缓冲；null 表示尚未输入过
         }
@@ -165,6 +171,7 @@ namespace Gunplay
                     modName = def.modContentPack?.Name ?? "??",
                     searchText = BuildSearchText(def, weapons),
                     weaponTip = BuildWeaponTip(weapons),
+                    trailDef = (GunplaySetup.ProjectileProp(def) ?? GunplaySetup.DefaultProjectileProp)?.trail,
                     editWidth = 0f,
                     widthBuffer = null
                 });
@@ -438,13 +445,14 @@ namespace Gunplay
 
         void DrawHeader(Rect rect)
         {
-            Columns(rect.width, out float overrideX, out float trailX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW);
+            Columns(rect.width, out float overrideX, out float trailX, out float colorX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW);
 
             Text.Anchor = TextAnchor.MiddleLeft;
             GUI.color = new Color(0.75f, 0.75f, 0.75f);
 
             Widgets.Label(new Rect(overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
             Widgets.Label(new Rect(trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
+            Widgets.Label(new Rect(colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
             Widgets.Label(new Rect(projX, rect.y, projW, rect.height), "GunplayOverrideColProjectile".Translate());
             Widgets.Label(new Rect(weaponX, rect.y, weaponW, rect.height), "GunplayOverrideColWeapon".Translate());
             Widgets.Label(new Rect(widthX, rect.y, WidthColumnWidth, rect.height), "GunplayOverrideColWidth".Translate());
@@ -453,17 +461,18 @@ namespace Gunplay
             Text.Anchor = TextAnchor.UpperLeft;
         }
 
-        static void Columns(float width, out float overrideX, out float trailX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW)
+        static void Columns(float width, out float overrideX, out float trailX, out float colorX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW)
         {
             float inner = Mathf.Max(0f, width - ScrollbarWidth);
-            float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - WidthColumnWidth);
+            float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - ColorColumnWidth - WidthColumnWidth);
 
             projW = rest * 0.5f;
             weaponW = rest - projW;
 
             overrideX = 0f;
             trailX = overrideX + OverrideToggleWidth;
-            projX = trailX + TrailToggleWidth;
+            colorX = trailX + TrailToggleWidth;
+            projX = colorX + ColorColumnWidth;
             weaponX = projX + projW;
             widthX = weaponX + weaponW;
         }
@@ -478,7 +487,7 @@ namespace Gunplay
                 return;
             }
 
-            Columns(outRect.width, out float overrideX, out float trailX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW);
+            Columns(outRect.width, out float overrideX, out float trailX, out float colorX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW);
 
             float viewWidth = Mathf.Max(0f, outRect.width - ScrollbarWidth);
             Rect viewRect = new Rect(0f, 0f, viewWidth, visible.Count * RowHeight);
@@ -490,14 +499,14 @@ namespace Gunplay
 
             for (int i = first; i <= last; i++)
             {
-                DrawRow(visible[i], i, viewWidth, overrideX, trailX, projX, weaponX, widthX, projW, weaponW);
+                DrawRow(visible[i], i, viewWidth, overrideX, trailX, colorX, projX, weaponX, widthX, projW, weaponW);
             }
 
             Widgets.EndScrollView();
         }
 
         void DrawRow(Row row, int index, float viewWidth,
-            float overrideX, float trailX, float projX, float weaponX, float widthX, float projW, float weaponW)
+            float overrideX, float trailX, float colorX, float projX, float weaponX, float widthX, float projW, float weaponW)
         {
             float y = index * RowHeight;
             Widgets.DrawHighlightIfMouseover(new Rect(0f, y, viewWidth, RowHeight));
@@ -508,6 +517,7 @@ namespace Gunplay
 
             DrawToggle(row, overrideX, y, overridden);
             DrawTrailToggle(row, trailX, y, trailOn);
+            DrawColorCell(row, colorX, y, overridden, trailOn);
             DrawNameCell(row.projectile, row.projectileLabel, row.projectile.defName, projX, y, projW, null);
             DrawWeaponCell(row, weaponX, y, weaponW);
             DrawWidthCell(row, widthX, y, overridden, trailOn);
@@ -616,6 +626,67 @@ namespace Gunplay
             // 走到这里必有武器（Count == 0 已在上面返回），两个 ?. 兜底只是为了让编译器不必猜
             ThingDef weapon = row.weapons[0];
             DrawNameCell(weapon, row.weaponLabel ?? weapon.defName, row.weaponDefName ?? weapon.defName, x, y, width, row.weaponTip);
+        }
+
+        // 颜色单元格：色块（当前生效颜色）+ 有自定义色时的「×」恢复按钮。
+        // 色块点击即取色；该行尚未开启覆写时与轨迹开关同约定——顺带开启覆写。
+        void DrawColorCell(Row row, float x, float y, bool overridden, bool trailOn)
+        {
+            // 该投射物的轨迹被关掉时，颜色没有意义
+            if (overridden && !trailOn)
+            {
+                GUI.color = new Color(0.55f, 0.55f, 0.55f);
+                Text.Anchor = TextAnchor.MiddleLeft;
+                Widgets.Label(new Rect(x + 4f, y, Mathf.Max(0f, ColorColumnWidth - 8f), RowHeight), "—");
+                Text.Anchor = TextAnchor.UpperLeft;
+                GUI.color = Color.white;
+                return;
+            }
+
+            Rect cellRect = new Rect(x, y, ColorColumnWidth, RowHeight);
+
+            ProjectileOverride? over = ProjectileOverrides.Get(row.projectile);
+            bool hasColor = over != null && over.hasColor;
+
+            // 显示当前生效颜色：自定义色优先，否则继承轨迹 def 的颜色
+            Color color = hasColor ? over!.trailColor : TrailColor.EffectiveForDef(row.trailDef);
+
+            float swatchX = x + 4f;
+            Rect swatchRect = new Rect(swatchX, y + (RowHeight - SwatchHeight) * 0.5f,
+                Mathf.Min(SwatchWidth, Mathf.Max(0f, ColorColumnWidth - (hasColor ? ResetButtonWidth + 12f : 8f))), SwatchHeight);
+
+            GUI.color = color;
+            GUI.DrawTexture(swatchRect, BaseContent.WhiteTex);
+            GUI.color = Color.white;
+            Widgets.DrawBox(swatchRect, 1);
+            TooltipHandler.TipRegion(swatchRect, "GunplayOverrideTipColor".Translate());
+
+            if (Widgets.ButtonInvisible(swatchRect))
+            {
+                // 与轨迹开关同约定：未覆写的行顺带开启覆写
+                if (!ProjectileOverrides.Has(row.projectile))
+                {
+                    ProjectileOverrides.Enable(row.projectile);
+                    SyncEditValue(row);
+                    RecountOverridden();
+
+                    if (onlyOverridden || trailFilter != TrailFilter.Any) MarkVisibleDirty(true);
+                }
+
+                Find.WindowStack.Add(new ColorPickerWindow(color, c =>
+                    ProjectileOverrides.SetTrailColor(row.projectile, c)));
+            }
+
+            // 「×」清除自定义颜色，回到继承
+            if (hasColor)
+            {
+                Rect resetRect = new Rect(swatchRect.xMax + 4f, y + (RowHeight - 24f) * 0.5f, ResetButtonWidth, 24f);
+                if (Widgets.ButtonText(resetRect, "×"))
+                {
+                    ProjectileOverrides.ClearTrailColor(row.projectile);
+                }
+                TooltipHandler.TipRegion(resetRect, "GunplayOverrideColorResetTip".Translate());
+            }
         }
 
         void DrawWidthCell(Row row, float x, float y, bool overridden, bool trailOn)

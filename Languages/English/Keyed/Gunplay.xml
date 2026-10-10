@@ -28,7 +28,31 @@
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>Per-projectile overrides...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>Override the trail width of individual projectiles. Overridden values are absolute and ignore the trail width multiplier above.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>Override the trail width and color of individual projectiles. Overridden widths are absolute and ignore the trail width multiplier above.</GunplayProjectileOverridesDesc>
+  <GunplayTrailColorsName>Trail colors...</GunplayTrailColorsName>
+  <GunplayTrailColorsDesc>Customize the color of each trail texture. Changes apply instantly, but only to projectiles fired afterwards.</GunplayTrailColorsDesc>
+  <GunplayTrailColorsWindowTitle>Trail colors</GunplayTrailColorsWindowTitle>
+  <GunplayTrailColorResetTip>Restore this trail's default color.</GunplayTrailColorResetTip>
+  <GunplayTrailTextureName>Trail texture...</GunplayTrailTextureName>
+  <GunplayTrailTextureDesc>Shape the runtime-generated trail texture (soft fade at the head, tail and both sides). Changes apply instantly.</GunplayTrailTextureDesc>
+  <GunplayTrailTextureWindowTitle>Trail texture</GunplayTrailTextureWindowTitle>
+  <GunplayTrailTextureReset>Restore defaults</GunplayTrailTextureReset>
+  <GunplayTrailTextureGroupLength>Along flight (length)</GunplayTrailTextureGroupLength>
+  <GunplayTrailTextureGroupWidth>Across the trail (width)</GunplayTrailTextureGroupWidth>
+  <GunplayTrailTexturePeakAlpha>Peak opacity</GunplayTrailTexturePeakAlpha>
+  <GunplayTrailTextureTopAlpha>Head opacity</GunplayTrailTextureTopAlpha>
+  <GunplayTrailTextureTopFade>Head fade length</GunplayTrailTextureTopFade>
+  <GunplayTrailTextureTopFadeCurve>Head fade curve</GunplayTrailTextureTopFadeCurve>
+  <GunplayTrailTextureTailFalloff>Tail falloff</GunplayTrailTextureTailFalloff>
+  <GunplayTrailTextureFlatCore>Flat core width</GunplayTrailTextureFlatCore>
+  <GunplayTrailTextureEdgeAlpha>Edge opacity</GunplayTrailTextureEdgeAlpha>
+  <GunplayTrailTextureEdgeFalloff>Edge fade curve</GunplayTrailTextureEdgeFalloff>
+  <GunplayTrailTexturePreviewHead>Head (projectile)</GunplayTrailTexturePreviewHead>
+  <GunplayTrailTexturePreviewTail>Tail</GunplayTrailTexturePreviewTail>
+  <GunplayTrailTexturePreviewActual>Detail</GunplayTrailTexturePreviewActual>
+  <GunplayTrailTexturePreviewShape>In-game shape</GunplayTrailTexturePreviewShape>
+  <GunplayTrailTexturePreviewColor>Preview color</GunplayTrailTexturePreviewColor>
+  <GunplayTrailTexturePreviewCustom>Custom...</GunplayTrailTexturePreviewCustom>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>All mods</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>Trail</GunplayOverrideTrailFilter>
@@ -41,6 +65,9 @@
   <GunplayOverrideClearAllConfirm>Clear all per-projectile overrides?</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
+  <GunplayOverrideColColor>Color</GunplayOverrideColColor>
+  <GunplayOverrideTipColor>Customize this projectile's trail color. Clicking the swatch on a row that is not overridden yet enables the override automatically; × restores the inherited trail color.</GunplayOverrideTipColor>
+  <GunplayOverrideColorResetTip>Clear the custom color and inherit the trail color again.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values.</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>Draw a trail for this projectile. When off, this projectile gets no trail at all and its width override goes unused. Adjusting this on a row that is not overridden yet will enable the override automatically.</GunplayOverrideTipTrail>
   <GunplayOverrideColProjectile>Projectile</GunplayOverrideColProjectile>
