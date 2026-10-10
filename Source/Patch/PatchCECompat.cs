@@ -31,6 +31,16 @@ namespace Gunplay.Patch
         // CE 是否已安装且兼容补丁挂载成功（设置界面的条件显示用）
         public static bool Enabled { get; private set; }
 
+        // 是否检测到 CE，不看补丁挂载是否成功。
+        //
+        // 与 Enabled 分开，是因为两者回答的不是同一个问题：
+        //   Enabled  —— 「Gunplay 的 CE 集成是否生效」（轨迹与命中特效要不要按 CE 路径走）；
+        //   Detected —— 「CE 是否在场」。CE 在场就意味着它那套弹道物理接管了投射物，
+        //               原版弹速缩放不再适用——这一点与我们的补丁有没有挂上无关。
+        // 弹速相关 UI 的隐藏判据必须用 Detected：CE 改 API 导致反射成员找不到时 Enabled 会是 false，
+        // 但那时若把弹速设置又放出来，用户调了也不生效（而且轨迹已经先坏了，更容易误判）。
+        public static bool Detected { get; private set; }
+
         // CE 弹速是真实弹道速度（一发子弹一 tick 可飞数格），speed * 15 的拖尾长度会拉出
         // 十余格的“激光束”，CE 路径对拖尾长度做此上限（4 格）。
         internal const float MaxTrailLength = 40f;
@@ -159,6 +169,9 @@ namespace Gunplay.Patch
         {
             Type? ceType = AccessTools.TypeByName("CombatExtended.ProjectileCE");
             if (ceType == null) return; // 未安装 CE
+
+            // 早于成员解析就置位：下面任何一步反射失配都不会让「CE 在场」这个事实变成假
+            Detected = true;
 
             exactPositionProp = AccessTools.Property(ceType, "ExactPosition");
             damageAmountProp = AccessTools.Property(ceType, "DamageAmount");

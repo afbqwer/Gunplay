@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using ASQPicker;
+using Gunplay.Patch;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -15,15 +16,29 @@ namespace Gunplay
     // 一行 = 一个投射物 ThingDef；武器列只是上下文（轨迹本身只由投射物 def 决定，见 PatchProjectileLaunch），
     // 多个武器共用同一投射物时显示第一个并在 defName 后加「+N」，悬浮列出全部。
     //
-    // 每行三个开关 / 选择（列序：覆写 | 轨迹 | 材质 | 颜色 | 投射物 | 武器 | 宽度 | 长度 | 淡出）：
+    // 每行若干开关 / 选择（列序：覆写 | 轨迹 | 弹速 | 材质 | 颜色 | 投射物 | 武器 | 宽度 | 长度 | 淡出；
+    // CE 在场时「弹速」整列不参与布局，见 SpeedColumnShown）：
     //   「覆写」—— 该行是否有覆写记录。关掉即丢弃记录（轨迹开关、材质与宽度一起回到继承/计算值）。
     //   「轨迹」—— 是否绘制该投射物的轨迹。未覆写时显示该投射物的「默认」值
     //              （见 ProjectileRules.TrailEnabled：可能因本体无贴图、弧线开关关闭而不勾选）。
     //              直接点它会顺带把覆写打开，省掉「先开覆写再关轨迹」两步。
+    //   「弹速」—— 该投射物是否受全局弹速缩放影响。唯一与轨迹无关的覆写项：轨迹关掉它照样生效，
+    //              因此不像材质/颜色/数值那样随轨迹开关变灰。未覆写时显示该投射物的「默认」判定
+    //              （见 ProjectileRules.SpeedAffected：弧线投射物不缩放，配置包可用 preserveSpeed 豁免），
+    //              同样点一下就顺带开启覆写。已单独指定时右侧有「×」可回到继承——否则要取消它
+    //              只能关掉整行覆写，那会一并丢掉同一行的宽度/长度/淡出/颜色。
+    //              CE 在场时整列隐藏：CE 的 ProjectileCE 不继承原版 Projectile，弹速缩放对它不生效，
+    //              留着这一列同样是死控件（判据见 SpeedColumnShown）。
     //   「材质」—— 该投射物用哪种轨迹材质（ProjectileTrailDef）。未覆写时是本体配置解析出的那一种；
     //              点击打开 Def 选择窗口，「清除」= 回到继承。与轨迹开关同约定：在未覆写的行上点它
     //              会顺带开启覆写，但**只**记材质一项，不会把当时的宽度/长度/淡出一起固化（见 SetTrailMaterial）。
     //   「颜色」—— 该投射物的轨迹颜色。它比材质自带的颜色更具体，因此排在材质列之后。
+    //
+    // 开关 / 材质 / 颜色三类格子都支持拖拽批量修改（drag-paint）：在某一行按下左键后上下拖动，
+    // 鼠标扫过的行会被涂成同一个值——开关取「按下那一行切换后的状态」（与本体复选框的涂抹一致，
+    // 见 Widgets.ToggleInvisibleDraggable 的 paintable 分支），材质与颜色取「按下那一行当时的值」。
+    // 材质 / 颜色的单击仍是打开选择窗口，两者不冲突：拖拽结束时鼠标不在原来那个按钮上，
+    // 按钮不会触发点击。实现见 DragPaint。
     //
     // 列表可能有数百行（装 CE 或大型武器包之后更多），因此走虚拟滚动：只为可见区间建 Rect，
     // 但输入框的字符串缓冲必须挂在行对象上跨帧保留，否则滚出视野再滚回来会丢焦点/丢输入。
@@ -36,6 +51,7 @@ namespace Gunplay
         const float IconSize = 32f;
         const float OverrideToggleWidth = 60f;
         const float TrailToggleWidth = 60f;
+        const float SpeedColumnWidth = 60f;
         const float ColorColumnWidth = 70f;
         const float SwatchWidth = 50f;
         const float SwatchHeight = 24f;
@@ -51,8 +67,21 @@ namespace Gunplay
         const float ClearButtonWidth = 150f;
         const float ScrollbarWidth = 16f;
 
+        // 弹速列是否显示。CE 的 ProjectileCE 自成一套弹道物理、不继承原版 Projectile，
+        // 全局弹速缩放对它不生效，因此 CE 在场时这一列没有意义。
+        // 判据用 Detected（只看 CE 在不在）而不是 Enabled（还要看兼容补丁挂没挂上）——
+        // 不兼容的原因是「CE 在场」本身，见 PatchCECompat.Detected。
+        static bool SpeedColumnShown => !PatchCECompat.Detected;
+
         const float MinWidth = 0f;
         const float MaxWidth = 2f;
+
+        const float ToggleSize = 24f;
+
+        // 拖拽涂抹的格子种类（见 DragPaint.Sweep 的 tag）。材质列与颜色列相邻，
+        // 横向拖出去时要靠它把「涂材质」挡在材质列内，否则颜色格会拿到一个 ProjectileTrailDef 转不成 Color。
+        const int MaterialPaintTag = 1;
+        const int ColorPaintTag = 2;
 
         public override Vector2 InitialSize => new Vector2(1280f, 720f);
 
@@ -533,6 +562,8 @@ namespace Gunplay
 
             Widgets.Label(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
             Widgets.Label(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
+            if (SpeedColumnShown)
+                Widgets.Label(new Rect(layout.speedX, rect.y, SpeedColumnWidth, rect.height), "GunplayOverrideColSpeed".Translate());
             Widgets.Label(new Rect(layout.materialX, rect.y, MaterialColumnWidth, rect.height), "GunplayOverrideColMaterial".Translate());
             Widgets.Label(new Rect(layout.colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
             Widgets.Label(new Rect(layout.projX, rect.y, layout.projW, rect.height), "GunplayOverrideColProjectile".Translate());
@@ -551,6 +582,7 @@ namespace Gunplay
         {
             internal readonly float overrideX;
             internal readonly float trailX;
+            internal readonly float speedX;
             internal readonly float colorX;
             internal readonly float materialX;
             internal readonly float projX;
@@ -561,11 +593,12 @@ namespace Gunplay
             internal readonly float projW;
             internal readonly float weaponW;
 
-            internal ColumnLayout(float overrideX, float trailX, float materialX, float colorX, float projX, float weaponX,
+            internal ColumnLayout(float overrideX, float trailX, float speedX, float materialX, float colorX, float projX, float weaponX,
                 float widthX, float lengthX, float fadeX, float projW, float weaponW)
             {
                 this.overrideX = overrideX;
                 this.trailX = trailX;
+                this.speedX = speedX;
                 this.materialX = materialX;
                 this.colorX = colorX;
                 this.projX = projX;
@@ -578,11 +611,17 @@ namespace Gunplay
             }
 
             // 固定宽度的列各占其位，剩余宽度由投射物 / 武器两列平分。
-            // 列序按「越具体越靠右」：覆写 → 轨迹 → 材质 → 颜色（颜色比材质具体，单项覆写的颜色会盖住材质色）。
+            // 列序：左边三个行为开关（覆写 / 轨迹 / 弹速）→ 轨迹外观（材质 → 颜色，颜色比材质具体，
+            // 单项覆写的颜色会盖住材质色）→ 投射物 / 武器两列上下文 → 轨迹的三个数值。
+            //
+            // 弹速列隐藏时不是「占着位置留空」，而是整列宽度归零：省下的 60px 直接还给
+            // 投射物 / 武器两个弹性列，而不是留一条空白。
             internal static ColumnLayout Compute(float width)
             {
+                float speedWidth = SpeedColumnShown ? SpeedColumnWidth : 0f;
+
                 float inner = Mathf.Max(0f, width - ScrollbarWidth);
-                float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - ColorColumnWidth
+                float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - speedWidth - ColorColumnWidth
                     - MaterialColumnWidth - WidthColumnWidth - LengthColumnWidth - FadeColumnWidth);
 
                 float projW = rest * 0.5f;
@@ -590,21 +629,23 @@ namespace Gunplay
 
                 float overrideX = 0f;
                 float trailX = overrideX + OverrideToggleWidth;
-                float materialX = trailX + TrailToggleWidth;
+                float speedX = trailX + TrailToggleWidth;
+                float materialX = speedX + speedWidth;
                 float colorX = materialX + MaterialColumnWidth;
                 float projX = colorX + ColorColumnWidth;
                 float weaponX = projX + projW;
                 float widthX = weaponX + weaponW;
                 float lengthX = widthX + WidthColumnWidth;
 
-                return new ColumnLayout(overrideX, trailX, materialX, colorX, projX, weaponX,
+                return new ColumnLayout(overrideX, trailX, speedX, materialX, colorX, projX, weaponX,
                     widthX, lengthX, lengthX + LengthColumnWidth, projW, weaponW);
             }
         }
 
         void DrawRows(Rect outRect)
         {
-            if (visibleDirty) RebuildVisible();
+            // 拖动期间冻结列表的重建（仍照常绘制），理由见 DragFrozen
+            if (visibleDirty && !DragFrozen) RebuildVisible();
 
             if (visible.Count == 0)
             {
@@ -641,6 +682,15 @@ namespace Gunplay
 
             DrawToggle(row, layout.overrideX, y, overridden);
             DrawTrailToggle(row, layout.trailX, y, trailOn);
+
+            // CE 下这一列不参与布局（见 SpeedColumnShown），连取值都省掉
+            if (SpeedColumnShown)
+            {
+                // 显示该投射物自己的决定（不含全局总开关，理由见 ProjectileRules.SpeedAffected）
+                DrawSpeedToggle(row, layout.speedX, y, ProjectileRules.SpeedAffected(row.projectile),
+                    over != null && over.hasSpeedOverride);
+            }
+
             DrawMaterialCell(row, layout.materialX, y, overridden, trailOn);
             DrawColorCell(row, layout.colorX, y, overridden, trailOn);
             DrawNameCell(row.projectile, row.projectileLabel, row.projectile.defName, layout.projX, y, layout.projW, null);
@@ -656,7 +706,8 @@ namespace Gunplay
             bool before = state;
 
             Rect rect = new Rect(x, y, OverrideToggleWidth, RowHeight);
-            Widgets.Checkbox(new Vector2(x + (OverrideToggleWidth - 24f) * 0.5f, y + (RowHeight - 24f) * 0.5f), ref state, 24f);
+            DrawToggleBox(x + (OverrideToggleWidth - ToggleSize) * 0.5f, y, state);
+            Widgets.ToggleInvisibleDraggable(rect, ref state, MouseoverSoundAllowed, true);
             TooltipHandler.TipRegion(rect, "GunplayOverrideTipEnabled".Translate());
 
             if (state == before) return;
@@ -677,13 +728,39 @@ namespace Gunplay
             AfterOverrideChanged();
         }
 
+        // 一个开关格：图标只负责显示，输入交给 Widgets.ToggleInvisibleDraggable，命中区是整个格子。
+        //
+        // 不用 Widgets.Checkbox 是因为它把绘制与输入的命中区绑死成图标那 24×24：
+        // 拖拽涂抹时要鼠标精准压住每一行的小图标才行，实际根本拖不直。
+        // paintable: true 让本体接管涂抹（它先把起始格切换成目标态，再把这个态涂到扫过的其余格子上），
+        // 连跟随光标的图标都一并画了，见 Widgets.WidgetsOnGUI。
+        static void DrawToggleBox(float iconX, float y, bool state)
+        {
+            Widgets.CheckboxDraw(iconX, y + (RowHeight - ToggleSize) * 0.5f, state, false, ToggleSize);
+        }
+
+        // 鼠标悬停音。按住左键期间一律关掉：涂抹一次要扫过几十行，逐行"嘀"一声很难听。
+        // 判断用「左键是否按着」而不是 DragPaint.Active —— 后者要等位移越过阈值才算数，
+        // 而第一行的音早在按下那一瞬就发出去了，那时再静音已经晚了。
+        static bool MouseoverSoundAllowed => !Input.GetMouseButton(0);
+
+        // 拖动期间（左键按着）冻结 visible 列表的重建。
+        //
+        // 起因：过滤生效时（仅显示已覆写 / 轨迹过滤），把一行涂成不符合条件就会让它从 visible 里
+        // 消失、后面的行整体上移，鼠标底下于是换成了另一行 —— 下一次判定继续涂它，又一次上移……
+        // 一次向下的拖动会像雪崩一样把下面全涂掉，远超用户划过的范围。
+        // 冻结到松开鼠标为止（松开那一帧 GetMouseButton 已是 false，当帧就重建），
+        // 于是「过滤结果在涂抹期间不变」，涂的永远是最初那批行。
+        static bool DragFrozen => Input.GetMouseButton(0);
+
         void DrawTrailToggle(Row row, float x, float y, bool trailOn)
         {
             bool state = trailOn;
             bool before = state;
 
             Rect rect = new Rect(x, y, TrailToggleWidth, RowHeight);
-            Widgets.Checkbox(new Vector2(x + (TrailToggleWidth - 24f) * 0.5f, y + (RowHeight - 24f) * 0.5f), ref state, 24f);
+            DrawToggleBox(x + (TrailToggleWidth - ToggleSize) * 0.5f, y, state);
+            Widgets.ToggleInvisibleDraggable(rect, ref state, MouseoverSoundAllowed, true);
             TooltipHandler.TipRegion(rect, "GunplayOverrideTipTrail".Translate());
 
             if (state == before) return;
@@ -691,6 +768,44 @@ namespace Gunplay
             EnsureOverridden(row);
             ProjectileOverrides.SetTrailEnabled(row.projectile, state);
             AfterOverrideChanged();
+        }
+
+        // 弹速列：该投射物是否受全局弹速缩放（GunplaySettings.projectileSpeed）。
+        // 与轨迹列同约定（未覆写时点一下会顺带开启覆写），但区别有两点：
+        //   1) 它不随轨迹开关变灰——弹速与画不画轨迹无关；
+        //   2) 它多一个「×」回到继承：这一项的三态（未设定 / 受 / 不受）里，
+        //      「未设定」是有意义的（继承弧线规则与配置包的 preserveSpeed），
+        //      而关掉整行覆写是唯一的其它退路，代价太大（同一行的宽度/长度/淡出/颜色一起丢）。
+        void DrawSpeedToggle(Row row, float x, float y, bool speedOn, bool picked)
+        {
+            bool state = speedOn;
+
+            // 勾选框的悬浮区与「×」的悬浮区不能重叠：两个 TipRegion 叠在一处时只有其中一个会显示。
+            // 单独指定过时勾选框的悬浮区让出右侧那一段给「×」。
+            Rect boxRect = new Rect(x, y, SpeedColumnWidth - (picked ? ResetButtonWidth : 0f), RowHeight);
+            DrawToggleBox(x + 6f, y, state);
+            Widgets.ToggleInvisibleDraggable(boxRect, ref state, MouseoverSoundAllowed, true);
+            TooltipHandler.TipRegion(boxRect, "GunplayOverrideTipSpeed".Translate());
+
+            if (state != speedOn)
+            {
+                EnsureOverridden(row);
+                ProjectileOverrides.SetSpeedAffected(row.projectile, state);
+                AfterOverrideChanged();
+                return;
+            }
+
+            // 没单独设过就没什么可清除的，右侧留空（勾选框固定靠左，避免出现/消失时整列跳动）
+            if (!picked) return;
+
+            Rect resetRect = new Rect(x + SpeedColumnWidth - ResetButtonWidth, y + (RowHeight - 24f) * 0.5f,
+                ResetButtonWidth, 24f);
+            if (Widgets.ButtonText(resetRect, "×"))
+            {
+                ProjectileOverrides.ClearSpeedOverride(row.projectile);
+                AfterOverrideChanged();
+            }
+            TooltipHandler.TipRegion(resetRect, "GunplayOverrideSpeedResetTip".Translate());
         }
 
         // 顺带开启覆写：该行还没有记录时，按当前生效值建一条（见 ProjectileOverrides.GetOrCreate）。
@@ -800,7 +915,7 @@ namespace Gunplay
             Widgets.DrawBox(swatchRect, 1);
             TooltipHandler.TipRegion(swatchRect, "GunplayOverrideTipColor".Translate());
 
-            if (Widgets.ButtonInvisible(swatchRect))
+            if (Widgets.ButtonInvisible(swatchRect, MouseoverSoundAllowed))
             {
                 if (EnsureOverridden(row)) AfterOverrideChanged();
 
@@ -817,6 +932,16 @@ namespace Gunplay
                     ProjectileOverrides.ClearTrailColor(row.projectile);
                 }
                 TooltipHandler.TipRegion(resetRect, "GunplayOverrideColorResetTip".Translate());
+            }
+
+            // 拖拽涂抹：把起始格的「当前生效颜色」涂到扫过的格子上。
+            // 起始格若本来就是继承色（hasColor=false），涂出去的是那个继承色的具体值 ——
+            // 也就是被涂的行会多出一条自定义色记录。这是有意的：用户拖的是「这个颜色」，
+            // 不是「跟着那个材质走」，否则目标行的材质与起始行不同时涂出来的色就不一样了。
+            if (DragPaint.Sweep(cellRect, ColorPaintTag, color))
+            {
+                ProjectileOverrides.SetTrailColor(row.projectile, (Color)DragPaint.Value!);
+                AfterOverrideChanged();
             }
         }
 
@@ -842,7 +967,7 @@ namespace Gunplay
             string label = row.trailDef != null ? row.trailDef.defName : "—";
             Rect buttonRect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, MaterialColumnWidth - 8f), RowHeight - 10f);
 
-            if (Widgets.ButtonText(buttonRect, label))
+            if (Widgets.ButtonText(buttonRect, label, true, MouseoverSoundAllowed))
             {
                 TrailMaterialPicker.Open(row.trailDef, def =>
                 {
@@ -858,6 +983,19 @@ namespace Gunplay
             TooltipHandler.TipRegion(buttonRect, picked
                 ? "GunplayOverrideTipMaterialPicked".Translate(label)
                 : "GunplayOverrideTipMaterialInherited".Translate(label));
+
+            // 拖拽涂抹：把起始格的「当前生效材质」涂到扫过的格子上（row.trailDef 可能为 null，
+            // 那表示起始格用的是继承材质，涂出去就是让目标行也回到继承 —— 与单击「清除」同一个结果）。
+            // 单击仍由上面的 ButtonText 负责：拖拽结束时鼠标不在原来那个按钮上，Unity 的
+            // GUI.Button 不会触发；反过来，只是点一下时 DragPaint 也判不出拖动，两边互不干扰。
+            if (DragPaint.Sweep(cellRect, MaterialPaintTag, row.trailDef))
+            {
+                ProjectileOverrides.SetTrailMaterial(row.projectile, DragPaint.Value as ProjectileTrailDef);
+
+                // 与单击换材质同一条收尾：本行后面几列的继承口径跟着换，缓存与输入框缓冲区都要重取
+                SyncEditValue(row);
+                AfterOverrideChanged();
+            }
         }
 
         // 数值列（宽度 / 长度 / 淡出）的统一渲染。三列流程完全一致：

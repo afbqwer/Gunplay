@@ -6,7 +6,7 @@ using Verse;
 
 namespace Gunplay
 {
-    // 单个投射物的覆写记录。目前六项：轨迹开关 + 轨迹材质 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长。
+    // 单个投射物的覆写记录。目前七项：轨迹开关 + 轨迹材质 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长 + 弹速。
     //
     // 加一项覆写的实际成本（别信「加个字段加一列」那种说法）：记录字段 + ExposeData +
     // ProjectileOverrides 的 TryGet/Set + 一个 TrailXxx 口径类 + 窗口的一列 + 三份语言键，
@@ -17,7 +17,8 @@ namespace Gunplay
     // 「是否命中」的统一契约 —— 用哨兵值表达「未设定」，而不是靠「记录存在」：
     //   宽度 / 拖尾长度 / 淡出时长 —— 0 表示未设定，回落到计算值或全局设置；
     //   轨迹材质 —— null 表示未设定，回落 ProjectilePropDef.trail（本体的引用天然可空，不需要哨兵）；
-    //   轨迹颜色 —— 单独用 hasColor 标记，因为白色是合法颜色，哨兵表达不了三态。
+    //   轨迹颜色 —— 单独用 hasColor 标记，因为白色是合法颜色，哨兵表达不了三态；
+    //   弹速 —— 同理用 hasSpeedOverride 标记，因为 false（不受全局弹速影响）也是合法值。
     // 记录本身存在 == 覆写已开启；关掉覆写即删除记录（Disable）。
     public class ProjectileOverride : IExposable
     {
@@ -45,6 +46,14 @@ namespace Gunplay
         // 淡出时长（tick，绝对值），见 TrailFade。0 = 未设定，继承材质设置与全局 GunplaySettings.trailFadeTicks。
         public float trailFadeTicks;
 
+        // 该投射物是否受全局弹速缩放（GunplaySettings.projectileSpeed）。
+        // hasSpeedOverride = false 表示未设定，继承「默认」判定：弧线投射物不缩放，
+        // 配置包可用 ProjectilePropDef.preserveSpeed 豁免（见 ProjectileRules.SpeedAffected）。
+        // false 是合法值（燃烧弹等），所以与 hasColor 一样靠显式标记表达三态，哨兵表达不了。
+        // 与其余各项不同，这一项与轨迹无关：轨迹关掉后它依然生效。
+        public bool hasSpeedOverride;
+        public bool speedAffected = true;
+
         // 三个数值字段都用 0 而不是各自的 Default 作哨兵，是因为「字段缺失」和「值恰好等于默认」
         // 必须区分开：后加的字段在老存档的已有记录里必然缺失。若哨兵取 Default，
         // 那些老记录会被当成「用户手动设成了绝对值」，之后改全局设置它们不再跟随。
@@ -56,6 +65,8 @@ namespace Gunplay
             Scribe_Values.Look(ref trailWidth, "trailWidth", 0f);
             Scribe_Values.Look(ref trailLengthFactor, "trailLengthFactor", 0f);
             Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", 0f);
+            Scribe_Values.Look(ref hasSpeedOverride, "hasSpeedOverride", false);
+            Scribe_Values.Look(ref speedAffected, "speedAffected", true);
 
             Scribe_Values.Look(ref hasColor, "hasColor", false);
             ColorPickerWindow.LookColor(ref trailColor, "trailColor", Color.white);
@@ -147,6 +158,20 @@ namespace Gunplay
             return true;
         }
 
+        // 单项弹速覆写是否命中。未设定（记录不存在或 hasSpeedOverride=false）时返回 false，
+        // 调用方回落到「默认」判定（弧线规则 + 配置包 preserveSpeed）。
+        // 与其它项不同，这一项可以取 false 且有意义，因此不能用 0/false 作哨兵。
+        public static bool TryGetSpeedAffected(ThingDef? projectileDef, out bool affected)
+        {
+            affected = true;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over == null || !over.hasSpeedOverride) return false;
+
+            affected = over.speedAffected;
+            return true;
+        }
+
         // 开启覆写：以「当前生效值」为起点（宽度取计算值、长度/淡出取全局值），
         // 用户从现状开始调，不会看到轨迹突然变粗/变细或拖尾长度突变。
         // 刻意不走 GetOrCreate：这里是「重置为当前生效值」，不是「保留已有设置」。
@@ -165,7 +190,7 @@ namespace Gunplay
             Map.Remove(projectileDef.defName);
         }
 
-        // 下面五个 Set* 共用同一条约定：记录不存在时按「顺带开启覆写」处理，
+        // 下面几个 Set* 共用同一条约定：记录不存在时按「顺带开启覆写」处理，
         // 调用方（窗口里的开关/色块/输入框）无需自己先判存在再分两步。
         // 这条约定只在 GetOrCreate 里实现一次。
         public static void SetTrailWidth(ThingDef? projectileDef, float width)
@@ -236,6 +261,25 @@ namespace Gunplay
             if (over != null) over.hasColor = false;
         }
 
+        // 设定该投射物是否受全局弹速影响。这里必须置 hasSpeedOverride：
+        // 记录里存的是「用户明确设过」（三态），而不是「默认判定算出来的值」。
+        public static void SetSpeedAffected(ThingDef? projectileDef, bool affected)
+        {
+            if (projectileDef == null) return;
+
+            ProjectileOverride over = GetOrCreate(projectileDef);
+            over.hasSpeedOverride = true;
+            over.speedAffected = affected;
+        }
+
+        // 清除弹速覆写 = 回到「继承默认判定」（弧线规则 / 配置包 preserveSpeed）。覆写记录本身保留。
+        // 存在的意义：否则想取消这一项就只能关掉整行覆写，而那会一并丢掉同一行的宽度/长度/淡出/颜色。
+        public static void ClearSpeedOverride(ThingDef? projectileDef)
+        {
+            ProjectileOverride? over = Get(projectileDef);
+            if (over != null) over.hasSpeedOverride = false;
+        }
+
         // 取已有记录，没有就新建一条并登记。新记录的所有字段都是「当前生效值」，
         // 因此「开启覆写」这个动作本身不改变画面，之后改哪个字段只影响哪个字段。
         static ProjectileOverride GetOrCreate(ThingDef projectileDef)
@@ -263,7 +307,8 @@ namespace Gunplay
                 trailMaterialDefName = null,   // 新记录不选材质 = 继承，与开启前的画面一致
                 trailWidth = TrailWidth.EffectiveForDef(projectileDef),
                 trailLengthFactor = TrailLength.Effective(projectileDef, trailDef),
-                trailFadeTicks = TrailFade.Effective(projectileDef, trailDef)
+                trailFadeTicks = TrailFade.Effective(projectileDef, trailDef),
+                hasSpeedOverride = false    // 新记录不接管弹速 = 继承默认判定，与开启覆写前的行为一致
             };
         }
 

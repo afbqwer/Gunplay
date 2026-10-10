@@ -38,7 +38,7 @@
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>Per-projectile overrides...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>Override the trail material, width, length, fade duration and color of individual projectiles. Overridden values are absolute and ignore the material and the global trail settings above.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>Override the trail material, width, length, fade duration and color of individual projectiles, and whether each projectile is affected by the global projectile speed. Trail values are absolute and ignore the material and the global trail settings above.</GunplayProjectileOverridesDesc>
   <GunplayTrailMaterialName>Trail materials...</GunplayTrailMaterialName>
   <GunplayTrailMaterialDesc>Shape, width profile, color and geometry of each trail material (one material per ProjectileTrailDef). Changes apply instantly.</GunplayTrailMaterialDesc>
   <GunplayTrailMaterialWindowTitle>Trail material</GunplayTrailMaterialWindowTitle>
@@ -102,14 +102,17 @@
   <GunplayOverrideClearAllConfirm>Clear all per-projectile overrides?</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
+  <GunplayOverrideColSpeed>Speed</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>Color</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>Material</GunplayOverrideColMaterial>
-  <GunplayOverrideTipMaterialPicked>This projectile uses a material picked here: {0}. Click to pick another one, or "Clear" to inherit again.</GunplayOverrideTipMaterialPicked>
-  <GunplayOverrideTipMaterialInherited>This projectile inherits the material configured on its def: {0}. Click to pick a material just for it.</GunplayOverrideTipMaterialInherited>
-  <GunplayOverrideTipColor>Customize this projectile's trail color. Clicking the swatch on a row that is not overridden yet enables the override automatically; × restores the inherited trail color.</GunplayOverrideTipColor>
+  <GunplayOverrideTipMaterialPicked>This projectile uses a material picked here: {0}. Click to pick another one, or "Clear" to inherit again. Press and drag over other rows to give them this material.</GunplayOverrideTipMaterialPicked>
+  <GunplayOverrideTipMaterialInherited>This projectile inherits the material configured on its def: {0}. Click to pick a material just for it. Press and drag over other rows to give them this inherited material.</GunplayOverrideTipMaterialInherited>
+  <GunplayOverrideTipColor>Customize this projectile's trail color. Clicking the swatch on a row that is not overridden yet enables the override automatically; × restores the inherited trail color. Press on a swatch and drag over other rows to paint the same color onto them.</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>Clear the custom color and inherit the trail color again.</GunplayOverrideColorResetTip>
-  <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values.</GunplayOverrideTipEnabled>
-  <GunplayOverrideTipTrail>Draw a trail for this projectile. When off, this projectile gets no trail at all and its width override goes unused. Adjusting this on a row that is not overridden yet will enable the override automatically.</GunplayOverrideTipTrail>
+  <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values. You can also press on a row and drag up or down to switch the rows you sweep over.</GunplayOverrideTipEnabled>
+  <GunplayOverrideTipTrail>Draw a trail for this projectile. When off, this projectile gets no trail at all and its width override goes unused. Adjusting this on a row that is not overridden yet will enable the override automatically. You can also press on a row and drag up or down to set the swept rows the same way.</GunplayOverrideTipTrail>
+  <GunplayOverrideTipSpeed>Whether this projectile is affected by the global projectile speed. Not overridden, it shows the default: arcing projectiles (grenades, shells) are never scaled, and a config package can exempt one with preserveSpeed (e.g. incendiary). Clicking enables the override automatically. The master switch above stops all scaling while off. You can also press on a row and drag up or down to set the swept rows the same way.</GunplayOverrideTipSpeed>
+  <GunplayOverrideSpeedResetTip>Clear the speed override and go back to the inherited default rule (arcing rule / config package preserveSpeed).</GunplayOverrideSpeedResetTip>
   <GunplayOverrideColProjectile>Projectile</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>Weapon</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>TrailW</GunplayOverrideColWidth>

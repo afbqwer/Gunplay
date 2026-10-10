@@ -15,8 +15,32 @@ namespace Gunplay
                 && projectileDef.projectile.arcHeightFactor > ArcHeightThreshold;
         }
 
-        // 是否对该投射物应用全局 projectileSpeed 加速。
-        // 独立于配置包的 preserveSpeed；未来换机制只改此方法。
+        // 该投射物「自己」是否受全局弹速缩放（不含全局总开关）。
+        //
+        // 这是弹速侧的唯一口径：补丁走 ShouldScaleSpeed，覆写窗口的弹速列直接读本方法。
+        // 窗口读的是它而不是 ShouldScaleSpeed，是因为总开关关闭时所有投射物都不缩放——
+        // 若显示 ShouldScaleSpeed，关掉总开关会让每一行的开关都变成未勾选，
+        // 看起来像用户逐行改过，其实是总开关在起作用。
+        //
+        // 优先级与 TrailEnabled 一致：单项覆写（命中即完全接管）> 各条「默认」规则。
+        public static bool SpeedAffected(ThingDef projectileDef)
+        {
+            if (projectileDef?.projectile == null) return false;
+
+            // 单项覆写命中即接管，可双向覆盖下面的「默认」规则
+            if (ProjectileOverrides.TryGetSpeedAffected(projectileDef, out bool affected)) return affected;
+
+            // ---- 以下为该投射物的「默认」是否受全局弹速缩放 ----
+
+            if (IsArcing(projectileDef)) return false; // 弧线投射物（手雷/炮弹）不缩放
+
+            // 配置包显式豁免（preserveSpeed，如燃烧弹）
+            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectileDef);
+            return prop == null || !prop.preserveSpeed;
+        }
+
+        // 是否真的对该投射物应用全局 projectileSpeed 缩放。补丁只读这一处。
+        // 全局总开关优先，与 TrailEnabled 同一优先级：总开关 > 单项覆写 > 「默认」规则。
         public static bool ShouldScaleSpeed(ThingDef projectileDef)
         {
             if (projectileDef?.projectile == null) return false;
@@ -25,7 +49,7 @@ namespace Gunplay
             // 全部投射物回到各自 def 的原始弹速。
             if (!GunplaySettings.projectileSpeedEnabled) return false;
 
-            return !IsArcing(projectileDef); // 弧线投射物（手雷/炮弹）不缩放
+            return SpeedAffected(projectileDef);
         }
 
         // 投射物本体是否配有贴图。无 graphicData 或 texPath 为空即视为「无贴图」——

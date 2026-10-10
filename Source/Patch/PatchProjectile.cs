@@ -81,10 +81,9 @@ namespace Gunplay.Patch
     {
         static float Postfix(float value, Projectile __instance)
         {
-            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(__instance.def);
-            if (prop != null && prop.preserveSpeed) return value;
-
-            // 独立排除机制：弧线投射物（手雷/炮弹）不受全局速度缩放影响
+            // 弹速是否缩放统一由 ProjectileRules.ShouldScaleSpeed 决定：
+            // 全局总开关、单项覆写、弧线规则与配置包 preserveSpeed 都在那一处判定，
+            // 补丁只读结论，不再自己重复一遍优先级。
             if (!ProjectileRules.ShouldScaleSpeed(__instance.def)) return value;
 
             return value / GunplaySettings.projectileSpeed;

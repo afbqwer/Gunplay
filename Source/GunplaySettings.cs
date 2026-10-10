@@ -32,8 +32,9 @@ namespace Gunplay
         public static float particleMultiplier = 1f;
 
         // 是否让投射物受全局弹速缩放（projectileSpeed）影响。关闭后 projectileSpeed 完全不起作用，
-        // 所有投射物保持各自 def 的原始弹速；单项覆写的 preserveSpeed 仍可单独豁免某个投射物。
-        // 判定统一收在 ProjectileRules.ShouldScaleSpeed，补丁只读那一处。
+        // 所有投射物保持各自 def 的原始弹速。这是总开关，优先于单项覆写。
+        // 判定统一收在 ProjectileRules.ShouldScaleSpeed（补丁只读那一处）：
+        // 总开关 > 单项覆写（覆写窗口的「弹速」列，命中即接管）> 默认规则（弧线不缩放 / 配置包 preserveSpeed）。
         public static bool projectileSpeedEnabled = true;
         public static float projectileSpeed = 3f;
         public static TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
@@ -130,14 +131,23 @@ namespace Gunplay
 
             // 弹速缩放是玩法改动，与轨迹是否绘制无关（补丁里也一直独立生效），因此独立成组，
             // 不再藏在「启用子弹轨迹」下面——否则关掉轨迹后就无法调整/关闭弹速了。
-            listing_Standard.Gap(4f);
-            listing_Standard.CheckboxLabeled("GunplayProjectileSpeedEnabledName".Translate(), ref projectileSpeedEnabled, "GunplayProjectileSpeedEnabledDesc".Translate());
-            if (projectileSpeedEnabled)
+            //
+            // CE 下整项隐藏：CE 的 ProjectileCE 自成一套弹道物理、不继承原版 Projectile，
+            // 那个「除以 projectileSpeed」的补丁对它根本不生效，留着开关只会让人以为调了有用
+            // （见 PatchCECompat 顶部说明与 PatchProjectileStartingTicksToImpact）。
+            // 判据用 Detected 而不是 Enabled：不兼容的原因是「CE 在场」，与我们的兼容补丁挂没挂上无关。
+            // 两个 Gap 一起放进条件里，隐藏时不留下空档。
+            if (!PatchCECompat.Detected)
             {
                 listing_Standard.Gap(4f);
-                listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
+                listing_Standard.CheckboxLabeled("GunplayProjectileSpeedEnabledName".Translate(), ref projectileSpeedEnabled, "GunplayProjectileSpeedEnabledDesc".Translate());
+                if (projectileSpeedEnabled)
+                {
+                    listing_Standard.Gap(4f);
+                    listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
+                }
+                listing_Standard.Gap(4f);
             }
-            listing_Standard.Gap(4f);
 
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());

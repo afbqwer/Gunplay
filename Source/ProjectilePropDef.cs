@@ -19,6 +19,8 @@ namespace Gunplay
         public ProjectileImpactSoundDef? projectileImpactSound;
         public ProjectileImpactEffectDef? projectileImpactEffect;
 
+        // 本配置包是否豁免全局弹速缩放（true = 该包内投射物保持自身 def 的原始弹速）。
+        // 这只是「默认」：单项覆写窗口的「弹速」列可按投射物覆盖它，见 ProjectileRules.SpeedAffected。
         public bool preserveSpeed = false;
     }
 }

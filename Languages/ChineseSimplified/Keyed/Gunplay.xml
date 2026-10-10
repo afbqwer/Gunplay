@@ -38,7 +38,7 @@
   <GunplayUnarmedBulletsOnlyName>仅限子弹类无武器投射物</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>开启后，只有伤害类型为子弹（Bullet）的无武器投射物才会产生这些特效.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>投射物单项覆写...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹材质、宽度、长度、淡出时长和颜色。各项覆写值都是绝对值，不再受材质与上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹材质、宽度、长度、淡出时长、颜色，以及是否受全局弹速缩放。轨迹各项覆写值都是绝对值，不再受材质与上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
   <GunplayTrailMaterialName>轨迹材质...</GunplayTrailMaterialName>
   <GunplayTrailMaterialDesc>编辑各类轨迹材质（一种材质对应一个 ProjectileTrailDef）的形状、宽度轮廓、颜色与几何。改动立即生效.</GunplayTrailMaterialDesc>
   <GunplayTrailMaterialWindowTitle>轨迹材质</GunplayTrailMaterialWindowTitle>
@@ -102,14 +102,17 @@
   <GunplayOverrideClearAllConfirm>确定要清除全部投射物覆写吗？</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>覆写</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>轨迹</GunplayOverrideColTrail>
+  <GunplayOverrideColSpeed>弹速</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>颜色</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>材质</GunplayOverrideColMaterial>
-  <GunplayOverrideTipMaterialPicked>该投射物已单独指定材质：{0}。点击可换成别的材质，或用「清除」回到继承.</GunplayOverrideTipMaterialPicked>
-  <GunplayOverrideTipMaterialInherited>该投射物继承本体配置的材质：{0}。点击可单独指定材质.</GunplayOverrideTipMaterialInherited>
-  <GunplayOverrideTipColor>自定义该投射物的轨迹颜色。本行尚未开启覆写时点击色块，会自动开启覆写；「×」恢复为继承轨迹颜色.</GunplayOverrideTipColor>
+  <GunplayOverrideTipMaterialPicked>该投射物已单独指定材质：{0}。点击可换成别的材质，或用「清除」回到继承.在某一行按住并拖动，可把这个材质涂到扫过的行上.</GunplayOverrideTipMaterialPicked>
+  <GunplayOverrideTipMaterialInherited>该投射物继承本体配置的材质：{0}。点击可单独指定材质.在某一行按住并拖动，可让扫过的行也回到同样的继承材质.</GunplayOverrideTipMaterialInherited>
+  <GunplayOverrideTipColor>自定义该投射物的轨迹颜色。本行尚未开启覆写时点击色块，会自动开启覆写；「×」恢复为继承轨迹颜色.在某一行色块上按住并拖动，可把这个颜色涂到扫过的行上.</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>清除自定义颜色，恢复为继承轨迹颜色.</GunplayOverrideColorResetTip>
-  <GunplayOverrideTipEnabled>覆写该投射物的轨迹设置。关闭会丢弃本行覆写，恢复为继承/计算值.</GunplayOverrideTipEnabled>
-  <GunplayOverrideTipTrail>是否为该投射物绘制轨迹。关闭后该投射物完全没有轨迹，宽度覆写也不再生效。本行尚未开启覆写时调整此开关，会自动开启覆写.</GunplayOverrideTipTrail>
+  <GunplayOverrideTipEnabled>覆写该投射物的轨迹设置。关闭会丢弃本行覆写，恢复为继承/计算值.也可在某一行按住并上下拖动，把开关状态批量应用到扫过的行.</GunplayOverrideTipEnabled>
+  <GunplayOverrideTipTrail>是否为该投射物绘制轨迹。关闭后该投射物完全没有轨迹，宽度覆写也不再生效。本行尚未开启覆写时调整此开关，会自动开启覆写.也可在某一行按住并上下拖动，把轨迹开关批量应用到扫过的行.</GunplayOverrideTipTrail>
+  <GunplayOverrideTipSpeed>该投射物是否受全局弹速缩放。未覆写时显示默认判定：弧线投射物（手雷/炮弹）不缩放，配置包可用 preserveSpeed 豁免（如燃烧弹）；点击会顺带开启覆写。上面的总开关关闭时，全部投射物都不缩放.也可在某一行按住并上下拖动，把弹速开关批量应用到扫过的行.</GunplayOverrideTipSpeed>
+  <GunplayOverrideSpeedResetTip>清除弹速覆写，回到继承默认判定（弧线规则 / 配置包 preserveSpeed）.</GunplayOverrideSpeedResetTip>
   <GunplayOverrideColProjectile>投射物</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>轨迹宽度</GunplayOverrideColWidth>
