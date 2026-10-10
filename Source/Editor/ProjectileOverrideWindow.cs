@@ -15,11 +15,15 @@ namespace Gunplay
     // 一行 = 一个投射物 ThingDef；武器列只是上下文（轨迹本身只由投射物 def 决定，见 PatchProjectileLaunch），
     // 多个武器共用同一投射物时显示第一个并在 defName 后加「+N」，悬浮列出全部。
     //
-    // 每行两个开关：
-    //   「覆写」—— 该行是否有覆写记录。关掉即丢弃记录（轨迹开关与宽度一起回到继承/计算值）。
+    // 每行三个开关 / 选择（列序：覆写 | 轨迹 | 材质 | 颜色 | 投射物 | 武器 | 宽度 | 长度 | 淡出）：
+    //   「覆写」—— 该行是否有覆写记录。关掉即丢弃记录（轨迹开关、材质与宽度一起回到继承/计算值）。
     //   「轨迹」—— 是否绘制该投射物的轨迹。未覆写时显示该投射物的「默认」值
     //              （见 ProjectileRules.TrailEnabled：可能因本体无贴图、弧线开关关闭而不勾选）。
     //              直接点它会顺带把覆写打开，省掉「先开覆写再关轨迹」两步。
+    //   「材质」—— 该投射物用哪种轨迹材质（ProjectileTrailDef）。未覆写时是本体配置解析出的那一种；
+    //              点击打开 Def 选择窗口，「清除」= 回到继承。与轨迹开关同约定：在未覆写的行上点它
+    //              会顺带开启覆写，但**只**记材质一项，不会把当时的宽度/长度/淡出一起固化（见 SetTrailMaterial）。
+    //   「颜色」—— 该投射物的轨迹颜色。它比材质自带的颜色更具体，因此排在材质列之后。
     //
     // 列表可能有数百行（装 CE 或大型武器包之后更多），因此走虚拟滚动：只为可见区间建 Rect，
     // 但输入框的字符串缓冲必须挂在行对象上跨帧保留，否则滚出视野再滚回来会丢焦点/丢输入。
@@ -36,6 +40,7 @@ namespace Gunplay
         const float SwatchWidth = 50f;
         const float SwatchHeight = 24f;
         const float ResetButtonWidth = 24f;
+        const float MaterialColumnWidth = 150f;
         const float WidthColumnWidth = 80f;
         const float LengthColumnWidth = 80f;
         const float FadeColumnWidth = 80f;
@@ -71,7 +76,7 @@ namespace Gunplay
             public string modName = null!;
             public string searchText = null!;   // 参与搜索的文本：投射物 + 全部武器 的 defName/label
             public string weaponTip = null!;    // 武器列的悬浮内容
-            public ProjectileTrailDef? trailDef;    // 该投射物解析出的轨迹 def（颜色继承的来源）
+            public ProjectileTrailDef? trailDef;    // 该投射物当前生效的轨迹材质（颜色/宽度继承的来源）
             public float editWidth;         // 输入框绑定的当前值
             public string? widthBuffer;     // 输入框字符串缓冲；null 表示尚未输入过
             public float editLength;        // 拖尾长度系数的输入框绑定值
@@ -114,12 +119,12 @@ namespace Gunplay
 
         static readonly NumberColumn LengthColumn = new NumberColumn(
             LengthColumnWidth, TrailLength.Min, TrailLength.Max, FormatInt, "GunplayOverrideTipLength",
-            row => TrailLength.Effective(row.projectile),
+            row => TrailLength.Effective(row.projectile, row.trailDef),
             (row, v) => ProjectileOverrides.SetTrailLength(row.projectile, v));
 
         static readonly NumberColumn FadeColumn = new NumberColumn(
             FadeColumnWidth, TrailFade.Min, TrailFade.Max, FormatInt, "GunplayOverrideTipFade",
-            row => TrailFade.Effective(row.projectile),
+            row => TrailFade.Effective(row.projectile, row.trailDef),
             (row, v) => ProjectileOverrides.SetTrailFade(row.projectile, v));
 
         readonly List<Row> rows = new List<Row>();
@@ -220,7 +225,7 @@ namespace Gunplay
                     modName = def.modContentPack?.Name ?? "??",
                     searchText = BuildSearchText(def, weapons),
                     weaponTip = BuildWeaponTip(weapons),
-                    trailDef = (GunplaySetup.ProjectileProp(def) ?? GunplaySetup.DefaultProjectileProp)?.trail,
+                    trailDef = ProjectileRules.TrailDefFor(def),
                     editWidth = 0f,
                     widthBuffer = null,
                     editLength = 0f,
@@ -294,12 +299,22 @@ namespace Gunplay
 
         static void SyncEditValue(Row row)
         {
+            RefreshTrailDef(row);
+
             row.editWidth = TrailWidth.EffectiveForDef(row.projectile);
             row.widthBuffer = Format(row.editWidth);
-            row.editLength = TrailLength.Effective(row.projectile);
+            row.editLength = TrailLength.Effective(row.projectile, row.trailDef);
             row.lengthBuffer = FormatInt(row.editLength);
-            row.editFade = TrailFade.Effective(row.projectile);
+            row.editFade = TrailFade.Effective(row.projectile, row.trailDef);
             row.fadeBuffer = FormatInt(row.editFade);
+        }
+
+        // 重取该行「当前生效的材质」。row.trailDef 是开窗时缓存的，只在覆写记录变化时才需要重算：
+        // 不重算的话，关掉覆写（记录被删）后材质列、颜色列的继承色、以及三个数值列的只读值
+        // 都会继续显示旧材质的内容——数据其实已经还原了，是显示没跟上。
+        static void RefreshTrailDef(Row row)
+        {
+            row.trailDef = ProjectileRules.TrailDefFor(row.projectile);
         }
 
         static string Format(float value)
@@ -498,6 +513,11 @@ namespace Gunplay
                 () =>
                 {
                     ProjectileOverrides.Clear();
+
+                    // 记录一次性全没了，每行缓存的材质都得重取（同 RefreshTrailDef 的理由：
+                    // 材质的解析结果依赖覆写记录，而记录是缓存在行上的）
+                    foreach (Row row in rows) RefreshTrailDef(row);
+
                     MarkVisibleDirty();
                     RebuildVisible();
                 },
@@ -513,6 +533,7 @@ namespace Gunplay
 
             Widgets.Label(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
             Widgets.Label(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
+            Widgets.Label(new Rect(layout.materialX, rect.y, MaterialColumnWidth, rect.height), "GunplayOverrideColMaterial".Translate());
             Widgets.Label(new Rect(layout.colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
             Widgets.Label(new Rect(layout.projX, rect.y, layout.projW, rect.height), "GunplayOverrideColProjectile".Translate());
             Widgets.Label(new Rect(layout.weaponX, rect.y, layout.weaponW, rect.height), "GunplayOverrideColWeapon".Translate());
@@ -531,6 +552,7 @@ namespace Gunplay
             internal readonly float overrideX;
             internal readonly float trailX;
             internal readonly float colorX;
+            internal readonly float materialX;
             internal readonly float projX;
             internal readonly float weaponX;
             internal readonly float widthX;
@@ -539,11 +561,12 @@ namespace Gunplay
             internal readonly float projW;
             internal readonly float weaponW;
 
-            internal ColumnLayout(float overrideX, float trailX, float colorX, float projX, float weaponX,
+            internal ColumnLayout(float overrideX, float trailX, float materialX, float colorX, float projX, float weaponX,
                 float widthX, float lengthX, float fadeX, float projW, float weaponW)
             {
                 this.overrideX = overrideX;
                 this.trailX = trailX;
+                this.materialX = materialX;
                 this.colorX = colorX;
                 this.projX = projX;
                 this.weaponX = weaponX;
@@ -554,25 +577,27 @@ namespace Gunplay
                 this.weaponW = weaponW;
             }
 
-            // 固定宽度的列各占其位，剩余宽度由投射物 / 武器两列平分
+            // 固定宽度的列各占其位，剩余宽度由投射物 / 武器两列平分。
+            // 列序按「越具体越靠右」：覆写 → 轨迹 → 材质 → 颜色（颜色比材质具体，单项覆写的颜色会盖住材质色）。
             internal static ColumnLayout Compute(float width)
             {
                 float inner = Mathf.Max(0f, width - ScrollbarWidth);
                 float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - ColorColumnWidth
-                    - WidthColumnWidth - LengthColumnWidth - FadeColumnWidth);
+                    - MaterialColumnWidth - WidthColumnWidth - LengthColumnWidth - FadeColumnWidth);
 
                 float projW = rest * 0.5f;
                 float weaponW = rest - projW;
 
                 float overrideX = 0f;
                 float trailX = overrideX + OverrideToggleWidth;
-                float colorX = trailX + TrailToggleWidth;
+                float materialX = trailX + TrailToggleWidth;
+                float colorX = materialX + MaterialColumnWidth;
                 float projX = colorX + ColorColumnWidth;
                 float weaponX = projX + projW;
                 float widthX = weaponX + weaponW;
                 float lengthX = widthX + WidthColumnWidth;
 
-                return new ColumnLayout(overrideX, trailX, colorX, projX, weaponX,
+                return new ColumnLayout(overrideX, trailX, materialX, colorX, projX, weaponX,
                     widthX, lengthX, lengthX + LengthColumnWidth, projW, weaponW);
             }
         }
@@ -616,6 +641,7 @@ namespace Gunplay
 
             DrawToggle(row, layout.overrideX, y, overridden);
             DrawTrailToggle(row, layout.trailX, y, trailOn);
+            DrawMaterialCell(row, layout.materialX, y, overridden, trailOn);
             DrawColorCell(row, layout.colorX, y, overridden, trailOn);
             DrawNameCell(row.projectile, row.projectileLabel, row.projectile.defName, layout.projX, y, layout.projW, null);
             DrawWeaponCell(row, layout.weaponX, y, layout.weaponW);
@@ -642,7 +668,10 @@ namespace Gunplay
             }
             else
             {
+                // 记录被删 = 轨迹开关、材质、颜色、宽度/长度/淡出一起回到继承/计算值。
+                // 数值列的只读显示是实时算的，但材质是缓存的，必须重取一次（见 RefreshTrailDef）。
                 ProjectileOverrides.Disable(row.projectile);
+                RefreshTrailDef(row);
             }
 
             AfterOverrideChanged();
@@ -789,6 +818,46 @@ namespace Gunplay
                 }
                 TooltipHandler.TipRegion(resetRect, "GunplayOverrideColorResetTip".Translate());
             }
+        }
+
+        // 材质单元格：显示该投射物当前生效的轨迹材质（=「材质类型」，本体 XML 配置或单项覆写选定），
+        // 点击打开 Def 选择窗口；窗口里的「清除」= 回到继承本体配置。
+        // 与其它单元格同约定：在未覆写的行上点它会顺带开启覆写，但只记材质一项（见 SetTrailMaterial）。
+        void DrawMaterialCell(Row row, float x, float y, bool overridden, bool trailOn)
+        {
+            Rect cellRect = new Rect(x, y, MaterialColumnWidth, RowHeight);
+
+            // 轨迹关掉时材质没有意义（与颜色列同一处理）
+            if (overridden && !trailOn)
+            {
+                DrawDash(cellRect);
+                return;
+            }
+
+            // 判「是否单独指定了材质」直接看记录里的 defName，而不是回查 DefDatabase：
+            // 每帧对每行都要用一次，这里只是显示与提示，一个字典查找就够；
+            // 材质 def 被移除时 defName 仍在，提示仍旧说"已单独指定"，与 SetTrailMaterial 的意图一致。
+            bool picked = ProjectileOverrides.Get(row.projectile)?.trailMaterialDefName != null;
+
+            string label = row.trailDef != null ? row.trailDef.defName : "—";
+            Rect buttonRect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, MaterialColumnWidth - 8f), RowHeight - 10f);
+
+            if (Widgets.ButtonText(buttonRect, label))
+            {
+                TrailMaterialPicker.Open(row.trailDef, def =>
+                {
+                    ProjectileOverrides.SetTrailMaterial(row.projectile, def);
+
+                    // 材质换了，本行后面几列的继承口径（颜色 / 宽度 / 长度 / 淡出）跟着换，
+                    // 缓存与输入框缓冲区都要重取一次，否则显示的还是旧材质的值
+                    SyncEditValue(row);
+                    AfterOverrideChanged();
+                });
+            }
+
+            TooltipHandler.TipRegion(buttonRect, picked
+                ? "GunplayOverrideTipMaterialPicked".Translate(label)
+                : "GunplayOverrideTipMaterialInherited".Translate(label));
         }
 
         // 数值列（宽度 / 长度 / 淡出）的统一渲染。三列流程完全一致：

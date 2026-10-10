@@ -5,9 +5,13 @@ namespace Gunplay
 {
     // 轨迹宽度的统一口径：运行时与设置界面共用同一份公式，避免两处各写一遍后慢慢跑偏。
     //
+    // 口径是「四边形宽度」——几何就是一块按 (width, 1, len) 缩放的 plane10，alpha 轮廓只在其中决定
+    // 哪些像素看得见。材质里的宽度轮廓参数是**相对比例**（见 TrailMaterialParams.headWidth / tailWidth），
+    // 生成时按两端较大者归一化到 1，最宽端必然贴住四边形边缘，因此这里不需要为轮廓做任何补偿。
+    //
     // 优先级（高 → 低）：
     //   1) 单项覆写（覆写窗口设置）—— 绝对值，完全独立：既不看伤害/贴图，也不乘全局系数；
-    //   2) ProjectileTrailDef.trailWidth（XML）—— 绝对值，之后仍乘全局系数；
+    //   2) 材质（ProjectileTrailDef 的 material.trailWidth，XML 或材质窗口编辑）—— 绝对值，之后仍乘全局系数；
     //   3) 基础宽度 —— 按伤害 min(damage,50)*0.006 或按贴图 drawSize.x*0.1，之后乘全局系数。
     public static class TrailWidth
     {
@@ -21,7 +25,7 @@ namespace Gunplay
             return ProjectileOverrides.TryGetTrailWidth(projectileDef, out width);
         }
 
-        // 基础宽度（伤害 / 贴图口径），不含 trailDef 覆盖与全局系数。
+        // 基础宽度（伤害 / 贴图口径），不含材质覆盖与全局系数。
         public static float Base(ThingDef? projectileDef, float damage)
         {
             if (projectileDef == null) return 0f;
@@ -42,19 +46,21 @@ namespace Gunplay
             if (TryOverride(projectileDef, out float w)) return w;
 
             float width = Base(projectileDef, damage);
-            if (trailDef != null && trailDef.trailWidth != -1) width = trailDef.trailWidth;
+
+            // 材质层：绝对值口径，-1 表示未设定（继续走基础宽度）
+            float materialWidth = TrailMaterial.Effective(trailDef).trailWidth;
+            if (materialWidth > 0f) width = materialWidth;
 
             return width * GunplaySettings.trailWidthFactor;
         }
 
-        // 设置界面口径：无法知道实际开火的武器，因此按无武器加成解析伤害（见 BaseDamage）。
+        // 设置界面口径：无法知道实际开火的武器，因此按无武器加成解析伤害（见 BaseDamage）；
+        // 材质同样按该投射物当前生效的材质解析（含单项覆写选的材质）。
         public static float EffectiveForDef(ThingDef? projectileDef)
         {
             if (TryOverride(projectileDef, out float w)) return w;
 
-            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
-
-            return Effective(projectileDef, BaseDamage(projectileDef), prop?.trail);
+            return Effective(projectileDef, BaseDamage(projectileDef), ProjectileRules.TrailDefFor(projectileDef));
         }
 
         // 伤害必须走游戏自己的解析，不能直接读 ProjectileProperties.damageAmountBase：

@@ -132,8 +132,8 @@ namespace Gunplay
             traveled = 0f;
 
             // 拖尾长度（格）与淡出时长（tick）是两个独立的量，不再互相派生，见 TrailLength / TrailFade
-            length = speed * TrailLength.Effective(proj.def);
-            fadeTicks = TrailFade.Effective(proj.def);
+            length = speed * TrailLength.Effective(proj.def, trailDef);
+            fadeTicks = TrailFade.Effective(proj.def, trailDef);
             dir = (b - a).normalized;
             ComputeWidth(proj.def, proj.DamageAmount);
             maxReach = length + width;
@@ -168,8 +168,8 @@ namespace Gunplay
 
             // CE 弹速是真实弹道速度（子弹一 tick 可飞数格），沿用「弹速 × 长度系数」会拉出十余格的
             // "激光束"，CE 路径对拖尾长度做上限截断。注意这只截长度，不再连带截短淡出时长。
-            length = Mathf.Min(speed * TrailLength.Effective(proj.def), PatchCECompat.MaxTrailLength);
-            fadeTicks = TrailFade.Effective(proj.def);
+            length = Mathf.Min(speed * TrailLength.Effective(proj.def, trailDef), PatchCECompat.MaxTrailLength);
+            fadeTicks = TrailFade.Effective(proj.def, trailDef);
             dir = (b - a).normalized;
             ComputeWidth(proj.def, PatchCECompat.GetDamageAmount(proj));
             maxReach = length + width;

@@ -38,15 +38,44 @@
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>Per-projectile overrides...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>Override the trail width, length, fade duration and color of individual projectiles. Overridden values are absolute and ignore the global trail settings above.</GunplayProjectileOverridesDesc>
-  <GunplayTrailColorsName>Trail colors...</GunplayTrailColorsName>
-  <GunplayTrailColorsDesc>Customize the color of each trail texture. Changes apply instantly, but only to projectiles fired afterwards.</GunplayTrailColorsDesc>
-  <GunplayTrailColorsWindowTitle>Trail colors</GunplayTrailColorsWindowTitle>
-  <GunplayTrailColorResetTip>Restore this trail's default color.</GunplayTrailColorResetTip>
-  <GunplayTrailTextureName>Trail texture...</GunplayTrailTextureName>
-  <GunplayTrailTextureDesc>Shape the runtime-generated trail texture (soft fade at the head, tail and both sides). Changes apply instantly.</GunplayTrailTextureDesc>
-  <GunplayTrailTextureWindowTitle>Trail texture</GunplayTrailTextureWindowTitle>
-  <GunplayTrailTextureReset>Restore defaults</GunplayTrailTextureReset>
+  <GunplayProjectileOverridesDesc>Override the trail material, width, length, fade duration and color of individual projectiles. Overridden values are absolute and ignore the material and the global trail settings above.</GunplayProjectileOverridesDesc>
+  <GunplayTrailMaterialName>Trail materials...</GunplayTrailMaterialName>
+  <GunplayTrailMaterialDesc>Shape, width profile, color and geometry of each trail material (one material per ProjectileTrailDef). Changes apply instantly.</GunplayTrailMaterialDesc>
+  <GunplayTrailMaterialWindowTitle>Trail material</GunplayTrailMaterialWindowTitle>
+  <GunplayTrailMaterialCurrent>Material: {0}</GunplayTrailMaterialCurrent>
+  <GunplayTrailMaterialNone>No trail material to edit</GunplayTrailMaterialNone>
+  <GunplayTrailMaterialPickTip>Pick the trail material to edit (one material = one ProjectileTrailDef).</GunplayTrailMaterialPickTip>
+  <GunplayTrailMaterialPickerTitle>Pick trail material</GunplayTrailMaterialPickerTitle>
+  <GunplayTrailMaterialEdited>Edited (stored in settings)</GunplayTrailMaterialEdited>
+  <GunplayTrailMaterialFromDef>Using the def template</GunplayTrailMaterialFromDef>
+  <GunplayTrailMaterialReset>Reset to def template</GunplayTrailMaterialReset>
+  <GunplayTrailMaterialResetTip>Discard every edit to this material and go back to the values in its def (XML).</GunplayTrailMaterialResetTip>
+  <GunplayTrailMaterialGroupSource>Texture source</GunplayTrailMaterialGroupSource>
+  <GunplayTrailMaterialSourceGenerated>Generated texture (shape parameters apply)</GunplayTrailMaterialSourceGenerated>
+  <GunplayTrailMaterialSourceFile>File texture (graphicData texPath)</GunplayTrailMaterialSourceFile>
+  <GunplayTrailMaterialSourceTip>The generated texture is built at runtime from the shape and width profile parameters below. A file texture uses the image referenced by the def's graphicData instead, and the shape parameters and width profile do not apply (they are greyed out).</GunplayTrailMaterialSourceTip>
+  <GunplayTrailMaterialNoTexture>This material has no usable texture</GunplayTrailMaterialNoTexture>
+  <GunplayTrailMaterialGroupProfile>Width profile (taper / flare)</GunplayTrailMaterialGroupProfile>
+  <GunplayTrailMaterialHeadWidth>Head width</GunplayTrailMaterialHeadWidth>
+  <GunplayTrailMaterialTailWidth>Tail width</GunplayTrailMaterialTailWidth>
+  <GunplayTrailMaterialProfileCurve>Profile curve</GunplayTrailMaterialProfileCurve>
+  <GunplayTrailMaterialProfileTip>Visible width as a fraction of the trail quad (0-1). Both ends are relative: at generation time the wider one is stretched to 1, so the widest point always fills the quad and the trail width setting is never silently changed. Equal values = uniform width (identical to the old look); a smaller tail = the tail tapers away; a larger tail = the tail flares out.</GunplayTrailMaterialProfileTip>
+  <GunplayTrailMaterialProfileCurveTip>Curve of the width transition: 1 = linear along the whole length; higher pushes the change towards the tail (the head stays wide and only the tip tapers or flares); lower pushes it towards the head.</GunplayTrailMaterialProfileCurveTip>
+  <GunplayTrailMaterialGroupGeometry>Color and geometry</GunplayTrailMaterialGroupGeometry>
+  <GunplayTrailMaterialColor>Color</GunplayTrailMaterialColor>
+  <GunplayTrailMaterialColorTip>Color of this material. Color is not baked into the texture (it is passed per batch), so recoloring does not rebuild anything, but it only affects projectiles fired afterwards.</GunplayTrailMaterialColorTip>
+  <GunplayTrailMaterialWidth>Override width</GunplayTrailMaterialWidth>
+  <GunplayTrailMaterialWidthTip>When checked, this material uses an absolute width in world units. Otherwise the width is the base width (damage/texture mode) times the global width multiplier. Checking starts at 0.15.</GunplayTrailMaterialWidthTip>
+  <GunplayTrailMaterialLength>Override length</GunplayTrailMaterialLength>
+  <GunplayTrailMaterialLengthTip>When checked, this material uses an absolute length factor (length = value x projectile speed). Otherwise the global "Trail length" setting applies.</GunplayTrailMaterialLengthTip>
+  <GunplayTrailMaterialFade>Override fade</GunplayTrailMaterialFade>
+  <GunplayTrailMaterialFadeTip>When checked, this material uses an absolute fade duration in ticks. Otherwise the global "Trail fade duration" setting applies.</GunplayTrailMaterialFadeTip>
+  <GunplayPickerConfirm>Confirm</GunplayPickerConfirm>
+  <GunplayPickerCancel>Cancel</GunplayPickerCancel>
+  <GunplayPickerClear>Clear</GunplayPickerClear>
+  <GunplayPickerCurrent>Current</GunplayPickerCurrent>
+  <GunplayPickerNone>None</GunplayPickerNone>
+  <GunplayPickerMisc>Misc</GunplayPickerMisc>
   <GunplayTrailTextureGroupLength>Along flight (length)</GunplayTrailTextureGroupLength>
   <GunplayTrailTextureGroupWidth>Across the trail (width)</GunplayTrailTextureGroupWidth>
   <GunplayTrailTexturePeakAlpha>Peak opacity</GunplayTrailTexturePeakAlpha>
@@ -61,8 +90,6 @@
   <GunplayTrailTexturePreviewTail>Tail</GunplayTrailTexturePreviewTail>
   <GunplayTrailTexturePreviewActual>Detail</GunplayTrailTexturePreviewActual>
   <GunplayTrailTexturePreviewShape>In-game shape</GunplayTrailTexturePreviewShape>
-  <GunplayTrailTexturePreviewColor>Preview color</GunplayTrailTexturePreviewColor>
-  <GunplayTrailTexturePreviewCustom>Custom...</GunplayTrailTexturePreviewCustom>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>All mods</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>Trail</GunplayOverrideTrailFilter>
@@ -76,6 +103,9 @@
   <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
   <GunplayOverrideColColor>Color</GunplayOverrideColColor>
+  <GunplayOverrideColMaterial>Material</GunplayOverrideColMaterial>
+  <GunplayOverrideTipMaterialPicked>This projectile uses a material picked here: {0}. Click to pick another one, or "Clear" to inherit again.</GunplayOverrideTipMaterialPicked>
+  <GunplayOverrideTipMaterialInherited>This projectile inherits the material configured on its def: {0}. Click to pick a material just for it.</GunplayOverrideTipMaterialInherited>
   <GunplayOverrideTipColor>Customize this projectile's trail color. Clicking the swatch on a row that is not overridden yet enables the override automatically; × restores the inherited trail color.</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>Clear the custom color and inherit the trail color again.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values.</GunplayOverrideTipEnabled>

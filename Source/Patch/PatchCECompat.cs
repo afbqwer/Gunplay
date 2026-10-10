@@ -208,14 +208,14 @@ namespace Gunplay.Patch
 
             // 投射物在 Launch/Throw 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
             Map? map = __instance.Map ?? launcher?.Map;
-            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(__instance.def) ?? GunplaySetup.DefaultProjectileProp;
-            if (map == null || prop?.trail == null) return;
+            ProjectileTrailDef? trailDef = ProjectileRules.TrailDefFor(__instance.def);
+            if (map == null || trailDef == null) return;
 
             // 轨迹不再 spawn Thing：登记到该地图的轨迹集合，由批量绘制统一处理。
             // CE 的 Destination 是发射时预测的落点（零高度），仅提供轨迹初始方向/弧线几何；
             // 直线轨迹的实际方向随后每 tick 由投射物真实位移校正。
             Vector2 dest2 = destinationField?.GetValue(__instance) is Vector2 dest ? dest : new Vector2(__instance.DrawPos.x, __instance.DrawPos.z);
-            MapComponent_ProjectileTrails.For(map)?.RegisterCE(__instance, new Vector3(dest2.x, 0f, dest2.y), prop.trail);
+            MapComponent_ProjectileTrails.For(map)?.RegisterCE(__instance, new Vector3(dest2.x, 0f, dest2.y), trailDef);
         }
 
         static void ImpactPrefix(Thing __instance, Thing hitThing)

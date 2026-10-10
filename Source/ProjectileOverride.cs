@@ -6,16 +6,17 @@ using Verse;
 
 namespace Gunplay
 {
-    // 单个投射物的覆写记录。目前五项：轨迹开关 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长。
+    // 单个投射物的覆写记录。目前六项：轨迹开关 + 轨迹材质 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长。
     //
     // 加一项覆写的实际成本（别信「加个字段加一列」那种说法）：记录字段 + ExposeData +
     // ProjectileOverrides 的 TryGet/Set + 一个 TrailXxx 口径类 + 窗口的一列 + 三份语言键，
-    // 大约五处。现在只有五项，为将来的第 N 项提前搭数据驱动的框架不划算，
+    // 大约五处。现在只有六项，为将来的第 N 项提前搭数据驱动的框架不划算，
     // 新项先照抄现有形状写；等真的到八项以上再谈抽象。
     // 存档格式始终向后兼容：缺失字段一律走默认值。
     //
     // 「是否命中」的统一契约 —— 用哨兵值表达「未设定」，而不是靠「记录存在」：
     //   宽度 / 拖尾长度 / 淡出时长 —— 0 表示未设定，回落到计算值或全局设置；
+    //   轨迹材质 —— null 表示未设定，回落 ProjectilePropDef.trail（本体的引用天然可空，不需要哨兵）；
     //   轨迹颜色 —— 单独用 hasColor 标记，因为白色是合法颜色，哨兵表达不了三态。
     // 记录本身存在 == 覆写已开启；关掉覆写即删除记录（Disable）。
     public class ProjectileOverride : IExposable
@@ -24,19 +25,24 @@ namespace Gunplay
         // （ProjectileRules.TrailEnabled，可能因无贴图或弧线开关而为 false），见 Create。
         public bool trailEnabled = true;
 
+        // 该投射物使用的轨迹材质（ProjectileTrailDef.defName），即「材质类型」选择。
+        // null = 未设定，继承 ProjectilePropDef.trail（见 ProjectileRules.TrailDefFor）。
+        // 与其它项一样用 defName 而不是引用做键/存储，mod 增删后残留的条目读不到就当没有。
+        public string? trailMaterialDefName;
+
         // 轨迹宽度，绝对值且完全独立：既不看伤害/贴图，也不乘全局系数。0 = 未设定。
         public float trailWidth;
 
-        // 自定义轨迹颜色。hasColor = false 表示继承该投射物所用轨迹 def 的颜色（见 TrailColor）。
+        // 自定义轨迹颜色。hasColor = false 表示继承该投射物所用材质的颜色（见 TrailColor）。
         // 颜色本身经 ColorPickerWindow.LookColor 以 "#RRGGBBAA" 字符串序列化。
         public bool hasColor;
         public Color trailColor = Color.white;
 
         // 拖尾长度系数（绝对值）：length = 弹速 × 该值，见 TrailLength。
-        // 0 = 未设定，继承全局 GunplaySettings.trailLengthFactor。
+        // 0 = 未设定，继承材质设置与全局 GunplaySettings.trailLengthFactor。
         public float trailLengthFactor;
 
-        // 淡出时长（tick，绝对值），见 TrailFade。0 = 未设定，继承全局 GunplaySettings.trailFadeTicks。
+        // 淡出时长（tick，绝对值），见 TrailFade。0 = 未设定，继承材质设置与全局 GunplaySettings.trailFadeTicks。
         public float trailFadeTicks;
 
         // 三个数值字段都用 0 而不是各自的 Default 作哨兵，是因为「字段缺失」和「值恰好等于默认」
@@ -46,6 +52,7 @@ namespace Gunplay
         public void ExposeData()
         {
             Scribe_Values.Look(ref trailEnabled, "trailEnabled", true);
+            Scribe_Values.Look(ref trailMaterialDefName, "trailMaterial", null);
             Scribe_Values.Look(ref trailWidth, "trailWidth", 0f);
             Scribe_Values.Look(ref trailLengthFactor, "trailLengthFactor", 0f);
             Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", 0f);
@@ -94,6 +101,23 @@ namespace Gunplay
         public static bool TryGetTrailFade(ThingDef? projectileDef, out float ticks)
         {
             return TryGetPositive(projectileDef, o => o.trailFadeTicks, out ticks);
+        }
+
+        // 单项覆写是否指定了轨迹材质（= 逐个投射物选择「材质类型」）。
+        // 未设定时返回 false，调用方回落到 ProjectilePropDef.trail。
+        // 查不到也返回 false：材质 def 被所在 mod 移除后，残留的 defName 不该让该投射物连轨迹一起丢掉。
+        public static bool TryGetTrailMaterial(ThingDef? projectileDef, out ProjectileTrailDef def)
+        {
+            def = null!;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over?.trailMaterialDefName == null) return false;
+
+            ProjectileTrailDef? found = DefDatabase<ProjectileTrailDef>.GetNamed(over.trailMaterialDefName, false);
+            if (found == null) return false;
+
+            def = found;
+            return true;
         }
 
         // 三个数值覆写项共用同一套「命中」语义：记录存在且值 > 0。0 是未设定哨兵，见 ProjectileOverride。
@@ -165,6 +189,30 @@ namespace Gunplay
             GetOrCreate(projectileDef).trailFadeTicks = ticks;
         }
 
+        // 设定该投射物使用的材质（= 逐个投射物指定「材质类型」）。
+        // 传 null = 清除选择、回到「继承本体配置的材质」。
+        //
+        // 与其它 Set* 的区别：这里不走 GetOrCreate。新建记录时**不**快照当前的宽度/长度/淡出——
+        // 选材质这件事的意思是"以后按这个材质来"，若顺手把旧材质的绝对值固化成覆写，
+        // 新材质自己设定的宽度/长度/淡出就会被静默屏蔽（覆写 > 材质）。所以新建时数值项一律留"未设定"。
+        // 轨迹开关仍以该投射物的当前生效值为起点，否则新建一条记录会把正在显示的轨迹关掉。
+        public static void SetTrailMaterial(ThingDef? projectileDef, ProjectileTrailDef? def)
+        {
+            if (projectileDef == null) return;
+
+            if (!Map.TryGetValue(projectileDef.defName, out ProjectileOverride? over))
+            {
+                // 注意：TrailEnabled 会回头读这条记录，必须在写进字典之前算完（此时读到的还是 null）
+                over = new ProjectileOverride
+                {
+                    trailEnabled = ProjectileRules.TrailEnabled(projectileDef)
+                };
+                Map[projectileDef.defName] = over;
+            }
+
+            over.trailMaterialDefName = def?.defName;
+        }
+
         public static void SetTrailEnabled(ThingDef? projectileDef, bool enabled)
         {
             if (projectileDef == null) return;
@@ -203,14 +251,19 @@ namespace Gunplay
         // 按「当前生效值」造一条全新记录。新增覆写项时在这里补默认值。
         // trailEnabled 取该投射物的「默认」值（而非恒 true）：无贴图或弧线开关关闭的投射物
         // 本就默认不显示，开启覆写不应把它们悄悄变成显示（见 ProjectileRules.TrailEnabled）。
+        // 长度 / 淡出要按该投射物当前生效的材质解析（材质可能自己定了绝对值），否则「开启覆写」
+        // 这个动作本身就会把画面改掉——那正是本方法存在的意义（开局即现状）。
         static ProjectileOverride Create(ThingDef projectileDef)
         {
+            ProjectileTrailDef? trailDef = ProjectileRules.TrailDefFor(projectileDef);
+
             return new ProjectileOverride
             {
                 trailEnabled = ProjectileRules.TrailEnabled(projectileDef),
+                trailMaterialDefName = null,   // 新记录不选材质 = 继承，与开启前的画面一致
                 trailWidth = TrailWidth.EffectiveForDef(projectileDef),
-                trailLengthFactor = GunplaySettings.trailLengthFactor,
-                trailFadeTicks = GunplaySettings.trailFadeTicks
+                trailLengthFactor = TrailLength.Effective(projectileDef, trailDef),
+                trailFadeTicks = TrailFade.Effective(projectileDef, trailDef)
             };
         }
 

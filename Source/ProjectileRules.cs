@@ -36,6 +36,20 @@ namespace Gunplay
             return graphicData != null && !graphicData.texPath.NullOrEmpty();
         }
 
+        // 该投射物实际使用的轨迹材质（ProjectileTrailDef，「材质类型」就是它）。
+        //
+        // 优先级：单项覆写里选的材质 > ProjectilePropDef.trail（XML 显式配置 / 名称关键字匹配 / default）。
+        // 运行时登记轨迹、轨迹门控、四个口径类（宽度/长度/淡出/颜色）与两个窗口全部只走这一处，
+        // 避免同一件事在多处各写一遍后慢慢跑偏。
+        public static ProjectileTrailDef? TrailDefFor(ThingDef? projectileDef)
+        {
+            if (projectileDef == null) return null;
+
+            if (ProjectileOverrides.TryGetTrailMaterial(projectileDef, out ProjectileTrailDef selected)) return selected;
+
+            return (GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp)?.trail;
+        }
+
         // 该投射物「默认」是否会绘制轨迹。这是「是否显示轨迹」的唯一口径：
         // 运行时登记轨迹、单项覆写窗口的轨迹列与过滤、以及新建覆写时的默认值都走这里，
         // 避免同一件事在多处各写一遍后慢慢跑偏。
@@ -47,9 +61,9 @@ namespace Gunplay
             if (!GunplaySettings.enableTrails) return false;
 
             // 没解析出 ProjectileTrailDef 的投射物根本不会登记轨迹（见两条 Launch 补丁）。
-            // 这条是「能不能画」的硬前提，与是否覆写无关。
-            ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectileDef) ?? GunplaySetup.DefaultProjectileProp;
-            if (prop?.trail == null) return false;
+            // 这条是「能不能画」的硬前提，与是否覆写无关——但解析必须走 TrailDefFor：
+            // 单项覆写可以自己指定材质，此时「没配 XML 材质」不再是不可画的理由。
+            if (TrailDefFor(projectileDef) == null) return false;
 
             // 单项覆写存在即完全接管，可覆盖下面所有「默认」规则（见 ProjectileOverrides）
             ProjectileOverride? over = ProjectileOverrides.Get(projectileDef);

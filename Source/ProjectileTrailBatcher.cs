@@ -41,9 +41,9 @@ namespace Gunplay
         // 颜色经 MaterialPropertyBlock 的 _Color 传入（与原版 DrawBatch.Flush 给微粒上色的同一机制，
         // Mote 系 shader 均支持），所以同材质不同颜色不能共用分组，绘制键是 (材质, 颜色) 二元组。
         //
-        // 键取材质而不是 def：多个 def 可能共用同一个材质（默认档全部用运行时生成贴图的那一个），
-        // 此时"同材质+同颜色"的分组可以合并成一次绘制调用——比按 def 分组更省，也不会因为
-        // 加颜色功能而变多（引入颜色前的键是 def，那时同材质的多个 def 反而各占一次调用）。
+        // 键取材质而不是 def：材质现在按 ProjectileTrailDef 缓存（一种材质一张生成贴图、一个材质实例），
+        // 于是"同材质 + 同颜色"的分组仍能把共用同一材质的多个 def 合并成一次绘制调用——
+        // 比如文件贴图档下多个 def 若指向同一张贴图，就会命中同一个材质实例。
         readonly struct TrailMaterialKey : IEquatable<TrailMaterialKey>
         {
             internal readonly Material? material;

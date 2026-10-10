@@ -38,15 +38,44 @@
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>有効にすると、ダメージ種別が「弾（Bullet）」の発射体のみこれらのエフェクトを表示します。</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>発射体ごとの上書き...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅・長さ・消滅時間・色を個別に指定します。上書きした値はすべて絶対値であり、上記の全体的な弾道設定は適用されません。</GunplayProjectileOverridesDesc>
-  <GunplayTrailColorsName>弾道の色...</GunplayTrailColorsName>
-  <GunplayTrailColorsDesc>弾道テクスチャの色を種類ごとに設定します。変更は即時反映されますが、以後に発射される発射体にのみ適用されます。</GunplayTrailColorsDesc>
-  <GunplayTrailColorsWindowTitle>弾道の色</GunplayTrailColorsWindowTitle>
-  <GunplayTrailColorResetTip>この弾道の既定の色に戻します。</GunplayTrailColorResetTip>
-  <GunplayTrailTextureName>弾道テクスチャ...</GunplayTrailTextureName>
-  <GunplayTrailTextureDesc>実行時に生成する弾道テクスチャの形状（先端・末端・両側の半透明ぼかし）を調整します。変更は即時反映されます。</GunplayTrailTextureDesc>
-  <GunplayTrailTextureWindowTitle>弾道テクスチャ</GunplayTrailTextureWindowTitle>
-  <GunplayTrailTextureReset>既定値に戻す</GunplayTrailTextureReset>
+  <GunplayProjectileOverridesDesc>発射体ごとに弾道マテリアル・幅・長さ・消滅時間・色を個別に指定します。上書きした値はすべて絶対値であり、マテリアルと上記の全体的な弾道設定は適用されません。</GunplayProjectileOverridesDesc>
+  <GunplayTrailMaterialName>弾道マテリアル...</GunplayTrailMaterialName>
+  <GunplayTrailMaterialDesc>各弾道マテリアル（マテリアル1つ＝ProjectileTrailDef 1つ）の形状・幅プロファイル・色・ジオメトリを編集します。変更は即時反映されます。</GunplayTrailMaterialDesc>
+  <GunplayTrailMaterialWindowTitle>弾道マテリアル</GunplayTrailMaterialWindowTitle>
+  <GunplayTrailMaterialCurrent>マテリアル：{0}</GunplayTrailMaterialCurrent>
+  <GunplayTrailMaterialNone>編集できる弾道マテリアルがありません</GunplayTrailMaterialNone>
+  <GunplayTrailMaterialPickTip>編集する弾道マテリアルを選択します（マテリアル1つ＝ProjectileTrailDef 1つ）。</GunplayTrailMaterialPickTip>
+  <GunplayTrailMaterialPickerTitle>弾道マテリアルを選択</GunplayTrailMaterialPickerTitle>
+  <GunplayTrailMaterialEdited>設定で変更済み</GunplayTrailMaterialEdited>
+  <GunplayTrailMaterialFromDef>defテンプレートの値</GunplayTrailMaterialFromDef>
+  <GunplayTrailMaterialReset>defテンプレートに戻す</GunplayTrailMaterialReset>
+  <GunplayTrailMaterialResetTip>このマテリアルへの編集をすべて破棄し、def（XML）のテンプレート値に戻します。</GunplayTrailMaterialResetTip>
+  <GunplayTrailMaterialGroupSource>テクスチャの供給元</GunplayTrailMaterialGroupSource>
+  <GunplayTrailMaterialSourceGenerated>生成テクスチャ（形状パラメータが有効）</GunplayTrailMaterialSourceGenerated>
+  <GunplayTrailMaterialSourceFile>ファイルテクスチャ（graphicData の texPath）</GunplayTrailMaterialSourceFile>
+  <GunplayTrailMaterialSourceTip>生成テクスチャは下の形状・幅プロファイルのパラメータから実行時に生成されます。ファイルテクスチャは def の graphicData が指す画像をそのまま使うため、形状パラメータと幅プロファイルは効きません（グレー表示になります）。</GunplayTrailMaterialSourceTip>
+  <GunplayTrailMaterialNoTexture>このマテリアルには使用できるテクスチャがありません</GunplayTrailMaterialNoTexture>
+  <GunplayTrailMaterialGroupProfile>幅プロファイル（末端の収縮 / 拡大）</GunplayTrailMaterialGroupProfile>
+  <GunplayTrailMaterialHeadWidth>先端の幅</GunplayTrailMaterialHeadWidth>
+  <GunplayTrailMaterialTailWidth>末端の幅</GunplayTrailMaterialTailWidth>
+  <GunplayTrailMaterialProfileCurve>プロファイルのカーブ</GunplayTrailMaterialProfileCurve>
+  <GunplayTrailMaterialProfileTip>四角形に対する可視幅の比率（0～1）。両端とも相対値で、生成時に大きい方が1に正規化されるため、最も広い端が必ず四角形の端に接し、弾道の幅設定が勝手に細くなることはありません。両端が等しい＝等幅（従来の見た目と完全に同一）、末端が小さい＝末端が収縮、末端が大きい＝末端が拡大します。</GunplayTrailMaterialProfileTip>
+  <GunplayTrailMaterialProfileCurveTip>幅の変化のカーブ指数：1＝全長で線形。大きいほど変化が末端に集中し（先端はほとんど変わらず先端だけが収縮/拡大）、小さいほど先端側に集中します。</GunplayTrailMaterialProfileCurveTip>
+  <GunplayTrailMaterialGroupGeometry>色とジオメトリ</GunplayTrailMaterialGroupGeometry>
+  <GunplayTrailMaterialColor>色</GunplayTrailMaterialColor>
+  <GunplayTrailMaterialColorTip>このマテリアルの色。色はテクスチャに焼き込まれないため（バッチごとに渡されます）、色の変更でテクスチャを再生成する必要はありませんが、以後に発射される発射体にのみ適用されます。</GunplayTrailMaterialColorTip>
+  <GunplayTrailMaterialWidth>幅を上書き</GunplayTrailMaterialWidth>
+  <GunplayTrailMaterialWidthTip>チェックするとこのマテリアルは絶対値の幅（ワールド単位）を使います。チェックしない場合は基本幅（ダメージ/テクスチャ基準）×全体の幅倍率になります。チェック時は0.15から始まります。</GunplayTrailMaterialWidthTip>
+  <GunplayTrailMaterialLength>長さを上書き</GunplayTrailMaterialLength>
+  <GunplayTrailMaterialLengthTip>チェックするとこのマテリアルは絶対値の長さ係数を使います（長さ＝値×発射体速度）。チェックしない場合は全体設定の「弾道の長さ」に従います。</GunplayTrailMaterialLengthTip>
+  <GunplayTrailMaterialFade>消滅時間を上書き</GunplayTrailMaterialFade>
+  <GunplayTrailMaterialFadeTip>チェックするとこのマテリアルは絶対値の消滅時間（ティック）を使います。チェックしない場合は全体設定の「弾道の消滅時間」に従います。</GunplayTrailMaterialFadeTip>
+  <GunplayPickerConfirm>確定</GunplayPickerConfirm>
+  <GunplayPickerCancel>キャンセル</GunplayPickerCancel>
+  <GunplayPickerClear>クリア</GunplayPickerClear>
+  <GunplayPickerCurrent>現在</GunplayPickerCurrent>
+  <GunplayPickerNone>なし</GunplayPickerNone>
+  <GunplayPickerMisc>その他</GunplayPickerMisc>
   <GunplayTrailTextureGroupLength>飛翔方向（縦）</GunplayTrailTextureGroupLength>
   <GunplayTrailTextureGroupWidth>弾道の幅方向（横）</GunplayTrailTextureGroupWidth>
   <GunplayTrailTexturePeakAlpha>最大不透明度</GunplayTrailTexturePeakAlpha>
@@ -61,8 +90,6 @@
   <GunplayTrailTexturePreviewTail>末端</GunplayTrailTexturePreviewTail>
   <GunplayTrailTexturePreviewActual>ディテール</GunplayTrailTexturePreviewActual>
   <GunplayTrailTexturePreviewShape>実際の形状</GunplayTrailTexturePreviewShape>
-  <GunplayTrailTexturePreviewColor>プレビュー色</GunplayTrailTexturePreviewColor>
-  <GunplayTrailTexturePreviewCustom>カスタム...</GunplayTrailTexturePreviewCustom>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全てのMod</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>弾道</GunplayOverrideTrailFilter>
@@ -76,6 +103,9 @@
   <GunplayOverrideColEnabled>上書き</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>弾道</GunplayOverrideColTrail>
   <GunplayOverrideColColor>色</GunplayOverrideColColor>
+  <GunplayOverrideColMaterial>マテリアル</GunplayOverrideColMaterial>
+  <GunplayOverrideTipMaterialPicked>この発射体は個別にマテリアルを指定しています：{0}。クリックで別のマテリアルに変更、または「クリア」で継承に戻せます。</GunplayOverrideTipMaterialPicked>
+  <GunplayOverrideTipMaterialInherited>この発射体は def に設定されたマテリアルを継承しています：{0}。クリックで個別に指定できます。</GunplayOverrideTipMaterialInherited>
   <GunplayOverrideTipColor>この発射体の弾道の色を設定します。行が未上書きの状態でクリックすると、自動的に上書きが有効になります。×で継承した弾道の色に戻ります。</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>カスタム色を解除し、継承した弾道の色に戻します。</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>この発射体の弾道設定を上書きします。オフにすると上書きを破棄し、継承値/計算値に戻ります。</GunplayOverrideTipEnabled>

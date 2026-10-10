@@ -18,25 +18,32 @@ namespace Gunplay
     // 带着 tick 语义。拆开后各自只有一个单位。
     //
     // 优先级（高 → 低）：
-    //   1) 单项覆写（覆写窗口设置）—— 绝对值，不看全局；
-    //   2) 全局设置 GunplaySettings.trailLengthFactor。
+    //   1) 单项覆写（覆写窗口设置）—— 绝对值，不看材质与全局；
+    //   2) 材质（ProjectileTrailDef 的 material.trailLengthFactor）—— 绝对值，-1 表示未设定；
+    //   3) 全局设置 GunplaySettings.trailLengthFactor。
     public static class TrailLength
     {
         public const float Default = 15f;
         public const float Min = 1f;
         public const float Max = 120f;
 
-        // 单项覆写是否命中（false = 未设定，走全局）。
+        // 单项覆写是否命中（false = 未设定，走材质 / 全局）。
         public static bool TryOverride(ThingDef? projectileDef, out float factor)
         {
             return ProjectileOverrides.TryGetTrailLength(projectileDef, out factor);
         }
 
-        public static float Effective(ThingDef? projectileDef)
+        public static float Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
         {
-            return TryOverride(projectileDef, out float factor)
-                ? Mathf.Clamp(factor, Min, Max)
-                : Mathf.Clamp(GunplaySettings.trailLengthFactor, Min, Max);
+            if (TryOverride(projectileDef, out float factor))
+            {
+                return Mathf.Clamp(factor, Min, Max);
+            }
+
+            float materialFactor = TrailMaterial.Effective(trailDef).trailLengthFactor;
+            if (materialFactor > 0f) return Mathf.Clamp(materialFactor, Min, Max);
+
+            return Mathf.Clamp(GunplaySettings.trailLengthFactor, Min, Max);
         }
     }
 }

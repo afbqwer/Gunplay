@@ -14,25 +14,32 @@ namespace Gunplay
     // 派生写法下淡出会跟着被截短，现在不会了。
     //
     // 优先级（高 → 低）：
-    //   1) 单项覆写（覆写窗口设置）—— 绝对值，不看全局；
-    //   2) 全局设置 GunplaySettings.trailFadeTicks。
+    //   1) 单项覆写（覆写窗口设置）—— 绝对值，不看材质与全局；
+    //   2) 材质（ProjectileTrailDef 的 material.trailFadeTicks）—— 绝对值，-1 表示未设定；
+    //   3) 全局设置 GunplaySettings.trailFadeTicks。
     public static class TrailFade
     {
         public const float Default = 15f;
         public const float Min = 1f;
         public const float Max = 120f;
 
-        // 单项覆写是否命中（false = 未设定，走全局）。
+        // 单项覆写是否命中（false = 未设定，走材质 / 全局）。
         public static bool TryOverride(ThingDef? projectileDef, out float ticks)
         {
             return ProjectileOverrides.TryGetTrailFade(projectileDef, out ticks);
         }
 
-        public static float Effective(ThingDef? projectileDef)
+        public static float Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
         {
-            return TryOverride(projectileDef, out float ticks)
-                ? Mathf.Clamp(ticks, Min, Max)
-                : Mathf.Clamp(GunplaySettings.trailFadeTicks, Min, Max);
+            if (TryOverride(projectileDef, out float ticks))
+            {
+                return Mathf.Clamp(ticks, Min, Max);
+            }
+
+            float materialTicks = TrailMaterial.Effective(trailDef).trailFadeTicks;
+            if (materialTicks > 0f) return Mathf.Clamp(materialTicks, Min, Max);
+
+            return Mathf.Clamp(GunplaySettings.trailFadeTicks, Min, Max);
         }
     }
 }

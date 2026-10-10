@@ -38,15 +38,44 @@
   <GunplayUnarmedBulletsOnlyName>仅限子弹类无武器投射物</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>开启后，只有伤害类型为子弹（Bullet）的无武器投射物才会产生这些特效.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>投射物单项覆写...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹宽度、长度、淡出时长和颜色。各项覆写值都是绝对值，不再受上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
-  <GunplayTrailColorsName>轨迹颜色...</GunplayTrailColorsName>
-  <GunplayTrailColorsDesc>自定义各类轨迹贴图的颜色。改动立即生效，但只对之后新发射的投射物生效.</GunplayTrailColorsDesc>
-  <GunplayTrailColorsWindowTitle>轨迹颜色</GunplayTrailColorsWindowTitle>
-  <GunplayTrailColorResetTip>恢复为该轨迹的默认颜色.</GunplayTrailColorResetTip>
-  <GunplayTrailTextureName>轨迹贴图...</GunplayTrailTextureName>
-  <GunplayTrailTextureDesc>调整运行时生成的轨迹贴图的形状（两端与两侧的半透明虚化）。改动立即生效.</GunplayTrailTextureDesc>
-  <GunplayTrailTextureWindowTitle>轨迹贴图</GunplayTrailTextureWindowTitle>
-  <GunplayTrailTextureReset>恢复默认</GunplayTrailTextureReset>
+  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹材质、宽度、长度、淡出时长和颜色。各项覆写值都是绝对值，不再受材质与上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
+  <GunplayTrailMaterialName>轨迹材质...</GunplayTrailMaterialName>
+  <GunplayTrailMaterialDesc>编辑各类轨迹材质（一种材质对应一个 ProjectileTrailDef）的形状、宽度轮廓、颜色与几何。改动立即生效.</GunplayTrailMaterialDesc>
+  <GunplayTrailMaterialWindowTitle>轨迹材质</GunplayTrailMaterialWindowTitle>
+  <GunplayTrailMaterialCurrent>材质：{0}</GunplayTrailMaterialCurrent>
+  <GunplayTrailMaterialNone>没有可编辑的轨迹材质</GunplayTrailMaterialNone>
+  <GunplayTrailMaterialPickTip>选择要编辑的轨迹材质（一种材质 = 一个 ProjectileTrailDef）.</GunplayTrailMaterialPickTip>
+  <GunplayTrailMaterialPickerTitle>选择轨迹材质</GunplayTrailMaterialPickerTitle>
+  <GunplayTrailMaterialEdited>已在设置中改写</GunplayTrailMaterialEdited>
+  <GunplayTrailMaterialFromDef>当前为 Def 模板值</GunplayTrailMaterialFromDef>
+  <GunplayTrailMaterialReset>重置为 Def 模板</GunplayTrailMaterialReset>
+  <GunplayTrailMaterialResetTip>丢弃这份材质的全部编辑，回到 Def（XML）里的模板值.</GunplayTrailMaterialResetTip>
+  <GunplayTrailMaterialGroupSource>贴图来源</GunplayTrailMaterialGroupSource>
+  <GunplayTrailMaterialSourceGenerated>生成贴图（形状参数生效）</GunplayTrailMaterialSourceGenerated>
+  <GunplayTrailMaterialSourceFile>文件贴图（graphicData 的 texPath）</GunplayTrailMaterialSourceFile>
+  <GunplayTrailMaterialSourceTip>生成贴图由下面的形状与宽度轮廓参数在运行时生成；文件贴图直接用 Def 里 graphicData 指定的贴图，此时形状参数与宽度轮廓都不生效（会变灰）.</GunplayTrailMaterialSourceTip>
+  <GunplayTrailMaterialNoTexture>该材质没有可用贴图</GunplayTrailMaterialNoTexture>
+  <GunplayTrailMaterialGroupProfile>宽度轮廓（尾部收缩 / 放大）</GunplayTrailMaterialGroupProfile>
+  <GunplayTrailMaterialHeadWidth>头部宽度</GunplayTrailMaterialHeadWidth>
+  <GunplayTrailMaterialTailWidth>尾部宽度</GunplayTrailMaterialTailWidth>
+  <GunplayTrailMaterialProfileCurve>轮廓曲线</GunplayTrailMaterialProfileCurve>
+  <GunplayTrailMaterialProfileTip>可见宽度占四边形的比例（0~1）。两端都是相对值：生成时按较大者归一化到 1，所以最宽的那一端必然贴住四边形边缘，轨迹宽度不会被悄悄改细。两端相等 = 等宽（与旧外观完全一致）；尾部更小 = 尾部逐渐收缩；尾部更大 = 尾部逐渐放大.</GunplayTrailMaterialProfileTip>
+  <GunplayTrailMaterialProfileCurveTip>轮廓过渡的曲线指数：1 = 全长线性；越大，变化越集中在尾部（头部一大段几乎不变，只在尾尖收/放）；越小，变化越集中在头部.</GunplayTrailMaterialProfileCurveTip>
+  <GunplayTrailMaterialGroupGeometry>颜色与几何</GunplayTrailMaterialGroupGeometry>
+  <GunplayTrailMaterialColor>颜色</GunplayTrailMaterialColor>
+  <GunplayTrailMaterialColorTip>该材质的颜色。颜色不进贴图（经材质逐组传入），所以改色不重建贴图；但只对之后新发射的投射物生效.</GunplayTrailMaterialColorTip>
+  <GunplayTrailMaterialWidth>覆盖宽度</GunplayTrailMaterialWidth>
+  <GunplayTrailMaterialWidthTip>勾选后本材质使用绝对宽度（世界单位）；否则按基础宽度（伤害/贴图口径）× 全局宽度倍率计算。勾选时从 0.15 起步.</GunplayTrailMaterialWidthTip>
+  <GunplayTrailMaterialLength>覆盖长度</GunplayTrailMaterialLength>
+  <GunplayTrailMaterialLengthTip>勾选后本材质使用绝对长度系数（长度 = 该值 × 弹速）；否则跟随全局「轨迹长度」设置.</GunplayTrailMaterialLengthTip>
+  <GunplayTrailMaterialFade>覆盖淡出</GunplayTrailMaterialFade>
+  <GunplayTrailMaterialFadeTip>勾选后本材质使用绝对淡出时长（tick）；否则跟随全局「轨迹淡出时长」设置.</GunplayTrailMaterialFadeTip>
+  <GunplayPickerConfirm>确定</GunplayPickerConfirm>
+  <GunplayPickerCancel>取消</GunplayPickerCancel>
+  <GunplayPickerClear>清除</GunplayPickerClear>
+  <GunplayPickerCurrent>当前</GunplayPickerCurrent>
+  <GunplayPickerNone>无</GunplayPickerNone>
+  <GunplayPickerMisc>其他</GunplayPickerMisc>
   <GunplayTrailTextureGroupLength>沿飞行方向（纵向）</GunplayTrailTextureGroupLength>
   <GunplayTrailTextureGroupWidth>轨迹宽度方向（横向）</GunplayTrailTextureGroupWidth>
   <GunplayTrailTexturePeakAlpha>峰值不透明度</GunplayTrailTexturePeakAlpha>
@@ -61,8 +90,6 @@
   <GunplayTrailTexturePreviewTail>尾</GunplayTrailTexturePreviewTail>
   <GunplayTrailTexturePreviewActual>细节</GunplayTrailTexturePreviewActual>
   <GunplayTrailTexturePreviewShape>实际形态</GunplayTrailTexturePreviewShape>
-  <GunplayTrailTexturePreviewColor>预览颜色</GunplayTrailTexturePreviewColor>
-  <GunplayTrailTexturePreviewCustom>自定义...</GunplayTrailTexturePreviewCustom>
   <GunplayOverrideModFilter>Mod</GunplayOverrideModFilter>
   <GunplayOverrideAllMods>全部 Mod</GunplayOverrideAllMods>
   <GunplayOverrideTrailFilter>轨迹</GunplayOverrideTrailFilter>
@@ -76,6 +103,9 @@
   <GunplayOverrideColEnabled>覆写</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>轨迹</GunplayOverrideColTrail>
   <GunplayOverrideColColor>颜色</GunplayOverrideColColor>
+  <GunplayOverrideColMaterial>材质</GunplayOverrideColMaterial>
+  <GunplayOverrideTipMaterialPicked>该投射物已单独指定材质：{0}。点击可换成别的材质，或用「清除」回到继承.</GunplayOverrideTipMaterialPicked>
+  <GunplayOverrideTipMaterialInherited>该投射物继承本体配置的材质：{0}。点击可单独指定材质.</GunplayOverrideTipMaterialInherited>
   <GunplayOverrideTipColor>自定义该投射物的轨迹颜色。本行尚未开启覆写时点击色块，会自动开启覆写；「×」恢复为继承轨迹颜色.</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>清除自定义颜色，恢复为继承轨迹颜色.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>覆写该投射物的轨迹设置。关闭会丢弃本行覆写，恢复为继承/计算值.</GunplayOverrideTipEnabled>

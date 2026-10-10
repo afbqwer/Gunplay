@@ -1,14 +1,30 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Defs>
 
-  <!-- 默认使用运行时生成的轨迹贴图（纯白，形状参数见 TrailTexture），颜色由 trailColor / 设置 / 单项覆写乘出。
-       下面的 graphicData 只是回退项：仅当某个 def 显式写 <useGeneratedTexture>false</useGeneratedTexture>
-       时才改用它自己的文件贴图（Textures 下的 Guntrail.png 因此只在回退时被读取）。
-       ProjectileTrailDef 是普通 Def，不再需要 thingClass / tickerType / altitudeLayer 等 ThingDef 专有字段。 -->
+  <!-- 轨迹材质。一个 ProjectileTrailDef = 一种材质（材质类型就是它本身），谁用哪种材质由
+       ProjectilePropDef.trail（下面 ProjectileProps.xml 里配）与「投射物单项覆写」窗口里逐投射物选择决定。
+
+       本 def 只是**模板**：运行时真正生效的参数是 TrailMaterial.Effective(def) 返回的那份
+       （设置里的编辑快照优先，否则就是这里的 <material>）。因此新增材质不用改代码，写个 def 即可。
+
+       <material> 可用字段（没写的取 TrailMaterialParams 的字段默认值，详见该类注释）：
+         贴图来源：useGeneratedTexture                  true=运行时生成 / false=用下面的 graphicData 贴图
+         纵向：    peakAlpha / topAlpha / topFade / topFadeCurve / tailFalloff
+         横向：    flatCore / edgeAlpha / edgeFalloff
+         宽度轮廓：headWidth / tailWidth / widthProfileCurve
+                   （两端是**相对**比例，生成时按较大者归一化到 1：最宽端必然贴住四边形边缘。
+                     两端相等 = 等宽；尾部更小 = 尾部逐渐收缩；尾部更大 = 尾部逐渐放大）
+         几何与色：trailColor / trailWidth（-1=未设定，按基础宽度×全局倍率）
+                   trailLengthFactor（-1=未设定，跟随全局「轨迹长度」）
+                   trailFadeTicks（-1=未设定，跟随全局「轨迹淡出时长」） -->
+
   <Gunplay.ProjectileTrailDef Name="GunplayProjectileTrailDefault">
     <defName>default</defName>
     <label>projectile trail</label>
+    <description>Uniform trail: the runtime-generated texture with equal width at the head and the tail.</description>
 
+    <!-- <material> 整块省略 = 全部取数据类的字段默认值（等宽、纯白、宽度/长度/淡出均未设定）。
+         下面的 graphicData 只是回退项：仅当 material.useGeneratedTexture 为 false 时才被读取。 -->
     <graphicData>
       <shaderType>Mote</shaderType>
       <texPath>Gunplay/Effects/Guntrail</texPath>
@@ -16,35 +32,71 @@
     </graphicData>
   </Gunplay.ProjectileTrailDef>
 
-  <!-- 充能武器轨迹：与 default 共用 Guntrail 贴图，仅按 trailColor 换色（#A7EAFF）。
-       颜色可在设置窗口的「轨迹颜色」中进一步覆写。 -->
+  <!-- 充能武器轨迹：等宽，仅换色（#A7EAFF）。颜色可在设置窗口的「轨迹颜色」中进一步覆写。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>charge</defName>
 
-    <trailColor>(0.655, 0.918, 1, 1)</trailColor>
+    <material>
+      <trailColor>(0.655, 0.918, 1, 1)</trailColor>
+    </material>
   </Gunplay.ProjectileTrailDef>
 
-  <!-- 燃烧武器轨迹：同一贴图换色（#FFB316）。 -->
+  <!-- 燃烧武器轨迹：等宽换色（#FFB316）。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>incendiary</defName>
+    <description>Uniform trail in an orange tone.</description>
 
-    <trailColor>(1, 0.702, 0.086, 1)</trailColor>
-
-    <trailWidth>0.15</trailWidth>
+    <material>
+      <trailColor>(1, 0.702, 0.086, 1)</trailColor>
+      <trailWidth>0.15</trailWidth>
+    </material>
   </Gunplay.ProjectileTrailDef>
-
-
 
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>medium</defName>
 
-    <trailWidth>0.15</trailWidth>
+    <material>
+      <trailWidth>0.15</trailWidth>
+    </material>
   </Gunplay.ProjectileTrailDef>
 
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>wide</defName>
 
-    <trailWidth>0.25</trailWidth>
+    <material>
+      <trailWidth>0.25</trailWidth>
+    </material>
+  </Gunplay.ProjectileTrailDef>
+
+  <!-- 尾部逐渐收缩：头部满宽、向尾部收到很细并淡出（弹丸/曳光类）。
+       widthProfileCurve > 1 让收缩集中在尾端——头部一大段几乎保持满宽，只在尾尖收。 -->
+  <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
+    <defName>taper</defName>
+    <label>taper trail</label>
+    <description>Tail tapers away: full width at the head, thinning out towards the tip.</description>
+
+    <material>
+      <headWidth>1</headWidth>
+      <tailWidth>0.12</tailWidth>
+      <widthProfileCurve>1.3</widthProfileCurve>
+    </material>
+  </Gunplay.ProjectileTrailDef>
+
+  <!-- 尾部逐渐放大：头部很细、向尾部展开到满宽（尾焰/烟羽类）。
+       注意两端是相对比例，最宽端归一化到 1，所以这里是"头部按 0.3 收细"，整体宽度仍由 trailWidth 决定。
+       tailFalloff 特意小于 1：默认的 1.15 会把尾段 alpha 压得很淡，"放大"就发生在一片几乎看不见的区域里；
+       放宽尾部衰减后，尾部既能变宽也还够亮。 -->
+  <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
+    <defName>flare</defName>
+    <label>flare trail</label>
+    <description>Tail flares out: a thin head that widens into a plume towards the tail.</description>
+
+    <material>
+      <headWidth>0.3</headWidth>
+      <tailWidth>1</tailWidth>
+      <widthProfileCurve>1.5</widthProfileCurve>
+      <tailFalloff>0.9</tailFalloff>
+    </material>
   </Gunplay.ProjectileTrailDef>
 
 </Defs>

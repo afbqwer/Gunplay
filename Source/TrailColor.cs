@@ -7,28 +7,26 @@ namespace Gunplay
     //
     // 优先级（高 → 低）：
     //   1) 单项覆写（覆写窗口设置，存 ProjectileOverride.hasColor/trailColor）—— 完全独立；
-    //   2) 轨迹 def 颜色覆写（设置窗口「轨迹颜色」设置，存 GunplaySettings.trailColors）；
-    //   3) ProjectileTrailDef.trailColor（XML，默认白 = 贴图原色）。
+    //   2) 材质（ProjectileTrailDef 的 material.trailColor，XML 或「轨迹材质」窗口编辑）；
+    //   3) 无 —— 材质颜色本身有出厂默认值（白），所以这里不存在"再往下回落"的一层。
+    //
+    // 颜色不进材质：它经 MaterialPropertyBlock 的 _Color 逐组传入（见 ProjectileTrailBatcher），
+    // 因此改颜色不需要重建贴图，已在飞的轨迹也不受影响（颜色在登记时已确定）。
     public static class TrailColor
     {
-        // 单项覆写是否命中（false = 未设自定义颜色，走 def 颜色）。
+        // 单项覆写是否命中（false = 未设自定义颜色，走材质颜色）。
         public static bool TryOverride(ThingDef? projectileDef, out Color color)
         {
             return ProjectileOverrides.TryGetTrailColor(projectileDef, out color);
         }
 
-        // def 层有效颜色：设置覆写 > XML trailColor。轨迹颜色窗口与覆写窗口的「继承色」预览共用。
+        // 材质层有效颜色：设置里的编辑快照 > def 模板。轨迹颜色窗口与覆写窗口的「继承色」预览共用。
         public static Color EffectiveForDef(ProjectileTrailDef? trailDef)
         {
-            if (trailDef != null && GunplaySettings.trailColors.TryGetValue(trailDef.defName, out Color color))
-            {
-                return color;
-            }
-
-            return trailDef?.trailColor ?? Color.white;
+            return TrailMaterial.Effective(trailDef).trailColor;
         }
 
-        // 运行时最终颜色。trailDef 为该投射物解析出的 ProjectileTrailDef（可能为 null，此时返回白）。
+        // 运行时最终颜色。trailDef 为该投射物解析出的 ProjectileTrailDef（可能为 null，此时返回材质默认白）。
         public static Color Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
         {
             if (TryOverride(projectileDef, out Color color)) return color;

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ASQPicker;
 using Gunplay.Patch;
 using UnityEngine;
 using Verse;
@@ -57,13 +56,13 @@ namespace Gunplay
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
         public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
-        // 轨迹 def 颜色覆写（设置窗口「轨迹颜色」编辑）：键为 ProjectileTrailDef.defName，值为颜色。
-        // 运行时直接以 Color 存储；持久化经 ColorPickerWindow.LookColorDictionary 做 HTML 字符串中转。
-        // 缺失条目 = 使用 ProjectileTrailDef.trailColor（XML）。解析统一走 TrailColor。
-        public static Dictionary<string, Color> trailColors = new Dictionary<string, Color>();
-
-        // 运行时生成贴图的形状参数（设置窗口「轨迹贴图」编辑，见 TrailTextureParams）。
-        public static TrailTextureParams trailTextureParams = new TrailTextureParams();
+        // 轨迹材质的编辑快照：键为 ProjectileTrailDef.defName，值为该材质的整份参数。
+        //
+        // 与 ProjectileTrailDef.material（XML 模板）共用同一个数据类（TrailMaterialParams）：
+        // 存在快照 → 快照就是该 def 的生效参数；不存在 → 直接用模板。
+        // 只有窗口里真正改过某个 def 才会产生条目（见 TrailMaterial.EnsureEdit），
+        // 「重置为 Def 模板」即删除条目（TrailMaterial.ResetEdit）。
+        public static Dictionary<string, TrailMaterialParams> trailMaterialEdits = new Dictionary<string, TrailMaterialParams>();
 
 
 
@@ -91,15 +90,14 @@ namespace Gunplay
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
-            ColorPickerWindow.LookColorDictionary(ref trailColors, "trailColors");
-            if (trailColors == null) trailColors = new Dictionary<string, Color>();
+            // 整份对象序列化（LookMode.Deep）：材质参数是一个数据类实例，
+            // 内部哪一项没改过由它自己的哨兵值表达，不需要额外的"是否覆写"标记。
+            Scribe_Collections.Look(ref trailMaterialEdits, "trailMaterialEdits", LookMode.Value, LookMode.Deep);
+            if (trailMaterialEdits == null) trailMaterialEdits = new Dictionary<string, TrailMaterialParams>();
 
-            Scribe_Deep.Look(ref trailTextureParams, "trailTextureParams");
-            if (trailTextureParams == null) trailTextureParams = new TrailTextureParams();
-
-            // 读档后参数可能已变：贴图已生成的话就地重填（未生成则下次取用时按新参数生成）。
+            // 读档后生效参数可能已变：材质缓存（贴图已生成的那些）按新参数就地重填。
             // 只在读档时做——存档时参数没变，没必要去重写贴图像素。
-            if (Scribe.mode == LoadSaveMode.LoadingVars) TrailTexture.Invalidate();
+            if (Scribe.mode == LoadSaveMode.LoadingVars) TrailMaterial.InvalidateAll();
         }
 
         // 设置窗口的滚动状态。设置项较多而窗口高度有限，内容超出时需滚动。
@@ -193,17 +191,10 @@ namespace Gunplay
                 }
 
                 listing_Standard.Gap(8f);
-                listing_Standard.Label("GunplayTrailColorsDesc".Translate());
-                if (listing_Standard.ButtonText("GunplayTrailColorsName".Translate()))
+                listing_Standard.Label("GunplayTrailMaterialDesc".Translate());
+                if (listing_Standard.ButtonText("GunplayTrailMaterialName".Translate()))
                 {
-                    Find.WindowStack.Add(new TrailColorWindow());
-                }
-
-                listing_Standard.Gap(8f);
-                listing_Standard.Label("GunplayTrailTextureDesc".Translate());
-                if (listing_Standard.ButtonText("GunplayTrailTextureName".Translate()))
-                {
-                    Find.WindowStack.Add(new TrailTextureWindow());
+                    Find.WindowStack.Add(new TrailMaterialWindow());
                 }
 
                 listing_Standard.Gap(8f);

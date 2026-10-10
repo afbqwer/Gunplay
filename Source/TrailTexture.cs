@@ -3,14 +3,14 @@ using Verse;
 
 namespace Gunplay
 {
-    // 运行时生成的轨迹贴图。
+    // 运行时生成的轨迹贴图（按材质参数生成，一份参数一张贴图）。
     //
     // 存在理由：轨迹本体只是「一条中间实、两头虚」的白色渐变，用文件贴图既浪费装载、
     // 又无法调虚化参数。生成后 RGB 恒为纯白（颜色由材质 _Color 乘出，见 ProjectileTrailBatcher），
-    // 造型全部落在 alpha 上，形状参数集中在 TrailTextureParams，改一处即可。
+    // 造型全部落在 alpha 上，形状参数集中在 TrailMaterialParams，改一处即可。
     //
     // Textures/Gunplay/Effects/Guntrail.png 只作为本类的形状参考，运行时不再读取
-    // （ProjectileTrailDef.useGeneratedTexture 为 false 时才会退回文件贴图）。
+    // （ProjectileTrailDef.material.useGeneratedTexture 为 false 时才会退回文件贴图）。
     //
     // 坐标约定：
     //   * V=1 是轨迹头部所在端（plane10 经 LookRotation 后 +Z 指向飞行方向，其 +Z 端 uv.y=1；
@@ -19,7 +19,7 @@ namespace Gunplay
     //
     // 注意运行时贴图与导入贴图的数据方向相反：SetPixels32 的数组第 0 行是 v=0（Unity 的贴图
     // 数据自下而上），而导入的 PNG 是文件顶行 = v=1。所以 Fill 里 y 直接就是 v，
-    // 想“照着参考 PNG 的样子写”必须反过来看（生成第 y 行 = PNG 第 Height-1-y 行）。
+    // 想"照着参考 PNG 的样子写"必须反过来看（生成第 y 行 = PNG 第 Height-1-y 行）。
     internal static class TrailTexture
     {
         // 尺寸：横截面 64 × 长度 256。
@@ -29,45 +29,36 @@ namespace Gunplay
         internal const int Width = 64;
         internal const int Height = 256;
 
-        static Texture2D? cached;
+        // 轮廓外那条软边的宽度（单位是 d，d = |2u-1| ∈ [0,1]）。取小值即可：
+        // 它的作用只是让"可见宽度"的边界不出现像素级硬切，不参与可见宽度的定义。
+        const float SoftEdgeBand = 0.18f;
 
-        // 当前生效的参数（存在 mod 设置里，见 GunplaySettings.trailTextureParams）。
-        static TrailTextureParams Params => GunplaySettings.trailTextureParams;
-
-        // 首次用到时才生成（全局轨迹关闭时完全不产生开销）。
-        public static Texture2D Get()
+        // 只负责建对象与采样设置，不填像素——调用方随后统一走 Fill，
+        // 这样"首次生成"与"参数改动后就地重填"共用同一条像素写入路径。
+        // name 带上 defName：贴图现在按材质一份，留个能认出来的名字便于在显存/Profiler 里排查。
+        public static Texture2D Create(string name)
         {
-            return cached ??= Generate();
-        }
-
-        // 参数改动后重填像素。刻意复用同一张贴图而不是新建：材质持有的是这张贴图，
-        // 换实例就得同时去改材质（还要处理旧贴图的销毁），原地重写最省事也最安全。
-        // 因此贴图必须保持可读（见 Fill 里的 Apply）——一旦 makeNoLongerReadable，
-        // 下次 SetPixels32 就会抛 "texture data is either not readable"。
-        public static void Invalidate()
-        {
-            if (cached != null) Fill(cached);
-        }
-
-        static Texture2D Generate()
-        {
-            Texture2D tex = new Texture2D(Width, Height, TextureFormat.RGBA32, false)
+            return new Texture2D(Width, Height, TextureFormat.RGBA32, false)
             {
-                name = "GunplayTrailGenerated",
+                name = name,
                 // 首尾不重复：轨迹是有头有尾的，Clamp 才能保证末端不会卷回来
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Bilinear,
                 anisoLevel = 1
             };
-
-            Fill(tex);
-            return tex;
         }
 
-        static void Fill(Texture2D tex)
+        // 按参数写像素。参数改动时就地重填同一张贴图而不是新建：材质持有的是这张贴图，
+        // 换实例就得同时去改材质（还要处理旧贴图的销毁），原地重写最省事也最安全。
+        // 因此贴图必须保持可读（见下面的 Apply）——一旦 makeNoLongerReadable，
+        // 下次 SetPixels32 就会抛 "texture data is either not readable"。
+        public static void Fill(Texture2D tex, TrailMaterialParams p)
         {
-            TrailTextureParams p = Params;
             Color32[] pixels = new Color32[Width * Height];
+
+            // 两端取较大者归一化：最宽端恒为 1，轮廓必然贴住四边形边缘。
+            // 于是"可见宽度"与"四边形宽度"两种口径恒等，trailWidth 的含义无须改变。
+            float maxWidth = Mathf.Max(0.0001f, Mathf.Max(p.headWidth, p.tailWidth));
 
             for (int y = 0; y < Height; y++)
             {
@@ -75,11 +66,13 @@ namespace Gunplay
                 // y=0 → v=0 = 尾部，y=Height-1 → v=1 = 头部（与参考 PNG 的文件顶行对应）
                 float v = y / (float)(Height - 1);
                 float lengthAlpha = LengthAlpha(v, p);
+                float profileWidth = WidthProfile(v, p, maxWidth);
 
                 for (int x = 0; x < Width; x++)
                 {
-                    float u = x / (float)(Width - 1);
-                    float alpha = p.peakAlpha * lengthAlpha * CrossAlpha(u, p);
+                    // d = 0 在轨迹中轴，d = 1 在四边形边缘
+                    float d = Mathf.Abs(2f * (x / (float)(Width - 1)) - 1f);
+                    float alpha = p.peakAlpha * lengthAlpha * CrossAlphaAt(d, profileWidth, p);
 
                     pixels[y * Width + x] = new Color32(
                         255, 255, 255,
@@ -87,14 +80,14 @@ namespace Gunplay
                 }
             }
 
-            // makeNoLongerReadable 必须为 false：重填（Invalidate）还要再写一次像素，
+            // makeNoLongerReadable 必须为 false：重填还要再写一次像素，
             // 置为 true 会释放 CPU 侧数据，下次 SetPixels32 直接抛异常。
             tex.SetPixels32(pixels);
             tex.Apply(false, false);
         }
 
         // 沿长度方向的 alpha：头部（v=1）半透明 → 峰值 → 向尾部（v=0）衰减
-        static float LengthAlpha(float v, TrailTextureParams p)
+        static float LengthAlpha(float v, TrailMaterialParams p)
         {
             if (v >= 1f - p.topFade)
             {
@@ -106,100 +99,38 @@ namespace Gunplay
             return Mathf.Pow(v / (1f - p.topFade), p.tailFalloff);
         }
 
-        // 横向 alpha：中间平、两侧虚化
-        static float CrossAlpha(float u, TrailTextureParams p)
+        // 该长度处的可见半宽比例（0~1）。两端参数是相对值，这里已经除过 maxWidth，
+        // 因此最宽端恒为 1（贴住四边形边缘），最窄端按两者的比值收细。
+        static float WidthProfile(float v, TrailMaterialParams p, float maxWidth)
         {
-            float d = Mathf.Abs(2f * u - 1f);
+            // s：0 在头部、1 在尾部。曲线指数 >1 时 s 在头部一大段都接近 0，
+            // 变化被推到尾部（"头部几乎不变、只在尾尖收"），<1 则相反。
+            float s = Mathf.Pow(1f - v, p.widthProfileCurve);
+            return Mathf.Clamp(Mathf.Lerp(p.headWidth, p.tailWidth, s) / maxWidth, 0f, 1f);
+        }
+
+        // 横截面 alpha：轮廓内沿用原横截面形状（按 1/w 归一化，保持"中间实、两侧虚"的比例关系不变），
+        // 轮廓外一条窄软边淡出。
+        //
+        // w = 1（等宽材质）时直接走原路径，逐像素与旧实现一致——所有内置旧 def 的外观不会因为
+        // 引入宽度轮廓而发生任何变化。这也是"遮罩法"相对"整体拉伸法"的关键优势：
+        // 收缩方向不会把边缘 alpha 抬成实心块，也不会在轮廓外侧留下硬切。
+        static float CrossAlphaAt(float d, float w, TrailMaterialParams p)
+        {
+            if (w >= 0.999f) return CrossAlpha(d, p);
+
+            float inner = CrossAlpha(Mathf.Min(d / w, 1f), p);
+            float soft = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(w, Mathf.Min(1f, w + SoftEdgeBand), d));
+            return inner * soft;
+        }
+
+        // 横向 alpha：中间平、两侧虚化（d = |2u-1|）
+        static float CrossAlpha(float d, TrailMaterialParams p)
+        {
             if (d <= p.flatCore) return 1f;
 
             float t = (d - p.flatCore) / (1f - p.flatCore);
             return Mathf.Lerp(1f, p.edgeAlpha, Mathf.Pow(t, p.edgeFalloff));
-        }
-    }
-
-    // 生成贴图的形状参数。默认值对齐参考贴图 Guntrail.png（峰值 153/255、顶边 33、边缘 54）。
-    // 取值范围在 Clamp() 里集中约束：滑块本身不会越界，但手改存档/跨版本可能读到越界值。
-    public class TrailTextureParams : IExposable
-    {
-        // ---------------- 纵向（沿飞行方向）----------------
-
-        // 峰值不透明度（最亮处）。参考贴图的峰值是 153/255 ≈ 0.6。
-        public float peakAlpha = 0.6f;
-
-        // 顶部（V=1，即贴图上边缘 = 轨迹头部所在端）保留的半透明程度。
-        // 参考贴图顶边只有峰值的 22%：头部完全不透会在弹体上压出一个硬亮块，
-        // 保留一点透明度让头部自然融入弹体。1 = 完全不虚化，0 = 头部全透。
-        public float topAlpha = 0.22f;
-
-        // 顶部虚化带占全长的比例：alpha 在 V=1 处为 topAlpha，向下到 V=1-topFade 升到峰值。
-        // 参考贴图（128 高）该带约 9% 长、约 11 像素；本贴图 256 高，同样的比例约 23 像素。
-        public float topFade = 0.09f;
-
-        // 顶部虚化带的曲线指数：>1 表示透明度收缩在最顶端一小段（参考贴图正是这种形态——
-        // 顶边 33，往下 4 像素就恢复到 102，11 像素处到峰值）。1 = 线性过渡。
-        public float topFadeCurve = 1.7f;
-
-        // 尾部衰减指数：1 = 线性衰减，越大尾部收得越快（拖尾更短促）。
-        public float tailFalloff = 1.15f;
-
-        // ---------------- 横向（轨迹宽度方向）----------------
-
-        // 中间保持满值的宽度比例（|2u-1| ≤ 该值内为实心）。
-        public float flatCore = 0.5f;
-
-        // 最外侧边缘保留的不透明度（相对峰值）。0 = 边缘完全透明。
-        public float edgeAlpha = 0.35f;
-
-        // 边缘虚化的曲线指数：越大则透明收缩在更靠外的一小段，边缘更"硬"。
-        public float edgeFalloff = 1.6f;
-
-        // ---------------- 取值范围（窗口滑块与 Clamp 共用）----------------
-
-        public const float PeakAlphaMin = 0f, PeakAlphaMax = 1f;
-        public const float TopAlphaMin = 0f, TopAlphaMax = 1f;
-        public const float TopFadeMin = 0.005f, TopFadeMax = 0.5f;
-        public const float TopFadeCurveMin = 0.5f, TopFadeCurveMax = 4f;
-        public const float TailFalloffMin = 0.3f, TailFalloffMax = 4f;
-        public const float FlatCoreMin = 0f, FlatCoreMax = 0.95f;
-        public const float EdgeAlphaMin = 0f, EdgeAlphaMax = 1f;
-        public const float EdgeFalloffMin = 0.5f, EdgeFalloffMax = 4f;
-
-        public void ExposeData()
-        {
-            Scribe_Values.Look(ref peakAlpha, "peakAlpha", 0.6f);
-            Scribe_Values.Look(ref topAlpha, "topAlpha", 0.22f);
-            Scribe_Values.Look(ref topFade, "topFade", 0.09f);
-            Scribe_Values.Look(ref topFadeCurve, "topFadeCurve", 1.7f);
-            Scribe_Values.Look(ref tailFalloff, "tailFalloff", 1.15f);
-            Scribe_Values.Look(ref flatCore, "flatCore", 0.5f);
-            Scribe_Values.Look(ref edgeAlpha, "edgeAlpha", 0.35f);
-            Scribe_Values.Look(ref edgeFalloff, "edgeFalloff", 1.6f);
-
-            Clamp();
-        }
-
-        public void Clamp()
-        {
-            peakAlpha = Mathf.Clamp(peakAlpha, PeakAlphaMin, PeakAlphaMax);
-            topAlpha = Mathf.Clamp(topAlpha, TopAlphaMin, TopAlphaMax);
-            topFade = Mathf.Clamp(topFade, TopFadeMin, TopFadeMax);
-            topFadeCurve = Mathf.Clamp(topFadeCurve, TopFadeCurveMin, TopFadeCurveMax);
-            tailFalloff = Mathf.Clamp(tailFalloff, TailFalloffMin, TailFalloffMax);
-            flatCore = Mathf.Clamp(flatCore, FlatCoreMin, FlatCoreMax);
-            edgeAlpha = Mathf.Clamp(edgeAlpha, EdgeAlphaMin, EdgeAlphaMax);
-            edgeFalloff = Mathf.Clamp(edgeFalloff, EdgeFalloffMin, EdgeFalloffMax);
-        }
-
-        public void ResetToDefaults()
-        {
-            peakAlpha = 0.6f;
-            topAlpha = 0.22f;
-            topFade = 0.09f;
-            topFadeCurve = 1.7f;
-            tailFalloff = 1.15f;
-            flatCore = 0.5f;
-            edgeAlpha = 0.35f;
-            edgeFalloff = 1.6f;
         }
     }
 }
