@@ -144,6 +144,8 @@ namespace Gunplay
 
         // ---------------- 直线/通用状态 ----------------
         int ticksUtilDeath;
+        // 连续没读到位置变化的 tick 数（移动即清零）。判定「投射物停住」的唯一依据，
+        // 阈值口径见 StationaryTicksBeforeDrop。
         int ticksIdle;
         Thing? projectile;
         Func<Vector3>? exactPositionGetter;
@@ -277,13 +279,36 @@ namespace Gunplay
 
         // ---------------- 运行时推进 ----------------
 
+        // 判停阈值：「位置连续不变」达到多少个 tick 才算投射物真的停住了。
+        //
+        // 取 17 = 15 + 2。15 是原版 Projectile 在视野外限流位置更新的间隔（它的 UpdateRateTicks
+        // 只有两档：视野内 1、其余一律 15），而 Thing.DoTick 保证每 15 tick 至少调一次 TickInterval，
+        // 于是两次位置更新之间位置不变的连续读数最多 14 个（15 - 1）。门槛取 15 以上即安全，
+        // 这里取 17：比上界高 3，再算上「> 17」自身要 +1，实际是第 18 个静止 tick 才动手；
+        // 多出来的余量留给边界情况，不是推导出来的。
+        //
+        // 刻意写死而不读 projectile.UpdateRateTicks：那是「此刻」的瞬时值，而 ticksIdle 是
+        // 「一段时间攒出来的」计数，两个量不在同一时刻，混用会误判——弹体在屏幕外攒到 11~14 个
+        // 静止 tick 时，只要镜头平移/缩放把它带进视野（弹体自己没动，是镜头动了），
+        // UpdateRateTicks 会立刻从 15 变成 1，阈值跟着塌成 3，还在正常飞行的轨迹当场被判死。
+        // 固定阈值与镜头状态无关。
+        //
+        // 代价：屏内落地待引爆的弹丸（手雷，explosionDelay = 100）比原先晚 7 tick（约 0.12 秒）
+        // 才开始淡出，看不出差别。
+        const int StationaryTicksBeforeDrop = 17;
+
         // 由 MapComponent_ProjectileTrails.MapComponentTick 每 tick 调用
         public void Tick()
         {
             if (projectile != null)
             {
-                if (projectile.Destroyed || (ticksUtilDeath == -1 && ticksIdle > 10))
+                if (projectile.Destroyed || (ticksUtilDeath == -1 && ticksIdle > StationaryTicksBeforeDrop))
                 {
+                    // 单向结束：此后不再跟踪这个投射物，它即使又开始动也不会复活——全 mod 只有
+                    // Launch / Throw 补丁会登记轨迹，飞行途中没有补登记路径；而且「停了再动」意味着
+                    // 位置是跳变的，把旧尾巴接回去只会画出一条弹体根本没飞过的假轨迹（真要支持这种
+                    // 弹体，得从新位置重开一条尾巴，即把位移累积清零）。原版与 CE 现有的投射物都没有
+                    // 这条路：唯一的冻结入口是 Projectile_Explosive 的 landed，而它只通向爆炸。
                     projectile = null;
                     exactPositionGetter = null;
                     ticksUtilDeath = Mathf.CeilToInt(fadeTicks);
@@ -319,6 +344,9 @@ namespace Gunplay
             {
                 traveled += delta.magnitude;
                 dir = delta.normalized;
+                // 静止计数必须是「连续」的：一旦动了就清零。少了这一句它就成了全生命周期累计值，
+                // 离屏飞行每 15 tick 攒 14 个静止 tick，累计值迟早越过阈值把还在飞的轨迹判死。
+                ticksIdle = 0;
             }
             else
             {
@@ -354,17 +382,6 @@ namespace Gunplay
         // ---------------- 剔除 ----------------
 
         // 视野剔除。view 是已展开为世界坐标范围的相机视野（见 TrailViewRect）。
-        //
-        // 这里是逐条执行的，也是本系统最热的一段：列表里含全图所有在飞轨迹，
-        // 而 Draw 只对可见的那部分执行，所以剔除一旦写得重，耗时就会远超 Draw，
-        // 且随场景弹量线性波动。两条路径都压到「一次 AABB 测试、四次比较」：
-        //   弧线 —— 初始化时缓存好的整条弧 AABB；
-        //   直线 —— 以头部为中心、maxReach 为半边长的保守 AABB。
-        //
-        // 直线的框刻意取得保守：maxReach = length + width 覆盖轨迹相对头部的一切可能延伸，
-        // 所以宁可对跨在视野边缘的轨迹多判几次可见，也绝不会把可见轨迹误剔除（不会漏）。
-        // 旧实现为省这点开销做了「头部快判 + 精确求交」的分档，但精确分支要现算 DrawLength
-        // 与四次 Mathf.Max/Min，在长拖尾、密集弹幕下未必真的是"少数"，收益抵不上这份复杂度。
         public bool IsVisible(TrailViewRect view)
         {
             if (arcing)
