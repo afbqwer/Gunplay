@@ -272,14 +272,6 @@ namespace Gunplay
             over.speedAffected = affected;
         }
 
-        // 清除弹速覆写 = 回到「继承默认判定」（弧线规则 / 配置包 preserveSpeed）。覆写记录本身保留。
-        // 存在的意义：否则想取消这一项就只能关掉整行覆写，而那会一并丢掉同一行的宽度/长度/淡出/颜色。
-        public static void ClearSpeedOverride(ThingDef? projectileDef)
-        {
-            ProjectileOverride? over = Get(projectileDef);
-            if (over != null) over.hasSpeedOverride = false;
-        }
-
         // 取已有记录，没有就新建一条并登记。新记录的所有字段都是「当前生效值」，
         // 因此「开启覆写」这个动作本身不改变画面，之后改哪个字段只影响哪个字段。
         static ProjectileOverride GetOrCreate(ThingDef projectileDef)

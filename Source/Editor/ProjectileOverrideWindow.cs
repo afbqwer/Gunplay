@@ -726,8 +726,7 @@ namespace Gunplay
             if (SpeedColumnShown)
             {
                 // 显示该投射物自己的决定（不含全局总开关，理由见 ProjectileRules.SpeedAffected）
-                DrawSpeedToggle(row, layout.speedX, y, ProjectileRules.SpeedAffected(row.projectile),
-                    over != null && over.hasSpeedOverride);
+                DrawSpeedToggle(row, layout.speedX, y, ProjectileRules.SpeedAffected(row.projectile));
             }
 
             DrawMaterialCell(row, layout.materialX, y, overridden, trailOn);
@@ -859,43 +858,23 @@ namespace Gunplay
         }
 
         // 弹速列：该投射物是否受全局弹速缩放（GunplaySettings.projectileSpeed）。
-        // 与轨迹列同约定（未覆写时点一下会顺带开启覆写），但区别有两点：
-        //   1) 它不随轨迹开关变灰——弹速与画不画轨迹无关；
-        //   2) 它多一个「×」回到继承：这一项的三态（未设定 / 受 / 不受）里，
-        //      「未设定」是有意义的（继承弧线规则与配置包的 preserveSpeed），
-        //      而关掉整行覆写是唯一的其它退路，代价太大（同一行的宽度/长度/淡出/颜色一起丢）。
-        void DrawSpeedToggle(Row row, float x, float y, bool speedOn, bool picked)
+        // 与轨迹列同约定（未覆写时点一下会顺带开启覆写），区别是它不随轨迹开关变灰——弹速与画不画轨迹无关。
+        void DrawSpeedToggle(Row row, float x, float y, bool speedOn)
         {
             bool state = speedOn;
 
-            // 勾选框的悬浮区与「×」的悬浮区不能重叠：两个 TipRegion 叠在一处时只有其中一个会显示。
-            // 单独指定过时勾选框的悬浮区让出右侧那一段给「×」。
-            Rect boxRect = new Rect(x, y, SpeedColumnWidth - (picked ? ResetButtonWidth : 0f), RowHeight);
+            Rect boxRect = new Rect(x, y, SpeedColumnWidth, RowHeight);
             DrawToggleBox(x + 6f, y, state);
             Widgets.ToggleInvisibleDraggable(boxRect, ref state, true, true);
             TooltipHandler.TipRegion(boxRect, "GunplayOverrideTipSpeed".Translate());
 
-            if (state != speedOn)
-            {
-                if (IsDragPaint) MarkPainted(row, SpeedPaintTag);
+            if (state == speedOn) return;
 
-                EnsureOverridden(row);
-                ProjectileOverrides.SetSpeedAffected(row.projectile, state);
-                AfterOverrideChanged();
-                return;
-            }
+            if (IsDragPaint) MarkPainted(row, SpeedPaintTag);
 
-            // 没单独设过就没什么可清除的，右侧留空（勾选框固定靠左，避免出现/消失时整列跳动）
-            if (!picked) return;
-
-            Rect resetRect = new Rect(x + SpeedColumnWidth - ResetButtonWidth, y + (RowHeight - 24f) * 0.5f,
-                ResetButtonWidth, 24f);
-            if (Widgets.ButtonText(resetRect, "×"))
-            {
-                ProjectileOverrides.ClearSpeedOverride(row.projectile);
-                AfterOverrideChanged();
-            }
-            TooltipHandler.TipRegion(resetRect, "GunplayOverrideSpeedResetTip".Translate());
+            EnsureOverridden(row);
+            ProjectileOverrides.SetSpeedAffected(row.projectile, state);
+            AfterOverrideChanged();
         }
 
         // 顺带开启覆写：该行还没有记录时，按当前生效值建一条（见 ProjectileOverrides.GetOrCreate）。

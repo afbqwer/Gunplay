@@ -112,8 +112,7 @@
   <GunplayOverrideColorResetTip>カスタム色を解除し、継承した弾道の色に戻します。</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>この発射体の弾道設定を上書きします。オフにすると上書きを破棄し、継承値/計算値に戻ります。行を押したまま上下にドラッグすると、なぞった行のスイッチをまとめて切り替えられます。</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>この発射体に弾道を描画するかどうか。オフにすると弾道自体が表示されず、幅の上書きも使われません。行が未上書きの状態で操作すると、自動的に上書きが有効になります。行を押したまま上下にドラッグすると、なぞった行の弾道設定をまとめて切り替えられます。</GunplayOverrideTipTrail>
-  <GunplayOverrideTipSpeed>この発射体が全体の発射体速度の影響を受けるかどうか。未上書きの場合は既定の判定を表示します：弧状発射体（擲弾・砲弾）はスケールされず、コンフィグパッケージが preserveSpeed で免除できます（例：焼夷弾）。クリックすると自動的に上書きが有効になります。上部の全体スイッチがオフのときは全発射体がスケールされません。行を押したまま上下にドラッグすると、なぞった行の速度設定をまとめて切り替えられます。</GunplayOverrideTipSpeed>
-  <GunplayOverrideSpeedResetTip>速度の上書きを解除し、継承した既定の判定（弧状ルール / コンフィグパッケージの preserveSpeed）に戻します。</GunplayOverrideSpeedResetTip>
+  <GunplayOverrideTipSpeed>この発射体が全体の発射体速度の影響を受けるかどうか。未上書きの場合は既定の判定を表示します：弧状発射体（擲弾・砲弾）はスケールされず。クリックすると自動的に上書きが有効になります。上部の全体スイッチがオフのときは全発射体がスケールされません。行を押したまま上下にドラッグすると、なぞった行の速度設定をまとめて切り替えられます。</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>発射体</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>弾道の幅</GunplayOverrideColWidth>
