@@ -107,6 +107,45 @@
     </children>
   </EffecterDef>
   
+  <!-- 石质 / 布质（含沙袋等）表面的命中特效。
+       原先直接引用原版 DamageDiminished_General，但那是原版与其它 mod 共用的 def——
+       改它的数据会影响别处，而「显示尘云」又只能作用于本 mod 自己的 def，于是石/布命中一直关不掉。
+       这里复制一份由本 mod 独占的 def（沿用 GunplayImpact* 前缀，ImpactEffectTuner 才能覆盖到），
+       子项与原版一致：AirPuff 尘云 + 两种火花；offsetTowardsTarget / positionRadius 由 GunplayImpact 继承。 -->
+  <EffecterDef ParentName="GunplayImpact">
+    <defName>GunplayImpactGeneric</defName>
+    <children>
+      <li>
+        <subEffecterClass>SubEffecter_SprayerTriggered</subEffecterClass>
+        <positionRadius>0.2</positionRadius>
+        <fleckDef>AirPuff</fleckDef>
+        <burstCount>3~4</burstCount>
+        <speed>0.3~0.7</speed>
+        <scale>0.5~0.8</scale>
+        <spawnLocType>OnSource</spawnLocType>
+      </li>
+      <li>
+        <subEffecterClass>SubEffecter_SprayerTriggered</subEffecterClass>
+        <positionRadius>0.02</positionRadius>
+        <moteDef>Mote_SparkThrownFast</moteDef>
+        <burstCount>4~5</burstCount>
+        <speed>3.3~5</speed>
+        <scale>0.1~0.2</scale>
+        <spawnLocType>OnSource</spawnLocType>
+      </li>
+      <li>
+        <subEffecterClass>SubEffecter_SprayerTriggered</subEffecterClass>
+        <moteDef>Mote_SparkThrown</moteDef>
+        <burstCount>3~3</burstCount>
+        <scale>0.1~0.2</scale>
+        <airTime>0.08~0.1</airTime>
+        <speed>2~4</speed>
+        <positionRadius>0.02</positionRadius>
+        <spawnLocType>OnSource</spawnLocType>
+      </li>
+    </children>
+  </EffecterDef>
+
   <EffecterDef Name="GunplayImpactMetal" ParentName="GunplayImpact">
     <defName>GunplayImpactMetal</defName>
     <children>

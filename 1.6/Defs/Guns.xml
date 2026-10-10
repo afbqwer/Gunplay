@@ -14,10 +14,10 @@
     <Gunplay.ProjectileImpactEffectDef>
         <defName>generic</defName>
         
-        <fabric>DamageDiminished_General</fabric>
+        <fabric>GunplayImpactGeneric</fabric>
         <metal>GunplayImpactMetal</metal>
         <soil>GunplayImpactSoil</soil>
-        <stone>DamageDiminished_General</stone>
+        <stone>GunplayImpactGeneric</stone>
         <wood>GunplayImpactWood</wood>
     </Gunplay.ProjectileImpactEffectDef>
 
