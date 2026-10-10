@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Verse;
@@ -35,25 +36,30 @@ namespace Gunplay
         const MeshUpdateFlags MeshFlags =
             MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices;
 
-        // ---------------- 绘制键：轨迹 def + 颜色 ----------------
+        // ---------------- 绘制键：材质 + 颜色 ----------------
 
         // 颜色经 MaterialPropertyBlock 的 _Color 传入（与原版 DrawBatch.Flush 给微粒上色的同一机制，
-        // Mote 系 shader 均支持），因此同 def 不同颜色不能共用分组，绘制键必须是 (def, color) 二元组。
-        // 颜色默认白时与不设色完全等价，不产生额外开销。
+        // Mote 系 shader 均支持），所以同材质不同颜色不能共用分组，绘制键是 (材质, 颜色) 二元组。
+        //
+        // 键取材质而不是 def：多个 def 可能共用同一个材质（默认档全部用运行时生成贴图的那一个），
+        // 此时"同材质+同颜色"的分组可以合并成一次绘制调用——比按 def 分组更省，也不会因为
+        // 加颜色功能而变多（引入颜色前的键是 def，那时同材质的多个 def 反而各占一次调用）。
         readonly struct TrailMaterialKey : IEquatable<TrailMaterialKey>
         {
-            internal readonly ProjectileTrailDef def;
+            internal readonly Material? material;
             internal readonly Color color;
 
-            internal TrailMaterialKey(ProjectileTrailDef def, Color color)
+            internal TrailMaterialKey(Material? material, Color color)
             {
-                this.def = def;
+                this.material = material;
                 this.color = color;
             }
 
             public bool Equals(TrailMaterialKey other)
             {
-                return def == other.def
+                // 引用比较而不是 Unity 的 == 重载：这里的材质全部来自 MaterialPool / def 缓存，
+                // 实例稳定且不会中途销毁，不需要那套"销毁对象视为 null"的语义，还省一次原生调用。
+                return ReferenceEquals(material, other.material)
                     && color.r == other.color.r && color.g == other.color.g
                     && color.b == other.color.b && color.a == other.color.a;
             }
@@ -67,7 +73,10 @@ namespace Gunplay
             {
                 unchecked
                 {
-                    return (def?.GetHashCode() ?? 0)
+                    // RuntimeHelpers 的标识哈希：不触发 Unity 侧的虚调用，比 material.GetHashCode() 便宜
+                    int h = material != null ? RuntimeHelpers.GetHashCode(material) : 0;
+
+                    return h
                         ^ ((color.r.GetHashCode() * 397) ^ (color.g.GetHashCode() * 31))
                         ^ ((color.b.GetHashCode() * 7) ^ (color.a.GetHashCode() * 3));
                 }
@@ -214,14 +223,16 @@ namespace Gunplay
                 ProjectileTrailDef def = trail.def;
                 if (def == null) continue;
 
-                // 绘制键 = (def, 颜色)：同 def 不同颜色的轨迹分属不同组、不同绘制调用
-                TrailMaterialKey key = new TrailMaterialKey(def, trail.color);
+                // 材质来源（运行时生成贴图 / def 自己的文件贴图）与 enableInstancing 都由 TrailMaterial 处理；
+                // 绘制键 = (材质, 颜色)，同材质同颜色的轨迹合并进同一次绘制调用
+                Material? material = TrailMaterial.For(def);
+                TrailMaterialKey key = new TrailMaterialKey(material, trail.color);
 
                 if (trail.IsArc)
                 {
                     if (!arcGroups.TryGetValue(key, out ArcGroup arc))
                     {
-                        arc = new ArcGroup { material = TrailMaterial.For(def), color = trail.color };
+                        arc = new ArcGroup { material = material, color = trail.color };
                         arcGroups[key] = arc;
                     }
                     arc.Add(trail);
@@ -230,8 +241,7 @@ namespace Gunplay
                 {
                     if (!instancedGroups.TryGetValue(key, out InstancedGroup inst))
                     {
-                        // 材质来源（运行时生成贴图 / def 自己的文件贴图）与 enableInstancing 都由 TrailMaterial 处理
-                        inst = new InstancedGroup { material = TrailMaterial.For(def), color = trail.color };
+                        inst = new InstancedGroup { material = material, color = trail.color };
                         instancedGroups[key] = inst;
                     }
                     inst.Add(trail);
