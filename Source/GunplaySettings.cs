@@ -145,6 +145,8 @@ namespace Gunplay
                 {
                     listing_Standard.Gap(4f);
                     listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
+                    // 按 5% 步进吸附，与粒子倍率的处理方式一致
+                    projectileSpeed = Mathf.Round(projectileSpeed * 20f) / 20f;
                 }
                 listing_Standard.Gap(4f);
             }
