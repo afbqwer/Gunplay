@@ -67,8 +67,7 @@ namespace Gunplay
         // 可能有小幅差异；覆写值本身是绝对值，一旦开启就不受该近似影响。
         static float BaseDamage(ThingDef? projectileDef)
         {
-            if (projectileDef?.projectile == null) return 0f;
-
+            if (projectileDef?.projectile == null || projectileDef?.projectile.damageDef == null) return 0f;
             return projectileDef.projectile.GetDamageAmount(1f, null, null);
         }
     }

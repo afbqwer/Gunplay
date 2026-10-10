@@ -32,13 +32,13 @@ namespace Gunplay
         const float IconSize = 32f;
         const float OverrideToggleWidth = 60f;
         const float TrailToggleWidth = 60f;
-        const float ColorColumnWidth = 90f;
+        const float ColorColumnWidth = 70f;
         const float SwatchWidth = 50f;
         const float SwatchHeight = 24f;
         const float ResetButtonWidth = 24f;
-        const float WidthColumnWidth = 110f;
-        const float LengthColumnWidth = 100f;
-        const float FadeColumnWidth = 90f;
+        const float WidthColumnWidth = 80f;
+        const float LengthColumnWidth = 80f;
+        const float FadeColumnWidth = 80f;
         const float ModButtonWidth = 220f;
         const float TrailFilterWidth = 190f;
         const float OnlyOverriddenWidth = 180f;
@@ -49,7 +49,7 @@ namespace Gunplay
         const float MinWidth = 0f;
         const float MaxWidth = 2f;
 
-        public override Vector2 InitialSize => new Vector2(1280f, 800f);
+        public override Vector2 InitialSize => new Vector2(1280f, 720f);
 
         // 轨迹列 / 轨迹过滤的取值口径：三选一
         enum TrailFilter
@@ -147,8 +147,8 @@ namespace Gunplay
         public ProjectileOverrideWindow()
         {
             forcePause = false;
-            draggable = true;
-            resizeable = true;
+            draggable = false;
+            resizeable = false;
             closeOnClickedOutside = true;
             doCloseX = true;
 
@@ -216,7 +216,7 @@ namespace Gunplay
                     projectileLabel = DisplayLabel(def),
                     weapons = weapons,
                     weaponDefName = WeaponDefName(weapons),
-                    weaponLabel = weapons.Count > 0 ? DisplayLabel(weapons[0]) : null,
+                    weaponLabel = weapons.Count > 0 ? DisplayLabel(weapons[0],weapons.Count - 1) : null,
                     modName = def.modContentPack?.Name ?? "??",
                     searchText = BuildSearchText(def, weapons),
                     weaponTip = BuildWeaponTip(weapons),
@@ -240,19 +240,18 @@ namespace Gunplay
         }
 
         // 上排显示名。部分投射物没有 label，退回 defName，避免出现空行。
-        static string DisplayLabel(ThingDef def)
+        static string DisplayLabel(ThingDef def, int extra = 0)
         {
             string label = def.LabelCap.Resolve();
-            return label.NullOrEmpty() ? def.defName : label;
+            return WithCount(label.NullOrEmpty() ? def.defName : label, extra);
         }
 
         // 无武器时返回 null（该列显示占位符）
-        static string? WeaponDefName(List<ThingDef> weapons)
-        {
-            if (weapons.Count == 0) return null;
+        static string? WeaponDefName(List<ThingDef> weapons) =>
+            weapons.Count == 0 ? null : WithCount(weapons[0].defName, weapons.Count - 1);
 
-            return weapons.Count > 1 ? weapons[0].defName + " +" + (weapons.Count - 1) : weapons[0].defName;
-        }
+        // 有额外项时追加 " +N" 后缀
+        static string WithCount(string name, int extra) => extra > 0 ? $"{name} +{extra}" : name;
 
         static string BuildSearchText(ThingDef projectile, List<ThingDef> weapons)
         {

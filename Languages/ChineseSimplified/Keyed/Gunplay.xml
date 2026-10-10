@@ -82,7 +82,7 @@
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>轨迹宽度</GunplayOverrideColWidth>
   <GunplayOverrideColLength>长度</GunplayOverrideColLength>
-  <GunplayOverrideColFade>淡出（tick）</GunplayOverrideColFade>
+  <GunplayOverrideColFade>淡出</GunplayOverrideColFade>
   <GunplayOverrideTipWidth>轨迹宽度，世界单位。绝对值，既不看宽度模式也不乘全局倍率.</GunplayOverrideTipWidth>
   <GunplayOverrideTipLength>长度 = 该值 × 投射物自身的（未缩放）弹速。绝对值，不受全局轨迹长度影响.</GunplayOverrideTipLength>
   <GunplayOverrideTipFade>弹体消失后，拖尾收缩到零所需的 tick 数（60 tick = 1 秒）。绝对值，不受全局淡出时长影响.</GunplayOverrideTipFade>

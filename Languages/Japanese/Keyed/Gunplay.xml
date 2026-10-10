@@ -82,7 +82,7 @@
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>弾道の幅</GunplayOverrideColWidth>
   <GunplayOverrideColLength>長さ</GunplayOverrideColLength>
-  <GunplayOverrideColFade>消滅（tick）</GunplayOverrideColFade>
+  <GunplayOverrideColFade>消滅</GunplayOverrideColFade>
   <GunplayOverrideTipWidth>弾道の幅（ワールド単位）。絶対値であり、幅の計算方法や全体的な倍率は適用されません。</GunplayOverrideTipWidth>
   <GunplayOverrideTipLength>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになります。絶対値であり、全体的な弾道の長さの影響を受けません。</GunplayOverrideTipLength>
   <GunplayOverrideTipFade>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。絶対値であり、全体的な消滅時間の影響を受けません。</GunplayOverrideTipFade>

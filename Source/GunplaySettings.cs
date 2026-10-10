@@ -96,10 +96,32 @@ namespace Gunplay
             if (Scribe.mode == LoadSaveMode.LoadingVars) TrailTexture.Invalidate();
         }
 
+        // 设置窗口的滚动状态。设置项较多而窗口高度有限，内容超出时需滚动。
+        static Vector2 settingsScroll;
+
+        // 内容高度缓存。Listing.CurHeight 就是 curY（=> curY），会随 GetRect/Gap 自动累加，
+        // 前提是「不分栏」——见下面 maxOneColumn。这里在 Layout 阶段量取一次，供同一帧的
+        // Repaint 使用（IMGUI 每帧先 Layout 再 Repaint），因此不会出现「滚动条晚一帧」的抖动。
+        // 初值 0：首帧按视口高度处理（无滚动条），Layout 后立即稳定。
+        static float settingsContentHeight;
+
         public static void DoSettingsWindowContents(Rect inRect)
         {
+            // 预留滚动条宽度，避免内容贴到滚动条上
+            const float ScrollbarWidth = 16f;
+            Rect viewRect = new Rect(0f, 0f, inRect.width - ScrollbarWidth, Mathf.Max(settingsContentHeight, inRect.height));
+
+            Widgets.BeginScrollView(inRect, ref settingsScroll, viewRect);
+
             Listing_Standard listing_Standard = new Listing_Standard();
-            listing_Standard.Begin(inRect);
+
+            // 必须关掉自动分栏：Listing.GetRect 会调 NewColumnIfNeeded，
+            // 当 curY + 行高 > listingRect.height 时执行 NewColumn()——把 curX 右移一列、curY 归零。
+            // 后果有两个：后续控件被排到视口右侧裁掉，且 CurHeight（=> curY）被清零而不再等于内容总高。
+            // 这正是「设置装不下、滚动无效」的根因，与 CurHeight 是否自动赋值无关。
+            listing_Standard.maxOneColumn = true;
+
+            listing_Standard.Begin(viewRect);
             listing_Standard.CheckboxLabeled("GunplayEnableTrailsName".Translate(), ref enableTrails, "GunplayEnableTrailsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());
@@ -178,6 +200,14 @@ namespace Gunplay
             }
 
             listing_Standard.End();
+
+            // 内容高度 + 一行间距的底部留白；只在 Layout 阶段量取，供同一帧的 Repaint 使用
+            if (Event.current.type == EventType.Layout)
+            {
+                settingsContentHeight = listing_Standard.CurHeight + listing_Standard.verticalSpacing;
+            }
+
+            Widgets.EndScrollView();
 
             ImpactEffectTuner.Apply();
         }

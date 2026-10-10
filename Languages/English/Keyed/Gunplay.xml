@@ -80,9 +80,9 @@
   <GunplayOverrideTipTrail>Draw a trail for this projectile. When off, this projectile gets no trail at all and its width override goes unused. Adjusting this on a row that is not overridden yet will enable the override automatically.</GunplayOverrideTipTrail>
   <GunplayOverrideColProjectile>Projectile</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>Weapon</GunplayOverrideColWeapon>
-  <GunplayOverrideColWidth>Trail width</GunplayOverrideColWidth>
+  <GunplayOverrideColWidth>TrailW</GunplayOverrideColWidth>
   <GunplayOverrideColLength>Length</GunplayOverrideColLength>
-  <GunplayOverrideColFade>Fade (ticks)</GunplayOverrideColFade>
+  <GunplayOverrideColFade>Fade</GunplayOverrideColFade>
   <GunplayOverrideTipWidth>Trail width in world units. Absolute value, ignores both the width mode and the width multiplier.</GunplayOverrideTipWidth>
   <GunplayOverrideTipLength>Trail length is this value multiplied by the projectile's own (unscaled) speed. Absolute value, ignores the global trail length.</GunplayOverrideTipLength>
   <GunplayOverrideTipFade>How many ticks the trail takes to shrink away after the projectile is gone, in ticks (60 ticks = 1 second). Absolute value, ignores the global fade duration.</GunplayOverrideTipFade>

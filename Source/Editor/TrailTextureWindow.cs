@@ -25,7 +25,6 @@ namespace Gunplay
         const float ValueWidth = 52f;
 
         const float CheckerSize = 14f;
-        const float HeadMarkerSize = 10f;
         const float ColorSwatchWidth = 42f;
         const float ColorSwatchHeight = 24f;
         const float CustomButtonWidth = 84f;
@@ -109,7 +108,7 @@ namespace Gunplay
                 TrailTextureParams.EdgeFalloffMin, TrailTextureParams.EdgeFalloffMax);
 
             // 预览颜色：给右侧预览着色用，不写进设置（滑块下方空间充裕，放这里不挤预览）
-            rowRect.y += Spacing * 2f;
+            rowRect.y += RowHeight + Spacing * 2f;
             DrawColorRow(new Rect(rect.x, rowRect.y, rect.width, ColorSwatchHeight + 22f));
 
             // 恢复默认
@@ -203,14 +202,14 @@ namespace Gunplay
             GUI.color = previewColor;
             GUI.DrawTexture(trailRect, tex);
             GUI.color = Color.white;
-            //Widgets.DrawBox(trailRect, 1);
+            Widgets.DrawBox(trailRect, 1);
 
             // 头（弹体端）标记
-            Rect headRect = new Rect(trailRect.center.x - HeadMarkerSize * 0.5f,
-                trailRect.y - HeadMarkerSize - 3f, HeadMarkerSize, HeadMarkerSize);
-            GUI.color = previewColor;
-            GUI.DrawTexture(headRect, BaseContent.WhiteTex);
-            GUI.color = Color.white;
+            //Rect headRect = new Rect(trailRect.center.x - HeadMarkerSize * 0.5f,
+            //    trailRect.y - HeadMarkerSize - 3f, HeadMarkerSize, HeadMarkerSize);
+            //GUI.color = previewColor;
+            //GUI.DrawTexture(headRect, BaseContent.WhiteTex);
+            //GUI.color = Color.white;
         }
 
         // 颜色预览行：每个轨迹 def 一枚当前生效颜色的色块（点击即用来着色预览）+ 自定义取色。
