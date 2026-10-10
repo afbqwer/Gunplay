@@ -2,25 +2,20 @@
 <Defs>
 
   <!-- 默认使用运行时生成的轨迹贴图（纯白，形状参数见 TrailTexture），颜色由 trailColor / 设置 / 单项覆写乘出。
-       下面的 texPath 只是回退项：仅当某个 def 显式写 <useGeneratedTexture>false</useGeneratedTexture>
-       时才改用它自己的文件贴图（Textures 下的 Guntrail.png 因此只在回退时被读取）。 -->
+       下面的 graphicData 只是回退项：仅当某个 def 显式写 <useGeneratedTexture>false</useGeneratedTexture>
+       时才改用它自己的文件贴图（Textures 下的 Guntrail.png 因此只在回退时被读取）。
+       ProjectileTrailDef 是普通 Def，不再需要 thingClass / tickerType / altitudeLayer 等 ThingDef 专有字段。 -->
   <Gunplay.ProjectileTrailDef Name="GunplayProjectileTrailDefault">
     <defName>default</defName>
-    <category>Projectile</category>
-    <tickerType>Normal</tickerType>
-    <altitudeLayer>Projectile</altitudeLayer>
-    <thingClass>Gunplay.ProjectileTrail</thingClass>
     <label>projectile trail</label>
-    <useHitPoints>False</useHitPoints>
-    <neverMultiSelect>True</neverMultiSelect>
-    
+
     <graphicData>
       <shaderType>Mote</shaderType>
       <texPath>Gunplay/Effects/Guntrail</texPath>
       <graphicClass>Graphic_Single</graphicClass>
     </graphicData>
   </Gunplay.ProjectileTrailDef>
-  
+
   <!-- 充能武器轨迹：与 default 共用 Guntrail 贴图，仅按 trailColor 换色（#A7EAFF）。
        颜色可在设置窗口的「轨迹颜色」中进一步覆写。 -->
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
@@ -39,16 +34,16 @@
   </Gunplay.ProjectileTrailDef>
 
 
-  
+
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>medium</defName>
-    
+
     <trailWidth>0.15</trailWidth>
   </Gunplay.ProjectileTrailDef>
-  
+
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
     <defName>wide</defName>
-    
+
     <trailWidth>0.25</trailWidth>
   </Gunplay.ProjectileTrailDef>
 

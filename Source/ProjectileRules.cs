@@ -21,6 +21,10 @@ namespace Gunplay
         {
             if (projectileDef?.projectile == null) return false;
 
+            // 全局开关（设置里的「投射物受全局弹速影响」）：关闭后整项缩放停用，
+            // 全部投射物回到各自 def 的原始弹速。
+            if (!GunplaySettings.projectileSpeedEnabled) return false;
+
             return !IsArcing(projectileDef); // 弧线投射物（手雷/炮弹）不缩放
         }
 

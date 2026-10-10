@@ -3,7 +3,12 @@ using Verse;
 
 namespace Gunplay
 {
-    public class ProjectileTrailDef : ThingDef
+    // 轨迹外观定义。
+    //
+    // 纯数据 Def：轨迹早已不再以 Thing 形式存在于地图上（见 ProjectileTrailState / MapComponent_ProjectileTrails），
+    // 用不到 ThingDef 的任何图形/物理方法，继承 ThingDef 只会白白带进一堆无意义的 XML 项
+    // （thingClass / category / tickerType / altitudeLayer / useHitPoints / neverMultiSelect ...）。
+    public class ProjectileTrailDef : Def
     {
         public float trailWidth = -1;
 
@@ -15,5 +20,9 @@ namespace Gunplay
         // false = 用本 def graphicData 的 texPath 贴图（第三方 def 想换自定义贴图时用这一档）。
         // 默认 true：内置所有 def 都走生成贴图，Textures 下的 Guntrail.png 只作形状参考、不再被读取。
         public bool useGeneratedTexture = true;
+
+        // useGeneratedTexture = false 时的贴图来源。普通 Def 没有 ThingDef 那套图形初始化，
+        // 这里自己持有 graphicData，由 TrailMaterial 取出 Graphic.MatSingle 使用（缺失则无材质）。
+        public GraphicData? graphicData;
     }
 }

@@ -14,6 +14,8 @@
   <GunplayShowPuffsDesc>発射体が地面や物体に命中した際の土煙を表示します。</GunplayShowPuffsDesc>
   <GunplayParticleMultiplierName>命中パーティクル数の倍率</GunplayParticleMultiplierName>
   <GunplayParticleMultiplierDesc>命中エフェクトで発生するパーティクル数の倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayParticleMultiplierDesc>
+  <GunplayProjectileSpeedEnabledName>発射体を全体速度の影響下に置く</GunplayProjectileSpeedEnabledName>
+  <GunplayProjectileSpeedEnabledDesc>有効にすると「発射体速度」が全発射体に適用されます。無効にすると全発射体がそれぞれのdefの本来の速度を保ちます。弧状発射体（擲弾・砲弾）は元々スケールされないため、この項目の影響を受けません。</GunplayProjectileSpeedEnabledDesc>
   <GunplayProjectileSpeedName>発射体速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>全種類の発射体の飛翔速度を指定したパーセンテージに変更します。</GunplayProjectileSpeedDesc>
   <GunplayTrailLengthName>弾道の長さ</GunplayTrailLengthName>

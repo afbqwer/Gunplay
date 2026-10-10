@@ -31,6 +31,11 @@ namespace Gunplay
         public static bool unarmedProjectileEffects = true;
         public static bool unarmedOnlyBullets = true;
         public static float particleMultiplier = 1f;
+
+        // 是否让投射物受全局弹速缩放（projectileSpeed）影响。关闭后 projectileSpeed 完全不起作用，
+        // 所有投射物保持各自 def 的原始弹速；单项覆写的 preserveSpeed 仍可单独豁免某个投射物。
+        // 判定统一收在 ProjectileRules.ShouldScaleSpeed，补丁只读那一处。
+        public static bool projectileSpeedEnabled = true;
         public static float projectileSpeed = 3f;
         public static TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
         public static float trailWidthFactor = 1f;
@@ -73,6 +78,7 @@ namespace Gunplay
             Scribe_Values.Look(ref unarmedProjectileEffects, "unarmedProjectileEffects", true);
             Scribe_Values.Look(ref unarmedOnlyBullets, "unarmedOnlyBullets", true);
             Scribe_Values.Look(ref particleMultiplier, "particleMultiplier", 1f);
+            Scribe_Values.Look(ref projectileSpeedEnabled, "projectileSpeedEnabled", true);
             Scribe_Values.Look(ref projectileSpeed, "projectileSpeed");
             Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
             Scribe_Values.Look(ref trailWidthFactor, "trailWidthFactor", 1f);
@@ -123,6 +129,18 @@ namespace Gunplay
 
             listing_Standard.Begin(viewRect);
             listing_Standard.CheckboxLabeled("GunplayEnableTrailsName".Translate(), ref enableTrails, "GunplayEnableTrailsDesc".Translate());
+
+            // 弹速缩放是玩法改动，与轨迹是否绘制无关（补丁里也一直独立生效），因此独立成组，
+            // 不再藏在「启用子弹轨迹」下面——否则关掉轨迹后就无法调整/关闭弹速了。
+            listing_Standard.Gap(4f);
+            listing_Standard.CheckboxLabeled("GunplayProjectileSpeedEnabledName".Translate(), ref projectileSpeedEnabled, "GunplayProjectileSpeedEnabledDesc".Translate());
+            if (projectileSpeedEnabled)
+            {
+                listing_Standard.Gap(4f);
+                listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
+            }
+            listing_Standard.Gap(4f);
+
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableEffectsName".Translate(), ref enableEffects, "GunplayEnableEffectsDesc".Translate());
@@ -142,9 +160,6 @@ namespace Gunplay
             }
             if (enableTrails)
             {
-                listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
-                listing_Standard.Gap(8f);
-
                 // 三项都是整数刻度：分数在这里既没有视觉意义，也会让长度和淡出对不上整数 tick
                 listing_Standard.SliderLabeled("GunplayTrailLengthName".Translate(), ref trailLengthFactor, "GunplayTrailLengthDesc".Translate(),
                     TrailLength.Min, TrailLength.Max, v => Mathf.RoundToInt(v).ToString());

@@ -14,6 +14,8 @@
   <GunplayShowPuffsDesc>子弹击中地面或物体时显示扬起的尘土和烟雾.</GunplayShowPuffsDesc>
   <GunplayParticleMultiplierName>命中粒子数量倍率</GunplayParticleMultiplierName>
   <GunplayParticleMultiplierDesc>对命中特效生成的粒子数量进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayParticleMultiplierDesc>
+  <GunplayProjectileSpeedEnabledName>投射物受全局弹速影响</GunplayProjectileSpeedEnabledName>
+  <GunplayProjectileSpeedEnabledDesc>开启后，「子弹速度」作用于所有投射物；关闭后所有投射物保持各自 def 的原始弹速。弧线投射物（手雷/炮弹）本就不缩放，不受此项影响.</GunplayProjectileSpeedEnabledDesc>
   <GunplayProjectileSpeedName>子弹速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>将所有子弹的速度调整到指定的百分比(默认300%)</GunplayProjectileSpeedDesc>
   <GunplayTrailLengthName>轨迹长度</GunplayTrailLengthName>

@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using UnityEngine;
 using Verse;
 
 namespace Gunplay
@@ -33,18 +32,6 @@ namespace Gunplay
 
             // 轨迹批量绘制：显式挂载（目标方法缺失时只报错并禁用轨迹，不抛异常）
             PatchDynamicDrawTrails.TryPatch(harmony);
-
-            foreach (ProjectileTrailDef def in DefDatabase<ProjectileTrailDef>.AllDefs)
-            {
-                // 走运行时生成贴图的 def 不需要这一步（贴图由 TrailTexture 自行设定 wrap 模式），
-                // 且不去碰 DrawMatSingle 就不会装载 Textures 下的参考贴图 Guntrail.png。
-                if (def.useGeneratedTexture) continue;
-
-                Material? mat = def.DrawMatSingle;
-                if (!mat || !mat.mainTexture) continue;
-
-                mat.mainTexture.wrapMode = TextureWrapMode.Clamp;
-            }
 
             foreach (GunPropDef def in DefDatabase<GunPropDef>.AllDefs)
             {

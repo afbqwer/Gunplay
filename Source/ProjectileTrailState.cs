@@ -65,7 +65,7 @@ namespace Gunplay
         internal const float DepthEpsilon = -0.002f;
 
         // 归属信息
-        internal ProjectileTrailDef def = null!;   // 材质来源 + 高度层来源；由 Initialize* 首个赋值，之后恒非空
+        internal ProjectileTrailDef def = null!;   // 材质来源；由 Initialize* 首个赋值，之后恒非空
         internal Color color = Color.white;        // 轨迹颜色，登记时按 TrailColor 口径解析一次（覆写 > def 颜色）
         internal Thing? LookupKey;                 // 登记时的投射物引用（捕获后仍保留），用于从集合移除
         internal bool Dead;                        // 生命周期结束，由集合回收

@@ -14,6 +14,8 @@
   <GunplayShowPuffsDesc>Show dust and smoke puffs spawned when projectiles impact surfaces.</GunplayShowPuffsDesc>
   <GunplayParticleMultiplierName>Impact particle multiplier</GunplayParticleMultiplierName>
   <GunplayParticleMultiplierDesc>Multiplies the number of particles spawned by impact effects. Default 100%, range 5% to 400%, in 5% steps.</GunplayParticleMultiplierDesc>
+  <GunplayProjectileSpeedEnabledName>Projectiles affected by global speed</GunplayProjectileSpeedEnabledName>
+  <GunplayProjectileSpeedEnabledDesc>When enabled, Projectile speed applies to all projectiles. When disabled, every projectile keeps its own def's original speed. Arcing projectiles (grenades, shells) are never scaled, so this does not affect them.</GunplayProjectileSpeedEnabledDesc>
   <GunplayProjectileSpeedName>Projectile speed</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>Alter speed to specified percentage for all projectiles.</GunplayProjectileSpeedDesc>
   <GunplayTrailLengthName>Trail length</GunplayTrailLengthName>
