@@ -86,11 +86,19 @@ namespace Gunplay
         // 横向拖出去时要靠它把「涂材质」挡在材质列内，否则颜色格会拿到一个 ProjectileTrailDef 转不成 Color。
         // 数值三列各一个，免得 Shift 涂抹横着划过去时把宽度涂到长度列上。
         // 全部 internal：顶层的光标图标补丁按它决定画什么，见 PatchDrawDragPaintIcon。
+        // 后三个是开关列——它们的涂抹由本体复选框接管（见 DrawToggleBox），
+        // 这里只借 tag 给"涂过哪个格子"的位掩码编号，不参与 DragPaint.Cell。
         internal const int MaterialPaintTag = 1;
         internal const int ColorPaintTag = 2;
         internal const int WidthPaintTag = 3;
         internal const int LengthPaintTag = 4;
         internal const int FadePaintTag = 5;
+        const int OverridePaintTag = 6;
+        const int TrailPaintTag = 7;
+        const int SpeedPaintTag = 8;
+
+        // 「本轮拖拽涂过」的高光。淡蓝一层，盖在格子内容之上（理由见 DrawPaintedHighlights）。
+        static readonly Color PaintedHighlightColor = new Color(0.35f, 0.65f, 1f, 0.25f);
 
         public override Vector2 InitialSize => new Vector2(1280f, 720f);
 
@@ -114,6 +122,7 @@ namespace Gunplay
             public string modName = null!;
             public string searchText = null!;   // 参与搜索的文本：投射物 + 全部武器 的 defName/label
             public string weaponTip = null!;    // 武器列的悬浮内容
+            public int paintedMask;         // 位 = tag：本轮拖拽涂过哪几列。松开鼠标整体清零（见 MarkPainted）
             public ProjectileTrailDef? trailDef;    // 该投射物当前生效的轨迹材质（颜色/宽度继承的来源）
             public float editWidth;         // 输入框绑定的当前值
             public string? widthBuffer;     // 输入框字符串缓冲；null 表示尚未输入过
@@ -190,6 +199,9 @@ namespace Gunplay
         bool visibleDirty = true;
         bool visibleKeepScroll;   // 重建列表时是否保留滚动位置（只有开关引发的重建才保留）
         int overriddenInFilter;
+
+        // 上一帧左键是否按着。只用来识别"松开"这个瞬间——高光要整体清零（见 ClearPaintedHighlightsOnRelease）。
+        bool dragHighlightActive;
 
         public ProjectileOverrideWindow()
         {
@@ -442,6 +454,8 @@ namespace Gunplay
         {
             Text.Font = GameFont.Small;
             Text.Anchor = TextAnchor.UpperLeft;
+
+            ClearPaintedHighlightsOnRelease();
 
             float curY = inRect.y;
 
@@ -698,6 +712,9 @@ namespace Gunplay
             float y = index * RowHeight;
             Widgets.DrawHighlightIfMouseover(new Rect(0f, y, viewWidth, RowHeight));
 
+            // 涂抹高光画在这一层（内容之前，行高亮之后），见 DrawPaintedHighlights
+            DrawPaintedHighlights(row, y, layout);
+
             ProjectileOverride? over = ProjectileOverrides.Get(row.projectile);
             bool overridden = over != null;
             bool trailOn = TrailShown(row);   // 未覆写时是默认情况，不再是恒为勾选
@@ -722,6 +739,58 @@ namespace Gunplay
             DrawNumberCell(row, FadeColumn, layout.fadeX, y, overridden, trailOn, ref row.editFade, ref row.fadeBuffer);
         }
 
+        // ---------------- 涂抹高光 ----------------
+
+        // 格子被涂过就记一位。用位掩码而不是 HashSet，是为了不给出几百个 Row 各挂一个集合对象；
+        // 清零是一次线性遍历，也只发生在松开鼠标那一帧（见 ClearPaintedHighlightsOnRelease）。
+        static void MarkPainted(Row row, int tag) => row.paintedMask |= 1 << tag;
+
+        static bool IsPainted(Row row, int tag) => (row.paintedMask & (1 << tag)) != 0;
+
+        // 开关列的涂抹由本体的复选框接管，我们拿不到"这一下是涂的还是点的"，
+        // 只能这样判：本体的涂抹只在按住左键时发力（见 Widgets.ToggleInvisibleDraggable 的
+        // paintable 分支与那个跟随光标的图标），而单击是松开那一帧才触发——那时左键已经没按着。
+        static bool IsDragPaint => Input.GetMouseButton(0);
+
+        // 松开鼠标就整体还原。只在"按着 → 没按着"这个跳变时遍历，不必每帧扫几百行。
+        void ClearPaintedHighlightsOnRelease()
+        {
+            bool held = Input.GetMouseButton(0);
+
+            if (dragHighlightActive && !held)
+            {
+                foreach (Row row in rows) row.paintedMask = 0;
+            }
+
+            dragHighlightActive = held;
+        }
+
+        // 高光画在**背景**上（在格子内容之前）。
+        //
+        // 格子里的内容基本都是内缩的——数值格的输入框、材质格的按钮都内缩 4~5 像素，
+        // 色块也留了边距——于是四周会露出一圈蓝，看上去就是一个淡蓝边框。
+        // 这比画在内容之上要好：那种做法文字会整体被蒙色，发蓝发闷。
+        void DrawPaintedHighlights(Row row, float y, in ColumnLayout layout)
+        {
+            if (row.paintedMask == 0) return;
+
+            if (IsPainted(row, OverridePaintTag)) HighlightCell(layout.overrideX, y, OverrideToggleWidth);
+            if (IsPainted(row, TrailPaintTag)) HighlightCell(layout.trailX, y, TrailToggleWidth);
+            if (SpeedColumnShown && IsPainted(row, SpeedPaintTag)) HighlightCell(layout.speedX, y, SpeedColumnWidth);
+            if (IsPainted(row, MaterialPaintTag)) HighlightCell(layout.materialX, y, MaterialColumnWidth);
+            if (IsPainted(row, ColorPaintTag)) HighlightCell(layout.colorX, y, ColorColumnWidth);
+            if (IsPainted(row, WidthPaintTag)) HighlightCell(layout.widthX, y, WidthColumnWidth);
+            if (IsPainted(row, LengthPaintTag)) HighlightCell(layout.lengthX, y, LengthColumnWidth);
+            if (IsPainted(row, FadePaintTag)) HighlightCell(layout.fadeX, y, FadeColumnWidth);
+        }
+
+        static void HighlightCell(float x, float y, float width)
+        {
+            GUI.color = PaintedHighlightColor;
+            GUI.DrawTexture(new Rect(x, y, width, RowHeight), BaseContent.WhiteTex);
+            GUI.color = Color.white;
+        }
+
         void DrawToggle(Row row, float x, float y, bool overridden)
         {
             bool state = overridden;
@@ -733,6 +802,7 @@ namespace Gunplay
             TooltipHandler.TipRegion(rect, "GunplayOverrideTipEnabled".Translate());
 
             if (state == before) return;
+            if (IsDragPaint) MarkPainted(row, OverridePaintTag);
 
             if (state)
             {
@@ -781,6 +851,7 @@ namespace Gunplay
             TooltipHandler.TipRegion(rect, "GunplayOverrideTipTrail".Translate());
 
             if (state == before) return;
+            if (IsDragPaint) MarkPainted(row, TrailPaintTag);
 
             EnsureOverridden(row);
             ProjectileOverrides.SetTrailEnabled(row.projectile, state);
@@ -806,6 +877,8 @@ namespace Gunplay
 
             if (state != speedOn)
             {
+                if (IsDragPaint) MarkPainted(row, SpeedPaintTag);
+
                 EnsureOverridden(row);
                 ProjectileOverrides.SetSpeedAffected(row.projectile, state);
                 AfterOverrideChanged();
@@ -957,6 +1030,7 @@ namespace Gunplay
             // 不是「跟着那个材质走」，否则目标行的材质与起始行不同时涂出来的色就不一样了。
             if (DragPaint.Cell(cellRect, ColorPaintTag, color))
             {
+                MarkPainted(row, ColorPaintTag);
                 ProjectileOverrides.SetTrailColor(row.projectile, (Color)DragPaint.Value!);
                 AfterOverrideChanged();
             }
@@ -1007,6 +1081,7 @@ namespace Gunplay
             // GUI.Button 不会触发；反过来，只是点一下时 DragPaint 也判不出拖动，两边互不干扰。
             if (DragPaint.Cell(cellRect, MaterialPaintTag, row.trailDef))
             {
+                MarkPainted(row, MaterialPaintTag);
                 ProjectileOverrides.SetTrailMaterial(row.projectile, DragPaint.Value as ProjectileTrailDef);
 
                 // 与单击换材质同一条收尾：本行后面几列的继承口径跟着换，缓存与输入框缓冲区都要重取
@@ -1117,6 +1192,7 @@ namespace Gunplay
         // 而涂抹可以从"未覆写"的行起手，会新建记录、从而改变已覆写计数与过滤结果。
         void WriteNumber(Row row, in NumberColumn col, float value)
         {
+            MarkPainted(row, col.paintTag);
             col.apply(row, Snap(col, value));
             SyncEditValue(row);
             AfterOverrideChanged();
