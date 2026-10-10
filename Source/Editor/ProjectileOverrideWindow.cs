@@ -79,7 +79,11 @@ namespace Gunplay
         // 不兼容的原因是「CE 在场」本身，见 PatchCECompat.Detected。
         static bool SpeedColumnShown => !PatchCECompat.Detected;
 
-        const float MinWidth = 0f;
+        // 宽度下限刻意不取 0：0 是「未设定」的哨兵（见 ProjectileOverride.TryGetPositive）。
+        // 若允许输入 0，「填了 0」与「没填」会被判成同一件事——用户设 0 后实际回落到计算值，
+        // 而输入框这一帧仍显示 0（打字路径不重算），当场看不出来。要「不画轨迹」有轨迹开关，
+        // 0 宽度本身没有意义，因此把下限抬到刚好越过哨兵。
+        const float MinWidth = 0.01f;
         const float MaxWidth = 2f;
 
         const float ToggleSize = 24f;
@@ -605,8 +609,13 @@ namespace Gunplay
             int count = ProjectileOverrides.Count;
             if (count == 0) return;
 
+            // 报两个数：总条目数，以及其中「键对应的投射物 def 已不存在」的条数。
+            // 后者不在列表里（BuildRows 只收 projectile != null 的 def），却会被 Clear 一并清掉，
+            // 不说明的话用户会觉得"确认框里的数字比列表里多"。
+            int orphaned = ProjectileOverrides.CountOrphaned();
+
             Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation(
-                "GunplayOverrideClearAllConfirm".Translate(count),
+                "GunplayOverrideClearAllConfirm".Translate(count, orphaned),
                 () =>
                 {
                     ProjectileOverrides.Clear();
@@ -990,7 +999,8 @@ namespace Gunplay
         }
 
         // 颜色单元格：色块（当前生效颜色）+ 有自定义色时的「×」恢复按钮。
-        // 色块点击即取色；该行尚未开启覆写时与轨迹开关同约定——顺带开启覆写。
+        // 色块点击打开取色窗；与轨迹/材质列同约定——在该行尚未覆写时顺带开启覆写，
+        // 但仅限「确定」且颜色确有变化：点开又原样确定、或直接取消，都不该留下覆写记录。
         void DrawColorCell(Row row, float x, float y, bool overridden, bool trailOn)
         {
             // 该投射物的轨迹被关掉时，颜色没有意义
@@ -1021,10 +1031,19 @@ namespace Gunplay
 
             if (Widgets.ButtonInvisible(swatchRect))
             {
-                if (EnsureOverridden(row)) AfterOverrideChanged();
+                // 覆写必须在取色窗的「确定」回调里按需开启，不能在点击时就开：
+                // 该窗口只在「确定」时回调、「取消」不回调（见 ColorPickerWindow.DoWindowContents），
+                // 点击时先 EnsureOverridden 会让「点开又取消」也把整行覆写打开。
+                // 并且颜色没变（c == color，UnityEngine.Color 的相等判定自带容差）时一并跳过：
+                // 用户没打算改，就不该留下覆写记录。
+                Color initial = color;
+                Find.WindowStack.Add(new ColorPickerWindow(initial, c =>
+                {
+                    if (c == initial) return;
 
-                Find.WindowStack.Add(new ColorPickerWindow(color, c =>
-                    ProjectileOverrides.SetTrailColor(row.projectile, c)));
+                    if (EnsureOverridden(row)) AfterOverrideChanged();
+                    ProjectileOverrides.SetTrailColor(row.projectile, c);
+                }));
             }
 
             // 「×」清除自定义颜色，回到继承
@@ -1064,16 +1083,29 @@ namespace Gunplay
                 return;
             }
 
-            // 判「是否单独指定了材质」直接看记录里的 defName，而不是回查 DefDatabase：
-            // 每帧对每行都要用一次，这里只是显示与提示，一个字典查找就够；
-            // 材质 def 被移除时 defName 仍在，提示仍旧说"已单独指定"，与 SetTrailMaterial 的意图一致。
-            bool picked = ProjectileOverrides.Get(row.projectile)?.trailMaterialDefName != null;
+            // 三态：未指定（继承）/ 已指定且 def 有效 / 已指定但 def 已被移除（失效）。
+            // 「已指定」必须真的回查 DefDatabase，不能只看 defName 非空：材质 def 被移除后
+            // defName 仍在，只判非空的话按钮会显示回落后的继承材质名，提示却说"已单独指定"，
+            // 等于把继承材质冒充成用户选的那个。TryGetTrailMaterial 内部就是一次 GetNamed(silent)，
+            // 一次字典查找，每行每帧可以接受。
+            string? pickedName = ProjectileOverrides.Get(row.projectile)?.trailMaterialDefName;
+            bool pickedValid = pickedName != null && ProjectileOverrides.TryGetTrailMaterial(row.projectile, out _);
+            bool pickedMissing = pickedName != null && !pickedValid;
 
-            string label = row.trailDef != null ? row.trailDef.defName : "—";
+            // 当前生效材质（失效态下即回落到继承的那个）。失效态刻意不用它做按钮文字——
+            // 那正是要和「继承」区分开的东西。
+            string effectiveLabel = row.trailDef != null ? row.trailDef.defName : "—";
+
+            string label;
+            if (pickedMissing) label = "GunplayOverrideMaterialMissingLabel".Translate(pickedName!);
+            else label = effectiveLabel;
+
             Rect buttonRect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, MaterialColumnWidth - 8f), RowHeight - 10f);
 
             if (Widgets.ButtonText(buttonRect, label))
             {
+                // 「当前选择」仍传生效材质而不是失效的 defName：那个 def 已不在 DefDatabase 里，
+                // 传它对应的对象只会高亮一个不该高亮的项；显示生效材质才与"确认后保持不变"一致。
                 TrailMaterialPicker.Open(row.trailDef, def =>
                 {
                     ProjectileOverrides.SetTrailMaterial(row.projectile, def);
@@ -1085,9 +1117,13 @@ namespace Gunplay
                 });
             }
 
-            TooltipHandler.TipRegion(buttonRect, picked
-                ? "GunplayOverrideTipMaterialPicked".Translate(label)
-                : "GunplayOverrideTipMaterialInherited".Translate(label));
+            // 失效态单独一条提示：说明指定的 def 没了、当前回落到谁，并指出怎么收拾它。
+            // 刻意不自动删掉这条失效记录——设置是全局跨存档的，临时停用 mod 不该永久丢用户数据。
+            TooltipHandler.TipRegion(buttonRect, pickedMissing
+                ? "GunplayOverrideTipMaterialMissing".Translate(pickedName!, effectiveLabel)
+                : pickedValid
+                    ? "GunplayOverrideTipMaterialPicked".Translate(effectiveLabel)
+                    : "GunplayOverrideTipMaterialInherited".Translate(effectiveLabel));
 
             // 拖拽涂抹：把起始格的「当前生效材质」涂到扫过的格子上（row.trailDef 可能为 null，
             // 那表示起始格用的是继承材质，涂出去就是让目标行也回到继承 —— 与单击「清除」同一个结果）。

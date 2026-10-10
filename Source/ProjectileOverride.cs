@@ -310,5 +310,23 @@ namespace Gunplay
         }
 
         public static int Count => Map.Count;
+
+        // 有多少条覆写的「键」已解析不到对应的投射物 ThingDef（原 mod 被移除 / defName 改名）。
+        // 这类条目运行时读不到、也不参与任何判定（入口都要 ThingDef），只是躺在设置里；
+        // 它们不出现在窗口列表里，但会被 Clear 一并清掉，所以「清除全部」的确认文案要把这个数报出来。
+        // 只在确认对话框弹出前调一次，不走每帧路径。
+        //
+        // 刻意不提供「自动清理孤儿」：GunplaySettings 是 ModSettings（全局、跨存档），
+        // 临时停用某个 mod 会让条目成批变成孤儿，自动删等于永久丢掉用户在所有存档里的设置，
+        // 重新启用 mod 也回不来。要清就由用户显式走「清除全部」。
+        public static int CountOrphaned()
+        {
+            int orphaned = 0;
+            foreach (string defName in Map.Keys)
+            {
+                if (DefDatabase<ThingDef>.GetNamed(defName, false) == null) orphaned++;
+            }
+            return orphaned;
+        }
     }
 }
