@@ -100,7 +100,7 @@
   <GunplayOverrideOnlyWithWeapon>With weapon only</GunplayOverrideOnlyWithWeapon>
   <GunplayOverrideCount>Overridden {0} / total {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>Clear all overrides</GunplayOverrideClearAll>
-  <GunplayOverrideClearAllConfirm>Clear all {0} per-projectile overrides? This cannot be undone.</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideClearAllConfirm>Clear all {0} per-projectile overrides ({1} of them come from removed content and are not listed)? This cannot be undone.</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
   <GunplayOverrideColSpeed>Speed</GunplayOverrideColSpeed>
@@ -108,6 +108,8 @@
   <GunplayOverrideColMaterial>Material</GunplayOverrideColMaterial>
   <GunplayOverrideTipMaterialPicked>This projectile uses a material picked here: {0}. Click to pick another one, or "Clear" to inherit again. Press and drag over other rows to give them this material.</GunplayOverrideTipMaterialPicked>
   <GunplayOverrideTipMaterialInherited>This projectile inherits the material configured on its def: {0}. Click to pick a material just for it. Press and drag over other rows to give them this inherited material.</GunplayOverrideTipMaterialInherited>
+  <GunplayOverrideMaterialMissingLabel>{0} (missing)</GunplayOverrideMaterialMissingLabel>
+  <GunplayOverrideTipMaterialMissing>The material {0} picked for this projectile no longer exists; it currently falls back to the inherited material: {1}. Click to pick another material, or use "Clear" to drop the dead entry.</GunplayOverrideTipMaterialMissing>
   <GunplayOverrideTipColor>Customize this projectile's trail color. Clicking the swatch on a row that is not overridden yet enables the override automatically; × restores the inherited trail color. Press on a swatch and drag over other rows to paint the same color onto them.</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>Clear the custom color and inherit the trail color again.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values. You can also press on a row and drag up or down to switch the rows you sweep over.</GunplayOverrideTipEnabled>

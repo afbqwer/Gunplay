@@ -72,7 +72,7 @@ namespace Gunplay
             ImpactEffectTuner.Apply();
         }
 
-        // 构建投射物映射表。解析优先级：显式 defTarget / 同名 defName > 名称关键字规则 > default。
+        // 构建投射物映射表。解析优先级：defTargets > weaponTargets > 名称关键字规则 > default。
         static void BuildProjectileProps()
         {
             if (defaultProjectileDef == null)
@@ -81,16 +81,17 @@ namespace Gunplay
                 return;
             }
 
-            // 1) 显式配置：defTarget（缺省回退 defName）指向投射物 ThingDef
+            // 1) 显式配置：defTargets 直接给投射物，weaponTargets 给武器（经其射击 verb 反查投射物）。
+            //    两个列表互相不排斥，可以同时写，解析结果一起登记；键始终是投射物——
+            //    粒度没变：多把武器共用同一投射物时共享同一条记录（见 PatchProjectileLaunch）。
             foreach (ProjectilePropDef def in DefDatabase<ProjectilePropDef>.AllDefs)
             {
                 if (def == defaultProjectileDef) continue;
 
-                ThingDef? target = null;
-                if (def.defTarget != null) target = DefDatabase<ThingDef>.GetNamed(def.defTarget, false);
-                if (target == null) target = DefDatabase<ThingDef>.GetNamed(def.defName, false);
-
-                if (target != null && target.projectile != null) projectilePropMap[target] = def;
+                foreach (ThingDef projectile in ResolveExplicitTargets(def))
+                {
+                    AssignExplicitTarget(projectile, def);
+                }
             }
 
             // 2) 包内字段级继承 default（保持既有“未配置即继承默认”的行为）
@@ -152,6 +153,97 @@ namespace Gunplay
 
                 projectilePropMap[def] = matched ?? defaultProjectileDef;
             }
+        }
+
+        // 把一条显式配置解析成它要作用的一组投射物。defTargets / weaponTargets 是仅有的两条显式途径，
+        // 解析结果为空就说明本包没有显式目标，交给后面的名称关键字规则。
+        // 契约：返回的每个元素都满足 projectile != null。
+        //
+        // 这里刻意**不**回退到「与本包同名的投射物」：defTargets 已经把「显式指定」表达完整了，
+        // 再留一条按名字隐式命中的路只会多一种说不清的绑定方式（同名恰好指向一个投射物时悄悄生效）。
+        // 武器侧的同名约定仍然保留——那边的 XML 正是靠它绑定原版 ThingDef（如 Gun_Minigun）。
+        //
+        // 所有失败都只报错并跳过该条目，不抛异常：配置写错不该让整个投射物侧解析中断，
+        // 剩下的投射物照常套 default。
+        static List<ThingDef> ResolveExplicitTargets(ProjectilePropDef def)
+        {
+            List<ThingDef> targets = new List<ThingDef>();
+
+            if (def.defTargets != null)
+            {
+                foreach (string name in def.defTargets)
+                {
+                    if (name.NullOrEmpty()) continue;
+
+                    ThingDef? projectile = DefDatabase<ThingDef>.GetNamed(name, false);
+                    if (projectile == null)
+                    {
+                        Log.Error("[Gunplay] ProjectilePropDef '" + def.defName
+                            + "': defTargets entry '" + name + "' not found.");
+                        continue;
+                    }
+                    if (projectile.projectile == null)
+                    {
+                        Log.Error("[Gunplay] ProjectilePropDef '" + def.defName + "': defTargets entry '" + name
+                            + "' is not a projectile (no <projectile> block); skipped.");
+                        continue;
+                    }
+
+                    if (!targets.Contains(projectile)) targets.Add(projectile);
+                }
+            }
+
+            if (def.weaponTargets != null)
+            {
+                foreach (string name in def.weaponTargets)
+                {
+                    if (name.NullOrEmpty()) continue;
+
+                    ThingDef? weapon = DefDatabase<ThingDef>.GetNamed(name, false);
+                    if (weapon == null)
+                    {
+                        Log.Error("[Gunplay] ProjectilePropDef '" + def.defName
+                            + "': weaponTargets entry '" + name + "' not found.");
+                        continue;
+                    }
+
+                    ThingDef? projectile = ProjectileOfWeapon(weapon);
+                    if (projectile == null)
+                    {
+                        Log.Error("[Gunplay] ProjectilePropDef '" + def.defName + "': weaponTargets entry '" + name
+                            + "' has no Verb_Shoot with a defaultProjectile; cannot resolve a projectile.");
+                        continue;
+                    }
+
+                    if (!targets.Contains(projectile)) targets.Add(projectile);
+                }
+            }
+
+            return targets;
+        }
+
+        // 从一把武器解析出它发射的投射物：取第一个 Verb_Shoot 的 defaultProjectile。
+        // 判据与上面武器侧注册（typeof(Verb_Shoot).IsAssignableFrom(v.verbClass)）保持一致。
+        // 一把武器挂多个 shoot verb 时只认第一个——投射物才是本层的键，按 verb 区分表达不了。
+        static ThingDef? ProjectileOfWeapon(ThingDef weapon)
+        {
+            VerbProperties? shoot = weapon.Verbs.FirstOrDefault(v =>
+                typeof(Verb_Shoot).IsAssignableFrom(v.verbClass));
+
+            return shoot?.defaultProjectile;
+        }
+
+        // 登记一条显式配置。同一个投射物被两条显式配置命中时后者覆盖前者并告警——
+        // 轨迹只由投射物决定，静默覆盖会让人以为两条都生效了。
+        static void AssignExplicitTarget(ThingDef projectile, ProjectilePropDef def)
+        {
+            if (projectilePropMap.TryGetValue(projectile, out ProjectilePropDef? existing) && existing != def)
+            {
+                Log.Warning("[Gunplay] Projectile '" + projectile.defName + "' is explicitly targeted by both '"
+                    + existing.defName + "' and '" + def.defName + "'; the latter wins.");
+            }
+
+            projectilePropMap[projectile] = def;
         }
 
         // 未注册的武器返回 null（正常带 shoot verb 的武器在启动时已全部注册）

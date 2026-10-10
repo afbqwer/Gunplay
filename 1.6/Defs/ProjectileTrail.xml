@@ -55,16 +55,8 @@
   </Gunplay.ProjectileTrailDef>
 
   <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
-    <defName>medium</defName>
-    <label>medium trail</label>
-    <material>
-      <trailWidth>0.15</trailWidth>
-    </material>
-  </Gunplay.ProjectileTrailDef>
-
-  <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
-    <defName>wide</defName>
-    <label>wide trail</label>
+    <defName>shotgun</defName>
+    <label>shotgun trail</label>
     <material>
       <trailWidth>0.25</trailWidth>
     </material>
@@ -81,14 +73,18 @@
       <headWidth>1</headWidth>
       <tailWidth>0.12</tailWidth>
       <widthProfileCurve>1.3</widthProfileCurve>
+      <trailWidth>0.25</trailWidth>
     </material>
   </Gunplay.ProjectileTrailDef>
 
   <!-- 尾部逐渐放大：头部很细、向尾部展开到满宽（尾焰/烟羽类）。
        注意两端是相对比例，最宽端归一化到 1，所以这里是"头部按 0.3 收细"，整体宽度仍由 trailWidth 决定。
        tailFalloff 特意小于 1：默认的 1.15 会把尾段 alpha 压得很淡，"放大"就发生在一片几乎看不见的区域里；
-       放宽尾部衰减后，尾部既能变宽也还够亮。 -->
-  <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailDefault">
+       放宽尾部衰减后，尾部既能变宽也还够亮。
+
+       带 Name 是为了能被别的材质继承（acid 以它为基准，只换颜色）。Name 只是挂个继承锚点，
+       本 def 仍是可正常选用的材质，defName 与外观都不变。 -->
+  <Gunplay.ProjectileTrailDef Name="GunplayProjectileTrailFlare" ParentName="GunplayProjectileTrailDefault">
     <defName>flare</defName>
     <label>flare trail</label>
     <description>Tail flares out: a thin head that widens into a plume towards the tail.</description>
@@ -98,7 +94,22 @@
       <tailWidth>1</tailWidth>
       <widthProfileCurve>1.5</widthProfileCurve>
       <tailFalloff>0.9</tailFalloff>
+      <trailWidth>0.25</trailWidth>
     </material>
   </Gunplay.ProjectileTrailDef>
 
+  <!-- 酸性轨迹：以 flare 为基准——尾部展开的羽状轮廓、宽度 0.25、纵向/横向的软硬参数全部继承，
+       只把颜色换成半透明绿。这里能只写 <trailColor> 是因为 XML 继承对嵌套对象是**按元素名递归合并**的
+       （见 Verse.XmlInheritance.RecursiveNodeCopyOverwriteElements：只有叶子文本节点整体替换），
+       flare 的 headWidth / tailWidth / widthProfileCurve / tailFalloff / trailWidth 都会保留下来。
+       alpha 取 0.7 与 charge / incendiary 一致，再乘材质的 peakAlpha(0.6) 得到最终峰值不透明度。 -->
+  <Gunplay.ProjectileTrailDef ParentName="GunplayProjectileTrailFlare">
+    <defName>acid</defName>
+    <label>acid trail</label>
+    <description>Semi-transparent green flare trail: a thin head widening into a plume towards the tail.</description>
+
+    <material>
+      <trailColor>(0.4, 0.9, 0.4, 0.7)</trailColor>
+    </material>
+  </Gunplay.ProjectileTrailDef>
 </Defs>

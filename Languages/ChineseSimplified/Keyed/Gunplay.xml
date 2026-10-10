@@ -100,7 +100,7 @@
   <GunplayOverrideOnlyWithWeapon>仅显示有武器</GunplayOverrideOnlyWithWeapon>
   <GunplayOverrideCount>已覆写 {0} / 共 {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>清除全部覆写</GunplayOverrideClearAll>
-  <GunplayOverrideClearAllConfirm>确定要清除全部 {0} 项投射物覆写吗？此操作无法撤销。</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideClearAllConfirm>确定要清除全部 {0} 项投射物覆写吗（其中 {1} 项来自已移除的内容、列表中不可见）？此操作无法撤销。</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>覆写</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>轨迹</GunplayOverrideColTrail>
   <GunplayOverrideColSpeed>弹速</GunplayOverrideColSpeed>
@@ -108,6 +108,8 @@
   <GunplayOverrideColMaterial>材质</GunplayOverrideColMaterial>
   <GunplayOverrideTipMaterialPicked>该投射物已单独指定材质：{0}。点击可换成别的材质，或用「清除」回到继承.在某一行按住并拖动，可把这个材质涂到扫过的行上.</GunplayOverrideTipMaterialPicked>
   <GunplayOverrideTipMaterialInherited>该投射物继承本体配置的材质：{0}。点击可单独指定材质.在某一行按住并拖动，可让扫过的行也回到同样的继承材质.</GunplayOverrideTipMaterialInherited>
+  <GunplayOverrideMaterialMissingLabel>{0}（已缺失）</GunplayOverrideMaterialMissingLabel>
+  <GunplayOverrideTipMaterialMissing>该投射物指定的材质 {0} 已被移除，当前回落到继承材质：{1}。点击可重新指定，或用「清除」丢弃这条失效的指定。</GunplayOverrideTipMaterialMissing>
   <GunplayOverrideTipColor>自定义该投射物的轨迹颜色。本行尚未开启覆写时点击色块，会自动开启覆写；「×」恢复为继承轨迹颜色.在某一行色块上按住并拖动，可把这个颜色涂到扫过的行上.</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>清除自定义颜色，恢复为继承轨迹颜色.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>覆写该投射物的轨迹设置。关闭会丢弃本行覆写，恢复为继承/计算值.也可在某一行按住并上下拖动，把开关状态批量应用到扫过的行.</GunplayOverrideTipEnabled>

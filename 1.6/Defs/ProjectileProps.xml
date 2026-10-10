@@ -8,6 +8,16 @@
     <projectileImpactEffect>generic</projectileImpactEffect>
   </Gunplay.ProjectilePropDef>
 
+  <!-- 上面是全局默认包。下面每个包有三种命中方式，优先级从高到低；三者都是列表，单个目标也写成一项：
+         defTargets    —— 直接写投射物 ThingDef 的 defName：
+                          <defTargets><li>Bullet_A</li><li>Bullet_B</li></defTargets>
+         weaponTargets —— 写武器 defName，自动取其射击 verb 的 defaultProjectile 得到投射物：
+                          <weaponTargets><li>Gun_A</li></weaponTargets>
+                          适合「知道武器名、不知道投射物名」；一把武器多个 shoot verb 时只取第一个。
+                          注意最终仍登记在**投射物**上，多把武器共用同一投射物时共享同一条记录。
+         matchKeywords —— 按投射物 defName 的关键字匹配（忽略大小写，多关键字更长者优先）。
+       两个列表不互斥，可同时写，解析结果合并。 -->
+
   <!-- ===== 以下配置包通过 matchKeywords 匹配投射物 defName（忽略大小写，多关键字更具体者优先） ===== -->
 
   <!-- Bullet_ChargeRifle / Bullet_ChargeLance / Bullet_ChargeBlasterHeavy -->
@@ -16,6 +26,8 @@
     
     <matchKeywords>
       <li>charge</li>
+      <li>thump</li>
+      <li>emp</li>
     </matchKeywords>
     
     <trail>charge</trail>
@@ -28,6 +40,7 @@
     
     <matchKeywords>
       <li>incendiary</li>
+      <li>inferno</li>
     </matchKeywords>
     
     <trail>incendiary</trail>
@@ -35,26 +48,51 @@
     <preserveSpeed>true</preserveSpeed>
   </Gunplay.ProjectilePropDef>
 
-  <!-- Bullet_SmokeLauncher（Bullet_Shell_Smoke 为弧线，不生成轨迹） -->
   <Gunplay.ProjectilePropDef>
-    <defName>medium</defName>
+    <defName>grenade</defName>
     
     <matchKeywords>
       <li>smoke</li>
+      <li>grenade</li>
     </matchKeywords>
     
-    <trail>medium</trail>
+    <trail>taper</trail>
+  </Gunplay.ProjectilePropDef>
+
+  <Gunplay.ProjectilePropDef>
+    <defName>shell</defName>
+    
+    <matchKeywords>
+      <li>shell</li>
+      <li>rocket</li>
+    </matchKeywords>
+    
+    <trail>flare</trail>
   </Gunplay.ProjectilePropDef>
 
   <!-- Bullet_Shotgun / Bullet_MiniShotgun -->
   <Gunplay.ProjectilePropDef>
-    <defName>wide</defName>
+    <defName>shotgun</defName>
     
     <matchKeywords>
       <li>shotgun</li>
     </matchKeywords>
     
-    <trail>wide</trail>
+    <trail>shotgun</trail>
+  </Gunplay.ProjectilePropDef>
+
+  <!-- 酸性投射物（defName 含 acid，如 Bullet_AcidSpray）
+       撞击特效 / 音效缺省 -> 启动时自动继承 default 的 generic；弹速不豁免，跟随全局缩放 -->
+  <Gunplay.ProjectilePropDef>
+    <defName>acid</defName>
+    
+    <matchKeywords>
+      <li>acid</li>
+      <li>tox</li>
+      <li>corrosive</li>
+    </matchKeywords>
+    
+    <trail>acid</trail>
   </Gunplay.ProjectilePropDef>
 
   <!-- Arrow_Recurve / Arrow_Short / Arrow_Great / Proj_FireArrow -->

@@ -4,8 +4,8 @@
   <default.label>默认轨迹</default.label>
   <default.description>等宽轨迹：运行时生成的贴图，头部与尾部的宽度相同。</default.description>
 
-  <charge.label>充能轨迹</charge.label>
-  <charge.description>等宽轨迹，淡蓝色调，用于充能武器。</charge.description>
+  <charge.label>电荷轨迹</charge.label>
+  <charge.description>等宽轨迹，淡蓝色调，用于电荷武器。</charge.description>
 
   <incendiary.label>燃烧轨迹</incendiary.label>
   <incendiary.description>橙色色调的等宽轨迹。</incendiary.description>
@@ -13,13 +13,16 @@
   <medium.label>中等轨迹</medium.label>
   <medium.description>等宽轨迹，宽度适中。</medium.description>
 
-  <wide.label>宽轨迹</wide.label>
-  <wide.description>等宽轨迹，比常规更宽。</wide.description>
+  <shotgun.label>霰弹枪轨迹</shotgun.label>
+  <shotgun.description>霰弹枪轨迹，比常规更宽。</shotgun.description>
 
   <taper.label>收缩轨迹</taper.label>
   <taper.description>尾部逐渐收缩：头部满宽，向尾尖逐渐收细。</taper.description>
 
   <flare.label>放大轨迹</flare.label>
   <flare.description>尾部逐渐放大：头部较细，向尾部展开成羽状。</flare.description>
+
+  <acid.label>酸性轨迹</acid.label>
+  <acid.description>半透明绿色的轨迹，尾部如羽状展开。</acid.description>
 
 </LanguageData>

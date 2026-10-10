@@ -10,9 +10,6 @@
   <incendiary.label>焼夷弾道</incendiary.label>
   <incendiary.description>オレンジ色の等幅の弾道。</incendiary.description>
 
-  <medium.label>中幅の弾道</medium.label>
-  <medium.description>中程度の幅の等幅の弾道。</medium.description>
-
   <wide.label>幅広の弾道</wide.label>
   <wide.description>通常より太い等幅の弾道。</wide.description>
 
@@ -21,5 +18,8 @@
 
   <flare.label>末広がり弾道</flare.label>
   <flare.description>末端が広がる：先端は細く、末端に向かって噴煙状に広がります。</flare.description>
+
+  <acid.label>酸性弾道</acid.label>
+  <acid.description>半透明のグリーンの弾道。末端が噴煙状に広がります。</acid.description>
 
 </LanguageData>

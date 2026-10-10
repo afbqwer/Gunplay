@@ -100,7 +100,7 @@
   <GunplayOverrideOnlyWithWeapon>武器ありのみ</GunplayOverrideOnlyWithWeapon>
   <GunplayOverrideCount>上書き {0} / 全 {1}</GunplayOverrideCount>
   <GunplayOverrideClearAll>全ての上書きを解除</GunplayOverrideClearAll>
-  <GunplayOverrideClearAllConfirm>発射体の上書き {0} 件をすべて解除しますか？この操作は元に戻せません。</GunplayOverrideClearAllConfirm>
+  <GunplayOverrideClearAllConfirm>発射体の上書き {0} 件をすべて解除しますか（うち {1} 件は削除されたコンテンツ由来で一覧に表示されません）？この操作は元に戻せません。</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>上書き</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>弾道</GunplayOverrideColTrail>
   <GunplayOverrideColSpeed>速度</GunplayOverrideColSpeed>
@@ -108,6 +108,8 @@
   <GunplayOverrideColMaterial>マテリアル</GunplayOverrideColMaterial>
   <GunplayOverrideTipMaterialPicked>この発射体は個別にマテリアルを指定しています：{0}。クリックで別のマテリアルに変更、または「クリア」で継承に戻せます。押したまま他の行へドラッグすると、同じマテリアルをまとめて適用できます。</GunplayOverrideTipMaterialPicked>
   <GunplayOverrideTipMaterialInherited>この発射体は def に設定されたマテリアルを継承しています：{0}。クリックで個別に指定できます。押したまま他の行へドラッグすると、同じ継承マテリアルをまとめて適用できます。</GunplayOverrideTipMaterialInherited>
+  <GunplayOverrideMaterialMissingLabel>{0}（欠落）</GunplayOverrideMaterialMissingLabel>
+  <GunplayOverrideTipMaterialMissing>この発射体に指定されたマテリアル {0} は削除されています。現在は継承マテリアル {1} にフォールバックしています。クリックで再指定、または「クリア」で無効な指定を破棄できます。</GunplayOverrideTipMaterialMissing>
   <GunplayOverrideTipColor>この発射体の弾道の色を設定します。行が未上書きの状態でクリックすると、自動的に上書きが有効になります。×で継承した弾道の色に戻ります。色を押したまま他の行へドラッグすると、同じ色をまとめて適用できます。</GunplayOverrideTipColor>
   <GunplayOverrideColorResetTip>カスタム色を解除し、継承した弾道の色に戻します。</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>この発射体の弾道設定を上書きします。オフにすると上書きを破棄し、継承値/計算値に戻ります。行を押したまま上下にドラッグすると、なぞった行のスイッチをまとめて切り替えられます。</GunplayOverrideTipEnabled>
