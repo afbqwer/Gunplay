@@ -90,8 +90,12 @@
       <li>acid</li>
       <li>tox</li>
       <li>corrosive</li>
+      <li>sludge</li>
     </matchKeywords>
     
+    <weaponTargets>
+      <li>FleshmassSpitter</li>
+    </weaponTargets>
     <trail>acid</trail>
   </Gunplay.ProjectilePropDef>
 
