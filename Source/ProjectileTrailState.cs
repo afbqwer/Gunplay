@@ -373,6 +373,8 @@ namespace Gunplay
         // 视野剔除。view 是已展开为世界坐标范围的相机视野（见 TrailViewRect）。
         public bool IsVisible(TrailViewRect view)
         {
+            //暂时禁用剔除，CE弧线的aabb计算有误
+            return true;
             if (arcing)
             {
                 return arcAabbMax.x >= view.MinX && arcAabbMin.x <= view.MaxX
