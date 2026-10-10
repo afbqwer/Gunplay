@@ -17,8 +17,9 @@ namespace Gunplay
     //
     // 每行两个开关：
     //   「覆写」—— 该行是否有覆写记录。关掉即丢弃记录（轨迹开关与宽度一起回到继承/计算值）。
-    //   「轨迹」—— 是否绘制该投射物的轨迹，未覆写时显示继承态（勾选）。直接点它会顺带把覆写打开，
-    //              省掉「先开覆写再关轨迹」两步。
+    //   「轨迹」—— 是否绘制该投射物的轨迹。未覆写时显示该投射物的「默认」值
+    //              （见 ProjectileRules.TrailEnabled：可能因本体无贴图、弧线开关关闭而不勾选）。
+    //              直接点它会顺带把覆写打开，省掉「先开覆写再关轨迹」两步。
     //
     // 列表可能有数百行（装 CE 或大型武器包之后更多），因此走虚拟滚动：只为可见区间建 Rect，
     // 但输入框的字符串缓冲必须挂在行对象上跨帧保留，否则滚出视野再滚回来会丢焦点/丢输入。
@@ -315,13 +316,12 @@ namespace Gunplay
 
         // ---------------- 是否显示轨迹 ----------------
 
-        // 一行当前是否显示轨迹。有覆写就以覆写为准，否则取默认情况
-        // （全局开关 + XML 是否配了 trail，见 ProjectileRules.TrailEnabled）。
-        // 轨迹列显示什么、轨迹过滤按什么筛，都只认这个方法，保证两者永远一致。
+        // 一行当前是否显示轨迹。有覆写就以覆写为准，否则取默认情况。判定统一收在
+        // ProjectileRules.TrailEnabled（全局开关 + XML 是否配了 trail + 无贴图 + 弧线开关）。
+        // 轨迹列显示什么、轨迹过滤按什么筛、新建覆写时的默认值，都只认这一处口径。
         static bool TrailShown(Row row)
         {
-            ProjectileOverride? over = ProjectileOverrides.Get(row.projectile);
-            return over != null ? over.trailEnabled : ProjectileRules.TrailEnabled(row.projectile);
+            return ProjectileRules.TrailEnabled(row.projectile);
         }
 
         // ---------------- 过滤 ----------------

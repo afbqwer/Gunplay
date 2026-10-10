@@ -22,6 +22,8 @@
   <GunplayTrailFadeDesc>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。弾道の長さとは無関係です（既定15、範囲1～120）。以後に発射される発射体にのみ適用されます。</GunplayTrailFadeDesc>
   <GunplayArcSegmentCountName>弧状弾道の分割数</GunplayArcSegmentCountName>
   <GunplayArcSegmentCountDesc>弧状の弾道（擲弾・迫撃砲弾など）を描画する際の分割数。多いほど滑らかになりますが、処理コストも増えます（既定16、範囲2～64）。</GunplayArcSegmentCountDesc>
+  <GunplayEnableArcTrailsName>バニラ発射体の弧状弾道を許可</GunplayEnableArcTrailsName>
+  <GunplayEnableArcTrailsDesc>バニラ（CE以外）の弧状発射体（迫撃砲弾・擲弾など）に弧状の弾道を描画します。無効にするとこれらの発射体には弾道が表示されず、直線発射体とCE発射体には影響しません。以後に発射される発射体にのみ適用されます。</GunplayEnableArcTrailsDesc>
   <GunplayTrailWidthModeDesc>弾道の基本幅の計算方法を指定します。</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>弾道の幅：発射体のダメージに基づく</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>弾道の幅：発射体のテクスチャサイズに基づく</GunplayTrailWidthModeTexture>

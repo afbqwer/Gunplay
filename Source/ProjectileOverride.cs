@@ -20,7 +20,8 @@ namespace Gunplay
     // 记录本身存在 == 覆写已开启；关掉覆写即删除记录（Disable）。
     public class ProjectileOverride : IExposable
     {
-        // 该投射物是否绘制轨迹。默认 true，与「未覆写时继承全局」的表现保持一致。
+        // 该投射物是否绘制轨迹。开启覆写时以「该投射物的默认值」为起点
+        // （ProjectileRules.TrailEnabled，可能因无贴图或弧线开关而为 false），见 Create。
         public bool trailEnabled = true;
 
         // 轨迹宽度，绝对值且完全独立：既不看伤害/贴图，也不乘全局系数。0 = 未设定。
@@ -200,11 +201,13 @@ namespace Gunplay
         }
 
         // 按「当前生效值」造一条全新记录。新增覆写项时在这里补默认值。
+        // trailEnabled 取该投射物的「默认」值（而非恒 true）：无贴图或弧线开关关闭的投射物
+        // 本就默认不显示，开启覆写不应把它们悄悄变成显示（见 ProjectileRules.TrailEnabled）。
         static ProjectileOverride Create(ThingDef projectileDef)
         {
             return new ProjectileOverride
             {
-                trailEnabled = true,
+                trailEnabled = ProjectileRules.TrailEnabled(projectileDef),
                 trailWidth = TrailWidth.EffectiveForDef(projectileDef),
                 trailLengthFactor = GunplaySettings.trailLengthFactor,
                 trailFadeTicks = GunplaySettings.trailFadeTicks
@@ -214,14 +217,6 @@ namespace Gunplay
         public static void Clear()
         {
             Map.Clear();
-        }
-
-        // 单项覆写层是否允许绘制轨迹。未覆写 = 继承全局（允许），是否真的画由全局 enableTrails 决定。
-        // 调用处形如：GunplaySettings.enableTrails && ProjectileOverrides.AllowsTrail(def)
-        public static bool AllowsTrail(ThingDef? projectileDef)
-        {
-            ProjectileOverride? over = Get(projectileDef);
-            return over == null || over.trailEnabled;
         }
 
         public static int Count => Map.Count;

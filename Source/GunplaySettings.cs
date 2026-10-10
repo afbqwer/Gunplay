@@ -45,6 +45,10 @@ namespace Gunplay
         // 弧线轨迹的采样段数：越大越平滑，顶点数与耗时线性增长。见 ProjectileTrailState.ArcSegmentCount。
         public static int arcSegmentCount = ArcSegments.Default;
 
+        // 原版（非 CE）弧线投射物（炮弹/手雷等）是否绘制弧线轨迹。关闭后这些投射物不再绘制轨迹，
+        // 直线投射物与 CE 投射物不受影响。由 ProjectileRules.TrailEnabled 统一读取。
+        public static bool enableArcTrails = true;
+
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
         public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
@@ -76,6 +80,7 @@ namespace Gunplay
             Scribe_Values.Look(ref trailLengthFactor, "trailLengthFactor", TrailLength.Default);
             Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", TrailFade.Default);
             Scribe_Values.Look(ref arcSegmentCount, "arcSegmentCount", ArcSegments.Default);
+            Scribe_Values.Look(ref enableArcTrails, "enableArcTrails", true);
 
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
@@ -126,6 +131,9 @@ namespace Gunplay
                 listing_Standard.SliderLabeled("GunplayTrailFadeName".Translate(), ref trailFadeTicks, "GunplayTrailFadeDesc".Translate(),
                     TrailFade.Min, TrailFade.Max, v => Mathf.RoundToInt(v).ToString());
                 trailFadeTicks = Mathf.Round(trailFadeTicks);
+
+                listing_Standard.CheckboxLabeled("GunplayEnableArcTrailsName".Translate(), ref enableArcTrails, "GunplayEnableArcTrailsDesc".Translate());
+                listing_Standard.Gap(4f);
 
                 listing_Standard.SliderLabeledInt("GunplayArcSegmentCountName".Translate(), ref arcSegmentCount, "GunplayArcSegmentCountDesc".Translate(),
                     ArcSegments.Min, ArcSegments.Max);
