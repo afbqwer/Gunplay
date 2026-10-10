@@ -9,29 +9,13 @@ namespace Gunplay
 {
     // 把当前地图所有可见轨迹压到最少的绘制调用。
     //
-    // 两条绘制路径，都按（trail def + 颜色）分桶，因此绘制调用数 = 本帧用到的「材质×颜色」种类数：
-    //   * 直线轨迹（绝大多数）：网格固定为 MeshPool.plane10，逐条只提供 TRS 矩阵，
-    //     用 Graphics.DrawMeshInstanced 一次提交 → 每帧不重建网格、不碰索引缓冲、不重算包围盒；
-    //   * 弧线轨迹（手雷/炮弹等）：几何逐帧变化、无法用矩阵表达，合并进一张可复用网格后单次 DrawMesh。
+    // 单一绘制路径：直线与弧线的几何都合并进一张「按（材质 + 颜色）分桶」的可复用网格，
+    // 每帧每组一次 Graphics.DrawMesh。绘制调用数 = 本帧用到的「材质×颜色」种类数。
     //
-    // 依据：RimWorld 1.6 自己的微粒系统就在走这条实例化路径 —— Verse.DrawBatch.Flush 在
-    // renderInstanced 分组上强制 material.enableInstancing = true 后调用
-    // Graphics.DrawMeshInstanced(key.mesh, 0, key.material, matrices, count, ...)，
-    // 且 Graphic_Fleck.AllowInstancing 恒为 true。
-    //
-    // 实测确认（A/B 往返各测过一轮）：轨迹能正常渲染，说明所用的 Mote 材质确实支持 GPU 实例化。
-    // 注意：本项目里 0.1ms 量级的耗时读数不足以支撑精细的 A/B 结论（profiler 在该量级只有一档 0.1ms
-    // 的量化，且不同时刻的在飞弹量不同），别用这些数字去追代码路径的差异。
-    //
-    // 刻意不做实例化失败回退：若材质不支持，DrawMeshInstanced 会直接报错而不是静默退化。
+    // 直线几何与旧实例化路径逐顶点一致：即 MeshPool.plane10（1×1 居中平面），
+    // 只是把原来的 TRS 矩阵变换展开成世界坐标后写入合并网格（见 ProjectileTrailState.AppendStraightGeometry）。
     internal static class ProjectileTrailBatcher
     {
-        // Graphics.DrawMeshInstanced 单次提交的实例上限。Unity 硬限制为 1023
-        // （matrices 数组长度超过 1023 会直接报错，与 count 无关），
-        // RimWorld 自己的 DrawBatch.MaxCountPerBatch 用的也是同一个常量。
-        // 超出时在 InstancedGroup.Add 里分批提交，对调用方透明。
-        const int MaxInstancesPerCall = 1023;
-
         // 合并网格上传时跳过 Unity 的包围盒重算与索引校验（包围盒由我们在下面自行设定）
         const MeshUpdateFlags MeshFlags =
             MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices;
@@ -83,59 +67,15 @@ namespace Gunplay
             }
         }
 
-        // ---------------- 直线轨迹：按材质实例化 ----------------
+        // ---------------- 合并网格分组 ----------------
 
-        class InstancedGroup
+        // 一组同（材质 + 颜色）的轨迹：几何逐帧重建进一张可复用网格，单次 DrawMesh 提交。
+        class MeshGroup
         {
             internal Material? material;   // 创建分组时解析一次；null 表示该 def 无材质，整组跳过
             internal Color color = Color.white;
             internal readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
-            internal readonly Matrix4x4[] matrices = new Matrix4x4[MaxInstancesPerCall];
-            internal int count;
-            internal bool touched;
-
-            internal void Reset()
-            {
-                count = 0;
-                touched = false;
-            }
-
-            internal void Add(ProjectileTrailState trail)
-            {
-                if (material == null) return;
-                if (!trail.TryGetStraightMatrix(out Matrix4x4 matrix)) return;
-
-                if (!touched)
-                {
-                    touched = true;
-                    usedInstanced.Add(this);
-                }
-
-                // 超出单次上限：先把已积累的一批提交掉，再继续
-                if (count >= MaxInstancesPerCall) Draw();
-
-                matrices[count++] = matrix;
-            }
-
-            internal void Draw()
-            {
-                if (count == 0 || material == null) return;
-
-                props.SetColor(ShaderPropertyIDs.Color, color);
-                Graphics.DrawMeshInstanced(MeshPool.plane10, 0, material, matrices, count,
-                    props, ShadowCastingMode.Off, false, 0);
-                count = 0;
-            }
-        }
-
-        // ---------------- 弧线轨迹：按材质合并网格 ----------------
-
-        class ArcGroup
-        {
-            internal Material? material;
-            internal Color color = Color.white;
-            internal readonly MaterialPropertyBlock props = new MaterialPropertyBlock();
-            internal Mesh? mesh;          // 首帧惰性创建（常规 Maps 上几乎不会走到弧线路径）
+            internal Mesh? mesh;          // 首帧惰性创建
             internal readonly List<Vector3> verts = new List<Vector3>();
             internal readonly List<Vector2> uvs = new List<Vector2>();
             internal readonly List<int> tris = new List<int>();
@@ -155,17 +95,28 @@ namespace Gunplay
             {
                 if (material == null) return;
 
-                int before = tris.Count;
-                trail.AppendArcGeometry(verts, uvs, tris);
-                if (tris.Count == before) return;   // 本帧该轨迹无可绘制内容
+                int firstVert = verts.Count;
+                trail.AppendGeometry(verts, uvs, tris);
+                if (verts.Count == firstVert) return;   // 本帧该轨迹无可绘制内容
 
-                trail.GetArcAabb(out Vector3 lo, out Vector3 hi);
+                // 包围盒直接由本帧实际写入的顶点求出：直线/弧线同一套，且紧贴所画内容。
+                // 只影响 Unity 自身的视锥剔除——可见性已在外面逐条判过。
+                Vector3 lo = verts[firstVert];
+                Vector3 hi = lo;
+                for (int i = firstVert + 1; i < verts.Count; i++)
+                {
+                    Vector3 v = verts[i];
+                    if (v.x < lo.x) lo.x = v.x; else if (v.x > hi.x) hi.x = v.x;
+                    if (v.y < lo.y) lo.y = v.y; else if (v.y > hi.y) hi.y = v.y;
+                    if (v.z < lo.z) lo.z = v.z; else if (v.z > hi.z) hi.z = v.z;
+                }
+
                 if (!touched)
                 {
                     touched = true;
                     min = lo;
                     max = hi;
-                    usedArc.Add(this);
+                    used.Add(this);
                 }
                 else
                 {
@@ -188,7 +139,7 @@ namespace Gunplay
                 mesh.SetVertices(verts, 0, verts.Count, MeshFlags);
                 mesh.SetUVs(0, uvs, 0, uvs.Count, MeshFlags);
                 mesh.SetTriangles(tris, 0, false);
-                // bounds 只影响 Unity 自身的视锥剔除：内容已按视口逐条剔除过，收紧到并集即可
+                // bounds 只影响 Unity 自身的视锥剔除；外扩一格避免边缘轨迹被剔
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 
                 props.SetColor(ShaderPropertyIDs.Color, color);
@@ -196,19 +147,15 @@ namespace Gunplay
             }
         }
 
-        static readonly Dictionary<TrailMaterialKey, InstancedGroup> instancedGroups = new Dictionary<TrailMaterialKey, InstancedGroup>();
-        static readonly Dictionary<TrailMaterialKey, ArcGroup> arcGroups = new Dictionary<TrailMaterialKey, ArcGroup>();
-        static readonly List<InstancedGroup> usedInstanced = new List<InstancedGroup>();
-        static readonly List<ArcGroup> usedArc = new List<ArcGroup>();
+        static readonly Dictionary<TrailMaterialKey, MeshGroup> groups = new Dictionary<TrailMaterialKey, MeshGroup>();
+        static readonly List<MeshGroup> used = new List<MeshGroup>();
 
         public static void Draw(List<ProjectileTrailState> trails)
         {
             if (trails.Count == 0) return;
 
-            for (int i = 0; i < usedInstanced.Count; i++) usedInstanced[i].Reset();
-            usedInstanced.Clear();
-            for (int i = 0; i < usedArc.Count; i++) usedArc[i].Reset();
-            usedArc.Clear();
+            for (int i = 0; i < used.Count; i++) used[i].Reset();
+            used.Clear();
 
             // 视野范围每帧只展开一次，避免在逐条剔除里反复访问 CellRect.Min / Max
             TrailViewRect view = new TrailViewRect(Find.CameraDriver.CurrentViewRect.ExpandedBy(1));
@@ -223,33 +170,20 @@ namespace Gunplay
                 ProjectileTrailDef def = trail.def;
                 if (def == null) continue;
 
-                // 材质来源（运行时生成贴图 / def 自己的文件贴图）与 enableInstancing 都由 TrailMaterial 处理；
-                // 绘制键 = (材质, 颜色)，同材质同颜色的轨迹合并进同一次绘制调用
+                // 材质来源（运行时生成贴图 / def 自己的文件贴图）由 TrailMaterial 处理；
+                // 绘制键 = (材质, 颜色)，同材质同颜色的轨迹合并进同一张网格、同一次绘制调用
                 Material? material = TrailMaterial.For(def);
                 TrailMaterialKey key = new TrailMaterialKey(material, trail.color);
 
-                if (trail.IsArc)
+                if (!groups.TryGetValue(key, out MeshGroup group))
                 {
-                    if (!arcGroups.TryGetValue(key, out ArcGroup arc))
-                    {
-                        arc = new ArcGroup { material = material, color = trail.color };
-                        arcGroups[key] = arc;
-                    }
-                    arc.Add(trail);
+                    group = new MeshGroup { material = material, color = trail.color };
+                    groups[key] = group;
                 }
-                else
-                {
-                    if (!instancedGroups.TryGetValue(key, out InstancedGroup inst))
-                    {
-                        inst = new InstancedGroup { material = material, color = trail.color };
-                        instancedGroups[key] = inst;
-                    }
-                    inst.Add(trail);
-                }
+                group.Add(trail);
             }
 
-            for (int i = 0; i < usedArc.Count; i++) usedArc[i].UploadAndDraw();
-            for (int i = 0; i < usedInstanced.Count; i++) usedInstanced[i].Draw();
+            for (int i = 0; i < used.Count; i++) used[i].UploadAndDraw();
         }
     }
 }

@@ -127,7 +127,6 @@ namespace Gunplay
                     shader = ShaderDatabase.Mote
                 });
 
-                mat.enableInstancing = true;
                 entry.material = mat;
                 return;
             }
@@ -136,9 +135,6 @@ namespace Gunplay
             Material? file = def.graphicData?.Graphic?.MatSingle;
             if (file != null)
             {
-                // 与 DrawBatch.Flush 同样的前置条件：实例化要求材质开启 enableInstancing
-                file.enableInstancing = true;
-
                 // 贴图会被拉成细长条，需 Clamp，否则边缘重复采样出接缝。
                 if (file.mainTexture != null) file.mainTexture.wrapMode = TextureWrapMode.Clamp;
             }

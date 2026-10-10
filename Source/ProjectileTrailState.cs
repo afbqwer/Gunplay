@@ -98,7 +98,8 @@ namespace Gunplay
         // 更避免反复访问 Bounds.min / max —— 那两个属性每次都会做一遍向量加减。
         Vector3 arcAabbMin;
         Vector3 arcAabbMax;
-        // 直线轨迹相对头部可能延伸的最大水平距离（length + width），用于 O(1) 快速否定剔除
+        // 直线轨迹相对头部可能延伸的最大水平距离（length + width）。
+        // 作为以头部为中心的保守 AABB 半边长用于剔除：必然包住整条轨迹，绝不会漏。
         float maxReach;
 
         // ---------------- CE 专用状态 ----------------
@@ -280,20 +281,18 @@ namespace Gunplay
 
         // ---------------- 剔除 ----------------
 
-        // 弧线轨迹的 AABB（初始化时算一次）。仅弧线使用——直线走实例化，不需要合并网格的 bounds。
-        public void GetArcAabb(out Vector3 min, out Vector3 max)
-        {
-            min = arcAabbMin;
-            max = arcAabbMax;
-        }
-
         // 视野剔除。view 是已展开为世界坐标范围的相机视野（见 TrailViewRect）。
         //
         // 这里是逐条执行的，也是本系统最热的一段：列表里含全图所有在飞轨迹，
         // 而 Draw 只对可见的那部分执行，所以剔除一旦写得重，耗时就会远超 Draw，
-        // 且随场景弹量线性波动。因此：
-        //   弧线 —— 用初始化时缓存好的 AABB，四次比较；
-        //   直线 —— 先用头部做两次 O(1) 判定，只有跨在视野边缘的少数轨迹才落到精确求交。
+        // 且随场景弹量线性波动。两条路径都压到「一次 AABB 测试、四次比较」：
+        //   弧线 —— 初始化时缓存好的整条弧 AABB；
+        //   直线 —— 以头部为中心、maxReach 为半边长的保守 AABB。
+        //
+        // 直线的框刻意取得保守：maxReach = length + width 覆盖轨迹相对头部的一切可能延伸，
+        // 所以宁可对跨在视野边缘的轨迹多判几次可见，也绝不会把可见轨迹误剔除（不会漏）。
+        // 旧实现为省这点开销做了「头部快判 + 精确求交」的分档，但精确分支要现算 DrawLength
+        // 与四次 Mathf.Max/Min，在长拖尾、密集弹幕下未必真的是"少数"，收益抵不上这份复杂度。
         public bool IsVisible(TrailViewRect view)
         {
             if (arcing)
@@ -304,40 +303,45 @@ namespace Gunplay
 
             float hx = exactPosition.x;
             float hz = exactPosition.z;
-
-            // 快速肯定：头部就在视野内 ⇒ 轨迹头段必然可见
-            if (hx >= view.MinX && hx <= view.MaxX && hz >= view.MinZ && hz <= view.MaxZ) return true;
-
-            // 快速否定：头部到视野的距离超过轨迹的最大延伸 ⇒ 整条轨迹必然不可见
-            if (hx < view.MinX - maxReach || hx > view.MaxX + maxReach
-                || hz < view.MinZ - maxReach || hz > view.MaxZ + maxReach) return false;
-
-            // 精确：按实际首尾点求交（只有跨越视野边缘的少数轨迹会走到这里）
-            float len = DrawLength();
-            float tx = hx - dir.x * len;
-            float tz = hz - dir.z * len;
-            return Mathf.Max(hx, tx) + width >= view.MinX && Mathf.Min(hx, tx) - width <= view.MaxX
-                && Mathf.Max(hz, tz) + width >= view.MinZ && Mathf.Min(hz, tz) - width <= view.MaxZ;
+            return hx + maxReach >= view.MinX && hx - maxReach <= view.MaxX
+                && hz + maxReach >= view.MinZ && hz - maxReach <= view.MaxZ;
         }
 
         // ---------------- 几何生成 ----------------
 
-        // 是否为弧线轨迹。直线轨迹走 GPU 实例化（只提供矩阵），弧线走合并网格。
-        public bool IsArc => arcing;
-
-        // 直线轨迹的绘制矩阵：网格固定为 MeshPool.plane10，逐条只提供 TRS 矩阵。
-        // 返回 false 表示当前无可绘制内容（长度退化或尚未定向）。
-        public bool TryGetStraightMatrix(out Matrix4x4 matrix)
+        // 追加本帧要绘制的几何。直线/弧线共用这一入口，由 batcher 统一合并进
+        // 按 (材质, 颜色) 分桶的网格；调用方据顶点数是否增长判断本帧有无内容。
+        public void AppendGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
         {
-            matrix = default;
-            if (length <= 0f || dir.sqrMagnitude < 0.000001f) return false;
+            if (arcing) AppendArcGeometry(verts, uvs, tris);
+            else AppendStraightGeometry(verts, uvs, tris);
+        }
+
+        // 直线轨迹的几何：一个四边形，与 MeshPool.plane10 逐顶点/逐 UV/缠绕一致。
+        // 旧实现走 Graphics.DrawMeshInstanced，直接把这个平面用
+        //   TRS(exactPosition - dir * len / 2, LookRotation(dir), (width, 1, len))
+        // 变换到世界；这里把该变换展开成分量、直接写出世界坐标顶点（外观逐像素不变）：
+        //   局部 +Z → dir（沿飞行方向），局部 +X → right = (dir.z, 0, -dir.x)（宽度方向）。
+        void AppendStraightGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
+        {
+            if (length <= 0f || dir.sqrMagnitude < 0.000001f) return;
 
             float len = DrawLength();
-            if (len <= 0f) return false;
+            if (len <= 0f) return;
 
-            Vector3 drawPos = exactPosition - dir * len / 2f;
-            matrix = Matrix4x4.TRS(drawPos, Quaternion.LookRotation(dir), new Vector3(width, 1f, len));
-            return true;
+            Vector3 right = new Vector3(dir.z, 0f, -dir.x) * (width * 0.5f);
+            Vector3 head = exactPosition;                   // 头部恒在弹体当前绘制位置
+            Vector3 tail = exactPosition - dir * len;
+
+            int b = verts.Count;
+            // 顶点顺序与 plane10 相同：(-x,-z)(-x,+z)(+x,+z)(+x,-z)，UV 的 v 从尾到头
+            verts.Add(tail - right); uvs.Add(new Vector2(0f, 0f));
+            verts.Add(head - right); uvs.Add(new Vector2(0f, 1f));
+            verts.Add(head + right); uvs.Add(new Vector2(1f, 1f));
+            verts.Add(tail + right); uvs.Add(new Vector2(1f, 0f));
+
+            tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+            tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
         }
 
         // 当前实际拖尾长度（含投掷物消亡后的收缩）
@@ -351,7 +355,8 @@ namespace Gunplay
             return Mathf.Max(0f, len);
         }
 
-        public void AppendArcGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
+        // 弧线轨迹的几何：沿弹道路径在尾部窗口内生成一串四边形。
+        void AppendArcGeometry(List<Vector3> verts, List<Vector2> uvs, List<int> tris)
         {
             if (arcHorizontalLength <= 0.0001f) return;
 
