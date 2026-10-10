@@ -646,10 +646,7 @@ namespace Gunplay
                 ProjectileOverrides.Disable(row.projectile);
             }
 
-            RecountOverridden();
-
-            // 过滤生效时该行可能已不符合条件，需要重建列表；此时保留滚动位置，避免跳回顶部
-            if (onlyOverridden || trailFilter != TrailFilter.Any) MarkVisibleDirty(true);
+            AfterOverrideChanged();
         }
 
         void DrawTrailToggle(Row row, float x, float y, bool trailOn)
@@ -663,17 +660,29 @@ namespace Gunplay
 
             if (state == before) return;
 
-            // 直接点轨迹开关时，若该行还没开启覆写，顺带开启（省掉先开覆写这一步）
-            if (!ProjectileOverrides.Has(row.projectile))
-            {
-                ProjectileOverrides.Enable(row.projectile);
-                SyncEditValue(row);
-            }
-
+            EnsureOverridden(row);
             ProjectileOverrides.SetTrailEnabled(row.projectile, state);
+            AfterOverrideChanged();
+        }
+
+        // 顺带开启覆写：该行还没有记录时，按当前生效值建一条（见 ProjectileOverrides.GetOrCreate）。
+        // 轨迹开关 / 色块 / 数值输入三处点击都先走这里，省掉「先开覆写再设置」两步。
+        // 返回是否真的新建了记录，调用方据此决定要不要走 AfterOverrideChanged。
+        bool EnsureOverridden(Row row)
+        {
+            if (ProjectileOverrides.Has(row.projectile)) return false;
+
+            ProjectileOverrides.Enable(row.projectile);
+            SyncEditValue(row);
+            return true;
+        }
+
+        // 覆写状态变化后的统一收尾。抽成一处不只是去重——三处调用原本的收尾顺序并不一致。
+        void AfterOverrideChanged()
+        {
             RecountOverridden();
 
-            // 同上：轨迹过滤生效时该行可能已不符合条件
+            // 过滤生效时该行可能已不符合条件，需要重建列表；保留滚动位置，避免跳回列表顶部
             if (onlyOverridden || trailFilter != TrailFilter.Any) MarkVisibleDirty(true);
         }
 
@@ -765,15 +774,7 @@ namespace Gunplay
 
             if (Widgets.ButtonInvisible(swatchRect))
             {
-                // 与轨迹开关同约定：未覆写的行顺带开启覆写
-                if (!ProjectileOverrides.Has(row.projectile))
-                {
-                    ProjectileOverrides.Enable(row.projectile);
-                    SyncEditValue(row);
-                    RecountOverridden();
-
-                    if (onlyOverridden || trailFilter != TrailFilter.Any) MarkVisibleDirty(true);
-                }
+                if (EnsureOverridden(row)) AfterOverrideChanged();
 
                 Find.WindowStack.Add(new ColorPickerWindow(color, c =>
                     ProjectileOverrides.SetTrailColor(row.projectile, c)));

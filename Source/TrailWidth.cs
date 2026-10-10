@@ -12,16 +12,13 @@ namespace Gunplay
     public static class TrailWidth
     {
 
-        // 覆写是否命中。命中即完全接管，调用方不应再叠加任何全局系数。
+        // 覆写是否命中（命中即完全接管，调用方不应再叠加任何全局系数）。
+        // 与 TrailLength / TrailFade 同形：命中判定与 0 哨兵的处理都在 ProjectileOverrides 里。
         // 以下入参的 projectileDef 一律可为 null：命中多态/CE 投射物时不一定拿得到 ThingDef，
         // 传 null 表示「无法解析」，各方法按 0 宽度或全局默认值处理，不抛异常。
         public static bool TryOverride(ThingDef? projectileDef, out float width)
         {
-            width = 0f;
-            if (!ProjectileOverrides.TryGetTrailWidth(projectileDef, out float w)) return false;
-
-            width = Mathf.Max(0f, w);
-            return true;
+            return ProjectileOverrides.TryGetTrailWidth(projectileDef, out width);
         }
 
         // 基础宽度（伤害 / 贴图口径），不含 trailDef 覆盖与全局系数。
