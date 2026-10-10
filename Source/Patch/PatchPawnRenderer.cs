@@ -26,11 +26,22 @@ namespace Gunplay.Patch
             CompGun comp = eq.TryGetComp<CompGun>();
             if (comp == null) return true;
 
-            drawLoc -= equipmentDir.RotatedBy(aimAngle);
-            aimAngle = (aimAngle + comp.RotationOffset) % 360;
-            drawLoc += equipmentDir.RotatedBy(aimAngle);
-
             GunPropDef? prop = GunplaySetup.GunProp(eq);
+            float rotationOffset = comp.RotationOffset;
+            CompPrimer primer = eq.TryGetComp<CompPrimer>();
+
+            // 常态（未开火、无缩放、无上膛动画）：不改动 drawLoc/aimAngle，绘制结果与原版一致。
+            // 这是每帧绝大多数调用的情形，跳过下面的枢轴旋转、三角函数与网格选择。
+            bool scaled = prop != null && prop.drawScale != 1f;
+            if (rotationOffset == 0f && !scaled && primer == null) return true;
+
+            if (rotationOffset != 0f)
+            {
+                drawLoc -= equipmentDir.RotatedBy(aimAngle);
+                aimAngle = (aimAngle + rotationOffset) % 360;
+                drawLoc += equipmentDir.RotatedBy(aimAngle);
+            }
+
             if (prop == null) return true;
 
             float num = aimAngle - 90f;
@@ -54,7 +65,6 @@ namespace Gunplay.Patch
             num %= 360f;
 
             drawingScale.x = drawingScale.z = prop.drawScale;
-            CompPrimer primer = eq.TryGetComp<CompPrimer>();
             if (primer != null)
             {
                 primer.Draw(mesh, drawLoc, num, drawingScale);
