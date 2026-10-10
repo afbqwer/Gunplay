@@ -17,29 +17,37 @@ namespace Gunplay
     //   1) 单项覆写（覆写窗口设置）—— 绝对值，不看材质与全局；
     //   2) 材质（ProjectileTrailDef 的 material.trailFadeTicks）—— 绝对值，-1 表示未设定；
     //   3) 全局设置 GunplaySettings.trailFadeTicks。
-    public static class TrailFade
+    // internal：运行时与设置界面共用的内部口径，不对外暴露（入参携带内部解析状态 TrailResolve）。
+    internal static class TrailFade
     {
         public const float Default = 15f;
         public const float Min = 1f;
         public const float Max = 120f;
 
         // 单项覆写是否命中（false = 未设定，走材质 / 全局）。
-        public static bool TryOverride(ThingDef? projectileDef, out float ticks)
+        public static bool TryOverride(in TrailResolve r, out float ticks)
         {
-            return ProjectileOverrides.TryGetTrailFade(projectileDef, out ticks);
+            return ProjectileOverrides.TryGetTrailFade(r.over, out ticks);
         }
 
-        public static float Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
+        // 运行时最终时长。r 为该投射物一次解析的结果（见 TrailResolve）。
+        public static float Effective(in TrailResolve r)
         {
-            if (TryOverride(projectileDef, out float ticks))
+            if (TryOverride(r, out float ticks))
             {
                 return Mathf.Clamp(ticks, Min, Max);
             }
 
-            float materialTicks = TrailMaterial.Effective(trailDef).trailFadeTicks;
+            float materialTicks = r.material.trailFadeTicks;
             if (materialTicks > 0f) return Mathf.Clamp(materialTicks, Min, Max);
 
             return Mathf.Clamp(GunplaySettings.trailFadeTicks, Min, Max);
+        }
+
+        // 仅有 def 与「该行缓存的材质」时（覆写窗口的数值列，理由同 TrailLength.Effective 的注释）。
+        public static float Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
+        {
+            return Effective(new TrailResolve(ProjectileOverrides.Get(projectileDef), trailDef, TrailMaterial.Effective(trailDef)));
         }
     }
 }

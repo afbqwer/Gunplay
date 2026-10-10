@@ -73,9 +73,10 @@ namespace Gunplay.Patch
             // 轨迹由投射物 def 决定（与发射武器无关）。
             // 直线投射物与弧线投射物共用这一条生成路径，具体用哪种绘制方式由
             // ProjectileTrailState 内部按“是否弧线”决定，因此多数（直线）投射物不会执行弧线相关代码。
-            // 是否绘制（全局开关 + 单项覆写 + 是否解析出材质）统一由 ProjectileRules.TrailEnabled 决定；
-            // 用哪个材质由 ProjectileRules.TrailDefFor 决定（单项覆写选的材质 > 本体 XML 配置）。
-            if (ProjectileRules.TrailEnabled(__instance.def))
+            // 是否绘制（全局开关 + 单项覆写 + 是否解析出材质）与用哪个材质，都在一次 Resolve 里定下来
+            // （覆写记录只在这里取一次，随后登记与初始化共用，见 TrailResolve）。
+            TrailResolve r = ProjectileRules.Resolve(__instance.def);
+            if (ProjectileRules.TrailEnabled(r, __instance.def))
             {
                 // 无武器判定口径 = equipment 为 null（Launch 体内执行完后等价于 EquipmentDef == null）
                 bool unarmed = equipment == null;
@@ -84,10 +85,9 @@ namespace Gunplay.Patch
                     // 投射物在 Launch 之前已 Spawn，本体的 Map 可作为无发射者时的兜底。
                     // 轨迹不再 spawn Thing：登记到该地图的轨迹集合，由批量绘制统一处理。
                     Map? map = __instance.Map ?? launcher?.Map;
-                    ProjectileTrailDef? trailDef = ProjectileRules.TrailDefFor(__instance.def);
-                    if (map != null && trailDef != null)
+                    if (map != null && r.trailDef != null)
                     {
-                        MapComponent_ProjectileTrails.For(map)?.Register(__instance, ___destination, trailDef);
+                        MapComponent_ProjectileTrails.For(map)?.Register(__instance, ___destination, in r);
                     }
                 }
             }

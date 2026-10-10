@@ -26,12 +26,13 @@ namespace Gunplay
             return map?.GetComponent<MapComponent_ProjectileTrails>();
         }
 
-        // 原版投射物登记
-        public void Register(Projectile proj, Vector3 destination, ProjectileTrailDef trailDef)
+        // 原版投射物登记。r 由调用方（Launch 后缀）一次解析好，这里与 Initialize 共用，
+        // 不再按 defName 重复取覆写记录（见 TrailResolve）。
+        public void Register(Projectile proj, Vector3 destination, in TrailResolve r)
         {
             ProjectileTrailState state = new ProjectileTrailState();
             state.LookupKey = proj;
-            state.Initialize(proj, destination, trailDef);
+            state.Initialize(proj, destination, in r);
             // 材质与颜色此时已定，分组解析一次，之后每帧直接用
             state.drawGroup = ProjectileTrailBatcher.ResolveGroup(state);
             trails.Add(state);
@@ -39,11 +40,11 @@ namespace Gunplay
         }
 
         // CE 投射物登记（ProjectileCE 不是 Projectile 子类）
-        public void RegisterCE(Thing proj, Vector3 destination, ProjectileTrailDef trailDef)
+        public void RegisterCE(Thing proj, Vector3 destination, in TrailResolve r)
         {
             ProjectileTrailState state = new ProjectileTrailState();
             state.LookupKey = proj;
-            state.InitializeCE(proj, destination, trailDef);
+            state.InitializeCE(proj, destination, in r);
             state.drawGroup = ProjectileTrailBatcher.ResolveGroup(state);
             trails.Add(state);
             byProjectile[proj] = state;

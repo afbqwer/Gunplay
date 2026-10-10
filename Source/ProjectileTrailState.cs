@@ -189,14 +189,16 @@ namespace Gunplay
         // ---------------- 初始化 ----------------
 
         // 原版投射物入口
-        public void Initialize(Projectile proj, Vector3 destination, ProjectileTrailDef trailDef)
+        public void Initialize(Projectile proj, Vector3 destination, in TrailResolve r)
         {
-            def = trailDef;
-            color = TrailColor.Effective(proj.def, trailDef);
+            def = r.trailDef!;
+            color = TrailColor.Effective(r);
             ticksUtilDeath = -1;
             ticksIdle = 0;
             projectile = proj;
-            exactPositionGetter = () => proj.ExactPosition;
+            // 原版路径不分配反射取值器：Tick 里直接用 projectile.ExactPosition（见该处注释）。
+            // 这里曾经写成 () => proj.ExactPosition，那是一发一次的闭包分配，纯多余。
+            exactPositionGetter = null;
             a = proj.ExactPosition;
             Vector3 b = destination;
             altitude = proj.def.Altitude + DepthEpsilon;
@@ -207,10 +209,10 @@ namespace Gunplay
             traveled = 0f;
 
             // 拖尾长度（格）与淡出时长（tick）是两个独立的量，不再互相派生，见 TrailLength / TrailFade
-            length = speed * TrailLength.Effective(proj.def, trailDef);
-            fadeTicks = TrailFade.Effective(proj.def, trailDef);
+            length = speed * TrailLength.Effective(r);
+            fadeTicks = TrailFade.Effective(r);
             dir = (b - a).normalized;
-            ComputeWidth(proj.def, proj.DamageAmount);
+            ComputeWidth(r, proj.def, proj.DamageAmount);
             maxReach = length + width;
 
             // 只有弧线投射物才需要额外的弧线几何；直线投射物到此为止，不执行任何弧线代码
@@ -224,10 +226,10 @@ namespace Gunplay
 
         // CE（Combat Extended）投射物入口。ProjectileCE 不是 Projectile 子类，位置/伤害/
         // 出射仰角等信息全部经由 PatchCECompat 的反射读取。
-        public void InitializeCE(Thing proj, Vector3 destination, ProjectileTrailDef trailDef)
+        public void InitializeCE(Thing proj, Vector3 destination, in TrailResolve r)
         {
-            def = trailDef;
-            color = TrailColor.Effective(proj.def, trailDef);
+            def = r.trailDef!;
+            color = TrailColor.Effective(r);
             ticksUtilDeath = -1;
             ticksIdle = 0;
             projectile = proj;
@@ -243,10 +245,10 @@ namespace Gunplay
 
             // CE 弹速是真实弹道速度（子弹一 tick 可飞数格），沿用「弹速 × 长度系数」会拉出十余格的
             // "激光束"，CE 路径对拖尾长度做上限截断。注意这只截长度，不再连带截短淡出时长。
-            length = Mathf.Min(speed * TrailLength.Effective(proj.def, trailDef), PatchCECompat.MaxTrailLength);
-            fadeTicks = TrailFade.Effective(proj.def, trailDef);
+            length = Mathf.Min(speed * TrailLength.Effective(r), PatchCECompat.MaxTrailLength);
+            fadeTicks = TrailFade.Effective(r);
             dir = (b - a).normalized;
-            ComputeWidth(proj.def, PatchCECompat.GetDamageAmount(proj));
+            ComputeWidth(r, proj.def, PatchCECompat.GetDamageAmount(proj));
             maxReach = length + width;
 
             // CE 轨迹样式由设置开关决定（ceStraightTrails，默认开启）：
@@ -272,9 +274,9 @@ namespace Gunplay
 
         // 宽度口径统一走 TrailWidth：单项覆写 > ProjectileTrailDef.trailWidth > 伤害/贴图基础宽度。
         // 覆写是绝对值且完全独立（不再乘全局系数），命中时直接采用。
-        void ComputeWidth(ThingDef projDef, float damage)
+        void ComputeWidth(in TrailResolve r, ThingDef projDef, float damage)
         {
-            width = TrailWidth.Effective(projDef, damage, def);
+            width = TrailWidth.Effective(r, projDef, damage);
         }
 
         // ---------------- 运行时推进 ----------------
@@ -305,10 +307,13 @@ namespace Gunplay
                 else
                 {
                     // 只在投射物存活时读取位置；销毁后不再访问它。
-                    // CE 直线投射物跟踪"绘制位置"（含高度屏幕偏移），其余跟踪地面投影。
+                    // 位置来源按运行时类型分流，而不是看哪个 Initialize 被调用过：
+                    //   * 原版投射物本身是 Projectile —— 直接读 projectile.ExactPosition，
+                    //     无需反射取值器（Initialize 因此不分配那个委托，见其注释）；
+                    //   * CE 的 ProjectileCE 不是 Projectile 子类 —— 走反射取值器（直线取绘制位置，含高度偏移）。
                     Vector3? drawn = ceTrackDrawnPosition
                         ? PatchCECompat.GetDrawPosition(projectile)
-                        : exactPositionGetter?.Invoke();
+                        : (projectile is Projectile vanilla ? vanilla.ExactPosition : exactPositionGetter?.Invoke());
                     if (drawn.HasValue) ApplyPosition(drawn.Value);
                 }
             }

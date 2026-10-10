@@ -358,8 +358,10 @@ namespace Gunplay.Patch
 
         static void RunSpawnTrail(Thing __instance, Thing launcher, Thing equipment)
         {
-            // 是否绘制（全局开关 + 单项覆写 + XML 是否配了 trail）统一由 ProjectileRules.TrailEnabled 决定
-            if (!ProjectileRules.TrailEnabled(__instance.def)) return;
+            // 覆写记录只在这里取一次：门控（全局开关 + 单项覆写 + XML 是否配了 trail）
+            // 与随后的材质解析共用同一个 Resolve 结果，见 TrailResolve。
+            TrailResolve r = ProjectileRules.Resolve(__instance.def);
+            if (!ProjectileRules.TrailEnabled(r, __instance.def)) return;
 
             // 无武器投射物判定口径与原版一致：equipment 为 null
             bool unarmed = equipment == null;
@@ -370,14 +372,13 @@ namespace Gunplay.Patch
 
             // 投射物在 Launch/Throw 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
             Map? map = __instance.Map ?? launcher?.Map;
-            ProjectileTrailDef? trailDef = ProjectileRules.TrailDefFor(__instance.def);
-            if (map == null || trailDef == null) return;
+            if (map == null || r.trailDef == null) return;
 
             // 轨迹不再 spawn Thing：登记到该地图的轨迹集合，由批量绘制统一处理。
             // CE 的 Destination 是发射时预测的落点（零高度），仅提供轨迹初始方向/弧线几何；
             // 直线轨迹的实际方向随后每 tick 由投射物真实位移校正。
             Vector2 dest2 = destinationField?.GetValue(__instance) is Vector2 dest ? dest : new Vector2(__instance.DrawPos.x, __instance.DrawPos.z);
-            MapComponent_ProjectileTrails.For(map)?.RegisterCE(__instance, new Vector3(dest2.x, 0f, dest2.y), trailDef);
+            MapComponent_ProjectileTrails.For(map)?.RegisterCE(__instance, new Vector3(dest2.x, 0f, dest2.y), in r);
         }
 
         static void ImpactPrefix(Thing __instance, Thing hitThing)

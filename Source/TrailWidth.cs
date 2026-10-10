@@ -13,16 +13,18 @@ namespace Gunplay
     //   1) 单项覆写（覆写窗口设置）—— 绝对值，完全独立：既不看伤害/贴图，也不乘全局系数；
     //   2) 材质（ProjectileTrailDef 的 material.trailWidth，XML 或材质窗口编辑）—— 绝对值，之后仍乘全局系数；
     //   3) 基础宽度 —— 按伤害 min(damage,50)*0.006 或按贴图 drawSize.x*0.1，之后乘全局系数。
-    public static class TrailWidth
+    // internal：运行时与设置界面共用的内部口径，不对外暴露（入参携带内部解析状态 TrailResolve）。
+    internal static class TrailWidth
     {
 
         // 覆写是否命中（命中即完全接管，调用方不应再叠加任何全局系数）。
         // 与 TrailLength / TrailFade 同形：命中判定与 0 哨兵的处理都在 ProjectileOverrides 里。
-        // 以下入参的 projectileDef 一律可为 null：命中多态/CE 投射物时不一定拿得到 ThingDef，
+        // 入参是「已解析的结果」（见 TrailResolve），所以这里不再按 defName 查字典。
+        // projectileDef 一律可为 null：命中多态/CE 投射物时不一定拿得到 ThingDef，
         // 传 null 表示「无法解析」，各方法按 0 宽度或全局默认值处理，不抛异常。
-        public static bool TryOverride(ThingDef? projectileDef, out float width)
+        public static bool TryOverride(in TrailResolve r, out float width)
         {
-            return ProjectileOverrides.TryGetTrailWidth(projectileDef, out width);
+            return ProjectileOverrides.TryGetTrailWidth(r.over, out width);
         }
 
         // 基础宽度（伤害 / 贴图口径），不含材质覆盖与全局系数。
@@ -40,27 +42,33 @@ namespace Gunplay
             return Mathf.Min(damage, 50f) * 0.006f;
         }
 
-        // 运行时最终宽度。trailDef 为该投射物解析出的 ProjectileTrailDef（可能为 null）。
-        public static float Effective(ThingDef? projectileDef, float damage, ProjectileTrailDef? trailDef)
+        // 运行时最终宽度。r 为该投射物一次解析的结果（见 TrailResolve）。
+        public static float Effective(in TrailResolve r, ThingDef? projectileDef, float damage)
         {
-            if (TryOverride(projectileDef, out float w)) return w;
+            if (TryOverride(r, out float w)) return w;
 
             float width = Base(projectileDef, damage);
 
             // 材质层：绝对值口径，-1 表示未设定（继续走基础宽度）
-            float materialWidth = TrailMaterial.Effective(trailDef).trailWidth;
+            float materialWidth = r.material.trailWidth;
             if (materialWidth > 0f) width = materialWidth;
 
             return width * GunplaySettings.trailWidthFactor;
         }
 
-        // 设置界面口径：无法知道实际开火的武器，因此按无武器加成解析伤害（见 BaseDamage）；
-        // 材质同样按该投射物当前生效的材质解析（含单项覆写选的材质）。
+        // 设置界面口径：无法知道实际开火的武器，因此按无武器加成解析伤害（见 BaseDamage）。
+        // 已解析结果在手时用这个重载（窗口同步输入框、新建覆写取默认值都走它）。
+        public static float EffectiveForDef(in TrailResolve r, ThingDef? projectileDef)
+        {
+            if (TryOverride(r, out float w)) return w;
+
+            return Effective(r, projectileDef, BaseDamage(projectileDef));
+        }
+
+        // 仅有 def 时（覆写窗口的宽度列只读显示）。
         public static float EffectiveForDef(ThingDef? projectileDef)
         {
-            if (TryOverride(projectileDef, out float w)) return w;
-
-            return Effective(projectileDef, BaseDamage(projectileDef), ProjectileRules.TrailDefFor(projectileDef));
+            return EffectiveForDef(ProjectileRules.Resolve(projectileDef), projectileDef);
         }
 
         // 伤害必须走游戏自己的解析，不能直接读 ProjectileProperties.damageAmountBase：

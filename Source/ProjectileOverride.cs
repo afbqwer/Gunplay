@@ -98,30 +98,33 @@ namespace Gunplay
             return Map.TryGetValue(projectileDef.defName, out ProjectileOverride? over) ? over : null;
         }
 
-        // 命中判定与 0 哨兵的处理都收在下面这两个方法里，调用方不必自己判。
-        public static bool TryGetTrailWidth(ThingDef? projectileDef, out float width)
+        // 命中判定与 0 哨兵的处理都收在下面这几个方法里，调用方不必自己判。
+        //
+        // 一律以「已取出的记录」为输入（即 TrailResolve.over）：记录只在解析入口
+        // （ProjectileRules.Resolve）按 defName 取一次，之后各口径只读这个指针。
+        // 原先每个 TryGet* 自己 Get 一次，在「一发」里被调用七八次，正是重复查找的来源。
+        public static bool TryGetTrailWidth(ProjectileOverride? over, out float width)
         {
-            return TryGetPositive(projectileDef, o => o.trailWidth, out width);
+            return TryGetPositive(over, o => o.trailWidth, out width);
         }
 
-        public static bool TryGetTrailLength(ThingDef? projectileDef, out float factor)
+        public static bool TryGetTrailLength(ProjectileOverride? over, out float factor)
         {
-            return TryGetPositive(projectileDef, o => o.trailLengthFactor, out factor);
+            return TryGetPositive(over, o => o.trailLengthFactor, out factor);
         }
 
-        public static bool TryGetTrailFade(ThingDef? projectileDef, out float ticks)
+        public static bool TryGetTrailFade(ProjectileOverride? over, out float ticks)
         {
-            return TryGetPositive(projectileDef, o => o.trailFadeTicks, out ticks);
+            return TryGetPositive(over, o => o.trailFadeTicks, out ticks);
         }
 
         // 单项覆写是否指定了轨迹材质（= 逐个投射物选择「材质类型」）。
         // 未设定时返回 false，调用方回落到 ProjectilePropDef.trail。
         // 查不到也返回 false：材质 def 被所在 mod 移除后，残留的 defName 不该让该投射物连轨迹一起丢掉。
-        public static bool TryGetTrailMaterial(ThingDef? projectileDef, out ProjectileTrailDef def)
+        public static bool TryGetTrailMaterial(ProjectileOverride? over, out ProjectileTrailDef def)
         {
             def = null!;
 
-            ProjectileOverride? over = Get(projectileDef);
             if (over?.trailMaterialDefName == null) return false;
 
             ProjectileTrailDef? found = DefDatabase<ProjectileTrailDef>.GetNamed(over.trailMaterialDefName, false);
@@ -131,12 +134,17 @@ namespace Gunplay
             return true;
         }
 
+        // 仅有 def 时的重载：覆写窗口校验「已选材质是否仍然存在」用（它手上没有记录）。
+        public static bool TryGetTrailMaterial(ThingDef? projectileDef, out ProjectileTrailDef def)
+        {
+            return TryGetTrailMaterial(Get(projectileDef), out def);
+        }
+
         // 三个数值覆写项共用同一套「命中」语义：记录存在且值 > 0。0 是未设定哨兵，见 ProjectileOverride。
-        static bool TryGetPositive(ThingDef? projectileDef, Func<ProjectileOverride, float> selector, out float value)
+        static bool TryGetPositive(ProjectileOverride? over, Func<ProjectileOverride, float> selector, out float value)
         {
             value = 0f;
 
-            ProjectileOverride? over = Get(projectileDef);
             if (over == null) return false;
 
             float candidate = selector(over);
@@ -148,10 +156,9 @@ namespace Gunplay
 
         // 自定义颜色是否命中。未设（记录不存在或 hasColor=false）时返回 false。
         // 颜色不走哨兵判定：白色是合法颜色，只能靠 hasColor 这个显式标记表达三态。
-        public static bool TryGetTrailColor(ThingDef? projectileDef, out Color color)
+        public static bool TryGetTrailColor(ProjectileOverride? over, out Color color)
         {
             color = Color.white;
-            ProjectileOverride? over = Get(projectileDef);
             if (over == null || !over.hasColor) return false;
 
             color = over.trailColor;
@@ -289,17 +296,20 @@ namespace Gunplay
         // 本就默认不显示，开启覆写不应把它们悄悄变成显示（见 ProjectileRules.TrailEnabled）。
         // 长度 / 淡出要按该投射物当前生效的材质解析（材质可能自己定了绝对值），否则「开启覆写」
         // 这个动作本身就会把画面改掉——那正是本方法存在的意义（开局即现状）。
+        //
+        // 整条走一次 Resolve：此刻记录还没写进字典（见调用方注释），所以 r.over 必为 null，
+        // 四项数值取到的都是「未覆写时的生效值」，正是要的。
         static ProjectileOverride Create(ThingDef projectileDef)
         {
-            ProjectileTrailDef? trailDef = ProjectileRules.TrailDefFor(projectileDef);
+            TrailResolve r = ProjectileRules.Resolve(projectileDef);
 
             return new ProjectileOverride
             {
-                trailEnabled = ProjectileRules.TrailEnabled(projectileDef),
+                trailEnabled = ProjectileRules.TrailEnabled(r, projectileDef),
                 trailMaterialDefName = null,   // 新记录不选材质 = 继承，与开启前的画面一致
-                trailWidth = TrailWidth.EffectiveForDef(projectileDef),
-                trailLengthFactor = TrailLength.Effective(projectileDef, trailDef),
-                trailFadeTicks = TrailFade.Effective(projectileDef, trailDef),
+                trailWidth = TrailWidth.EffectiveForDef(r, projectileDef),
+                trailLengthFactor = TrailLength.Effective(r),
+                trailFadeTicks = TrailFade.Effective(r),
                 hasSpeedOverride = false    // 新记录不接管弹速 = 继承默认判定，与开启覆写前的行为一致
             };
         }

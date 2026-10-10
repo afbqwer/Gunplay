@@ -369,13 +369,16 @@ namespace Gunplay
 
         static void SyncEditValue(Row row)
         {
-            RefreshTrailDef(row);
+            // 一次解析：材质列 / 颜色列的「继承」预览要用 row.trailDef，三个数值列也要用同一份结果。
+            // 顺手把 trailDef 同步到行上，省掉 RefreshTrailDef 那次重复解析（见 TrailResolve）。
+            TrailResolve r = ProjectileRules.Resolve(row.projectile);
+            row.trailDef = r.trailDef;
 
-            row.editWidth = TrailWidth.EffectiveForDef(row.projectile);
+            row.editWidth = TrailWidth.EffectiveForDef(r, row.projectile);
             row.widthBuffer = Format(row.editWidth);
-            row.editLength = TrailLength.Effective(row.projectile, row.trailDef);
+            row.editLength = TrailLength.Effective(r);
             row.lengthBuffer = FormatInt(row.editLength);
-            row.editFade = TrailFade.Effective(row.projectile, row.trailDef);
+            row.editFade = TrailFade.Effective(r);
             row.fadeBuffer = FormatInt(row.editFade);
         }
 

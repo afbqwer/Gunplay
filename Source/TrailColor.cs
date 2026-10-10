@@ -12,12 +12,13 @@ namespace Gunplay
     //
     // 颜色不进材质：它经 MaterialPropertyBlock 的 _Color 逐组传入（见 ProjectileTrailBatcher），
     // 因此改颜色不需要重建贴图，已在飞的轨迹也不受影响（颜色在登记时已确定）。
-    public static class TrailColor
+    // internal：运行时与设置界面共用的内部口径，不对外暴露（入参携带内部解析状态 TrailResolve）。
+    internal static class TrailColor
     {
         // 单项覆写是否命中（false = 未设自定义颜色，走材质颜色）。
-        public static bool TryOverride(ThingDef? projectileDef, out Color color)
+        public static bool TryOverride(in TrailResolve r, out Color color)
         {
-            return ProjectileOverrides.TryGetTrailColor(projectileDef, out color);
+            return ProjectileOverrides.TryGetTrailColor(r.over, out color);
         }
 
         // 材质层有效颜色：设置里的编辑快照 > def 模板。轨迹颜色窗口与覆写窗口的「继承色」预览共用。
@@ -26,12 +27,12 @@ namespace Gunplay
             return TrailMaterial.Effective(trailDef).trailColor;
         }
 
-        // 运行时最终颜色。trailDef 为该投射物解析出的 ProjectileTrailDef（可能为 null，此时返回材质默认白）。
-        public static Color Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
+        // 运行时最终颜色。r 为该投射物一次解析的结果（见 TrailResolve）。
+        public static Color Effective(in TrailResolve r)
         {
-            if (TryOverride(projectileDef, out Color color)) return color;
+            if (TryOverride(r, out Color color)) return color;
 
-            return EffectiveForDef(trailDef);
+            return r.material.trailColor;
         }
 
         // 颜色以 "#RRGGBBAA" 形式进出存档（与 LookColor 同一口径）；运行时一律存 Color，不做实时解析。

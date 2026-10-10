@@ -21,29 +21,38 @@ namespace Gunplay
     //   1) 单项覆写（覆写窗口设置）—— 绝对值，不看材质与全局；
     //   2) 材质（ProjectileTrailDef 的 material.trailLengthFactor）—— 绝对值，-1 表示未设定；
     //   3) 全局设置 GunplaySettings.trailLengthFactor。
-    public static class TrailLength
+    // internal：运行时与设置界面共用的内部口径，不对外暴露（入参携带内部解析状态 TrailResolve）。
+    internal static class TrailLength
     {
         public const float Default = 15f;
         public const float Min = 1f;
         public const float Max = 120f;
 
         // 单项覆写是否命中（false = 未设定，走材质 / 全局）。
-        public static bool TryOverride(ThingDef? projectileDef, out float factor)
+        public static bool TryOverride(in TrailResolve r, out float factor)
         {
-            return ProjectileOverrides.TryGetTrailLength(projectileDef, out factor);
+            return ProjectileOverrides.TryGetTrailLength(r.over, out factor);
         }
 
-        public static float Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
+        // 运行时最终系数。r 为该投射物一次解析的结果（见 TrailResolve）。
+        public static float Effective(in TrailResolve r)
         {
-            if (TryOverride(projectileDef, out float factor))
+            if (TryOverride(r, out float factor))
             {
                 return Mathf.Clamp(factor, Min, Max);
             }
 
-            float materialFactor = TrailMaterial.Effective(trailDef).trailLengthFactor;
+            float materialFactor = r.material.trailLengthFactor;
             if (materialFactor > 0f) return Mathf.Clamp(materialFactor, Min, Max);
 
             return Mathf.Clamp(GunplaySettings.trailLengthFactor, Min, Max);
+        }
+
+        // 仅有 def 与「该行缓存的材质」时（覆写窗口的数值列：它每帧逐行取值，
+        // 手上已有 row.trailDef，不该为了重解析材质再查一次字典）。
+        public static float Effective(ThingDef? projectileDef, ProjectileTrailDef? trailDef)
+        {
+            return Effective(new TrailResolve(ProjectileOverrides.Get(projectileDef), trailDef, TrailMaterial.Effective(trailDef)));
         }
     }
 }
