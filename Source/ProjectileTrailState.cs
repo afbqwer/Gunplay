@@ -34,11 +34,22 @@ namespace Gunplay
         }
     }
 
+    // 弧线采样段数的取值约定。放在类外是因为三个地方都要读它：
+    // 本类的几何生成、GunplaySettings 的滑杆区间、存档读写的默认值。
+    // 顶点数 = (段数 + 1) × 2，代价线性增长；弧线投射物稀少，默认取适中值，
+    // 上限不放太高——64 段已远超肉眼能分辨的平滑度。
+    internal static class ArcSegments
+    {
+        internal const int Default = 16;
+        internal const int Min = 2;
+        internal const int Max = 64;
+    }
+
     internal class ProjectileTrailState
     {
-        // ---------------- 弧线绘制参数 ----------------
-        // 弧线采样段数：越大越平滑，代价线性增长。弧线投射物稀少，取适中值即可。
-        internal const int ArcSegmentCount = 16;
+        // 当前生效段数（全局设置 + 夹取）。做成属性而非常量，是为了让 AppendArcGeometry
+        // 的三处循环保持原样；夹取放在这里，设置项即使被外部改成越界值也不会炸几何。
+        static int ArcSegmentCount => Mathf.Clamp(GunplaySettings.arcSegmentCount, ArcSegments.Min, ArcSegments.Max);
 
         // 尾部至少占整段弧线的比例，避免低速抛射物（如手雷）的轨迹过短而不明显。
         const float ArcMinTailFraction = 0.1f;
@@ -69,11 +80,13 @@ namespace Gunplay
         Vector3 previousPosition;
         float speed;
         Vector3 dir;
+        // 拖尾满长（格）。与 fadeTicks 无关：长度是几何量，淡出是时间量，见 TrailLength / TrailFade。
         float length;
         float width;
         float traveled;
         float altitude;
-        float ticksPerLength;
+        // 弹体消失后尾巴收缩到零所用的 tick 数
+        float fadeTicks;
 
         // ---------------- 弧线轨迹专用状态（仅 arcing == true 时使用） ----------------
         bool arcing;
@@ -118,8 +131,9 @@ namespace Gunplay
             previousPosition = a;
             traveled = 0f;
 
-            length = speed * 15f;
-            ticksPerLength = speed > 0f ? length / speed : 0f;
+            // 拖尾长度（格）与淡出时长（tick）是两个独立的量，不再互相派生，见 TrailLength / TrailFade
+            length = speed * TrailLength.Effective(proj.def);
+            fadeTicks = TrailFade.Effective(proj.def);
             dir = (b - a).normalized;
             ComputeWidth(proj.def, proj.DamageAmount);
             maxReach = length + width;
@@ -152,10 +166,10 @@ namespace Gunplay
             previousPosition = a;
             traveled = 0f;
 
-            // CE 弹速是真实弹道速度（子弹一 tick 可飞数格），沿用 speed * 15 会拉出十余格的
-            // "激光束"，CE 路径对拖尾长度做上限截断。
-            length = Mathf.Min(speed * 15f, PatchCECompat.MaxTrailLength);
-            ticksPerLength = speed > 0f ? length / speed : 0f;
+            // CE 弹速是真实弹道速度（子弹一 tick 可飞数格），沿用「弹速 × 长度系数」会拉出十余格的
+            // "激光束"，CE 路径对拖尾长度做上限截断。注意这只截长度，不再连带截短淡出时长。
+            length = Mathf.Min(speed * TrailLength.Effective(proj.def), PatchCECompat.MaxTrailLength);
+            fadeTicks = TrailFade.Effective(proj.def);
             dir = (b - a).normalized;
             ComputeWidth(proj.def, PatchCECompat.GetDamageAmount(proj));
             maxReach = length + width;
@@ -199,7 +213,7 @@ namespace Gunplay
                 {
                     projectile = null;
                     exactPositionGetter = null;
-                    ticksUtilDeath = Mathf.CeilToInt(ticksPerLength);
+                    ticksUtilDeath = Mathf.CeilToInt(fadeTicks);
                 }
                 else
                 {
@@ -248,7 +262,7 @@ namespace Gunplay
             ApplyPosition(pos);
             projectile = null;
             exactPositionGetter = null;
-            ticksUtilDeath = Mathf.CeilToInt(ticksPerLength);
+            ticksUtilDeath = Mathf.CeilToInt(fadeTicks);
         }
 
         // CE 投射物销毁前锁定最终位置。取位置口径与飞行中一致：直线取绘制位置，弧线取地面投影。
@@ -332,7 +346,7 @@ namespace Gunplay
             float len = Mathf.Min(traveled, length);
             if (ticksUtilDeath != -1)
             {
-                len *= ticksPerLength > 0f ? ticksUtilDeath / ticksPerLength : 0f;
+                len *= fadeTicks > 0f ? ticksUtilDeath / fadeTicks : 0f;
             }
             return Mathf.Max(0f, len);
         }
@@ -348,7 +362,7 @@ namespace Gunplay
             if (ticksUtilDeath != -1)
             {
                 // 投射物已消失：尾部向前收缩，模拟淡出（与直线轨迹一致）
-                float k = ticksPerLength > 0f ? Mathf.Clamp01(ticksUtilDeath / ticksPerLength) : 0f;
+                float k = fadeTicks > 0f ? Mathf.Clamp01(ticksUtilDeath / fadeTicks) : 0f;
                 tail = head - (head - tail) * k;
             }
 
@@ -413,7 +427,7 @@ namespace Gunplay
             }
             arcHeight = rawArcHeight;
 
-            // 尾部长度与直线轨迹同为 speed * 15 世界单位，换算成弧线比例并保留下限
+            // 尾部长度与直线轨迹同为「弹速 × 时长」世界单位，换算成弧线比例并保留下限
             arcTailFraction = arcHorizontalLength > 0.0001f
                 ? Mathf.Clamp(length / arcHorizontalLength, ArcMinTailFraction, 1f)
                 : 1f;
@@ -434,7 +448,7 @@ namespace Gunplay
             arcHorizontalLength = ceArcTotalLen;
             arcSide = new Vector3(-dir.z, 0f, dir.x);
 
-            // 尾部长度与直线轨迹同为 speed * 15 世界单位，换算成弧线比例并保留下限
+            // 尾部长度与直线轨迹同为「弹速 × 时长」世界单位，换算成弧线比例并保留下限
             arcTailFraction = arcHorizontalLength > 0.0001f
                 ? Mathf.Clamp(length / arcHorizontalLength, ArcMinTailFraction, 1f)
                 : 1f;

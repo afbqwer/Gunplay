@@ -36,6 +36,15 @@ namespace Gunplay
         public static float trailWidthFactor = 1f;
         public static bool ceStraightTrails = true;
 
+        // 拖尾长度系数：length = 投射物 def 原始弹速 × 该值（格），见 TrailLength。
+        public static float trailLengthFactor = TrailLength.Default;
+
+        // 弹体消失后尾巴收缩完的 tick 数，见 TrailFade。
+        public static float trailFadeTicks = TrailFade.Default;
+
+        // 弧线轨迹的采样段数：越大越平滑，顶点数与耗时线性增长。见 ProjectileTrailState.ArcSegmentCount。
+        public static int arcSegmentCount = ArcSegments.Default;
+
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
         public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
@@ -64,6 +73,9 @@ namespace Gunplay
             Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
             Scribe_Values.Look(ref trailWidthFactor, "trailWidthFactor", 1f);
             Scribe_Values.Look(ref ceStraightTrails, "ceStraightTrails", true);
+            Scribe_Values.Look(ref trailLengthFactor, "trailLengthFactor", TrailLength.Default);
+            Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", TrailFade.Default);
+            Scribe_Values.Look(ref arcSegmentCount, "arcSegmentCount", ArcSegments.Default);
 
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
@@ -104,6 +116,20 @@ namespace Gunplay
             if (enableTrails)
             {
                 listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
+                listing_Standard.Gap(8f);
+
+                // 三项都是整数刻度：分数在这里既没有视觉意义，也会让长度和淡出对不上整数 tick
+                listing_Standard.SliderLabeled("GunplayTrailLengthName".Translate(), ref trailLengthFactor, "GunplayTrailLengthDesc".Translate(),
+                    TrailLength.Min, TrailLength.Max, v => Mathf.RoundToInt(v).ToString());
+                trailLengthFactor = Mathf.Round(trailLengthFactor);
+
+                listing_Standard.SliderLabeled("GunplayTrailFadeName".Translate(), ref trailFadeTicks, "GunplayTrailFadeDesc".Translate(),
+                    TrailFade.Min, TrailFade.Max, v => Mathf.RoundToInt(v).ToString());
+                trailFadeTicks = Mathf.Round(trailFadeTicks);
+
+                listing_Standard.SliderLabeledInt("GunplayArcSegmentCountName".Translate(), ref arcSegmentCount, "GunplayArcSegmentCountDesc".Translate(),
+                    ArcSegments.Min, ArcSegments.Max);
+
                 listing_Standard.Gap(8f);
 
                 if (listing_Standard.RadioButton("GunplayTrailWidthModeDamage".Translate(), trailWidthMode == TrailWidthMode.Damage, tooltip: "GunplayTrailWidthModeDesc".Translate()))
@@ -153,6 +179,12 @@ namespace Gunplay
     {
         public static void SliderLabeled(this Listing_Standard listing, string label, ref float val, string tooltip, float min, float max)
         {
+            listing.SliderLabeled(label, ref val, tooltip, min, max, v => v.ToStringPercent());
+        }
+
+        // 与上一版同布局，只是右侧数值的呈现方式可换：百分比之外的量（tick、段数）不该显示成 %。
+        public static void SliderLabeled(this Listing_Standard listing, string label, ref float val, string tooltip, float min, float max, Func<float, string> format)
+        {
             Rect rect = listing.GetRect(Text.LineHeight);
 
             TextAnchor anchor = Text.Anchor;
@@ -160,11 +192,19 @@ namespace Gunplay
             Widgets.Label(rect.LeftPart(0.5f), label);
             val = Widgets.HorizontalSlider(rect.RightPart(0.5f).LeftPart(0.8f), val, min, max, true);
             Text.Anchor = TextAnchor.MiddleRight;
-            Widgets.Label(rect.RightPart(0.1f), val.ToStringPercent());
+            Widgets.Label(rect.RightPart(0.1f), format(val));
             if (!tooltip.NullOrEmpty()) TooltipHandler.TipRegion(rect, tooltip);
             Text.Anchor = anchor;
 
             listing.Gap(listing.verticalSpacing);
+        }
+
+        // 整数版：滑杆本身只认 float，取整后回填，避免把舍入逻辑散落到每个调用点。
+        public static void SliderLabeledInt(this Listing_Standard listing, string label, ref int val, string tooltip, int min, int max)
+        {
+            float f = val;
+            listing.SliderLabeled(label, ref f, tooltip, min, max, v => Mathf.RoundToInt(v).ToString());
+            val = Mathf.RoundToInt(f);
         }
     }
 

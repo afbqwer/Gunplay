@@ -16,6 +16,12 @@
   <GunplayParticleMultiplierDesc>Multiplies the number of particles spawned by impact effects. Default 100%, range 5% to 400%, in 5% steps.</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedName>Projectile speed</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>Alter speed to specified percentage for all projectiles.</GunplayProjectileSpeedDesc>
+  <GunplayTrailLengthName>Trail length</GunplayTrailLengthName>
+  <GunplayTrailLengthDesc>Trail length is this value multiplied by the projectile's own (unscaled) speed, so faster projectiles get longer trails. By default a bullet with speed 70 gets a 10.5 tile trail. Default 15, range 1 to 120. Applies only to projectiles fired afterwards.</GunplayTrailLengthDesc>
+  <GunplayTrailFadeName>Trail fade duration</GunplayTrailFadeName>
+  <GunplayTrailFadeDesc>How many ticks the trail takes to shrink away after the projectile is gone, in ticks (60 ticks = 1 second). Independent of trail length. Default 15, range 1 to 120. Applies only to projectiles fired afterwards.</GunplayTrailFadeDesc>
+  <GunplayArcSegmentCountName>Arc segment count</GunplayArcSegmentCountName>
+  <GunplayArcSegmentCountDesc>How many segments an arcing trail (grenades, mortar shells) is split into. Higher is smoother and costs more. Default 16, range 2 to 64.</GunplayArcSegmentCountDesc>
   <GunplayTrailWidthModeDesc>Determines how the base trail width is calculated.</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>Trail width: based on projectile damage</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>Trail width: based on projectile texture size</GunplayTrailWidthModeTexture>
@@ -28,7 +34,7 @@
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>Per-projectile overrides...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>Override the trail width and color of individual projectiles. Overridden widths are absolute and ignore the trail width multiplier above.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>Override the trail width, length, fade duration and color of individual projectiles. Overridden values are absolute and ignore the global trail settings above.</GunplayProjectileOverridesDesc>
   <GunplayTrailColorsName>Trail colors...</GunplayTrailColorsName>
   <GunplayTrailColorsDesc>Customize the color of each trail texture. Changes apply instantly, but only to projectiles fired afterwards.</GunplayTrailColorsDesc>
   <GunplayTrailColorsWindowTitle>Trail colors</GunplayTrailColorsWindowTitle>
@@ -73,6 +79,11 @@
   <GunplayOverrideColProjectile>Projectile</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>Weapon</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>Trail width</GunplayOverrideColWidth>
+  <GunplayOverrideColLength>Length</GunplayOverrideColLength>
+  <GunplayOverrideColFade>Fade (ticks)</GunplayOverrideColFade>
+  <GunplayOverrideTipWidth>Trail width in world units. Absolute value, ignores both the width mode and the width multiplier.</GunplayOverrideTipWidth>
+  <GunplayOverrideTipLength>Trail length is this value multiplied by the projectile's own (unscaled) speed. Absolute value, ignores the global trail length.</GunplayOverrideTipLength>
+  <GunplayOverrideTipFade>How many ticks the trail takes to shrink away after the projectile is gone, in ticks (60 ticks = 1 second). Absolute value, ignores the global fade duration.</GunplayOverrideTipFade>
   <GunplayOverrideNoWeapon>No weapon fires this projectile.</GunplayOverrideNoWeapon>
   <GunplayOverrideWeaponTipHeader>Weapons firing this projectile:</GunplayOverrideWeaponTipHeader>
   <GunplayOverrideNoResults>No projectiles match the current filter.</GunplayOverrideNoResults>

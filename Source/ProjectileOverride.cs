@@ -5,8 +5,8 @@ using Verse;
 
 namespace Gunplay
 {
-    // 单个投射物的覆写记录。目前三项：是否绘制轨迹 + 轨迹宽度 + 轨迹颜色。
-    // 后续要加覆写项（轨迹材质、拖尾长度、速度缩放等）时，只在这里加字段 +
+    // 单个投射物的覆写记录。目前五项：是否绘制轨迹 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长。
+    // 后续要加覆写项（轨迹材质、速度缩放等）时，只在这里加字段 +
     // 在 ProjectileOverrideWindow 加一列即可，存档格式向后兼容（缺失字段走默认值）。
     public class ProjectileOverride : IExposable
     {
@@ -21,10 +21,24 @@ namespace Gunplay
         public bool hasColor;
         public Color trailColor = Color.white;
 
+        // 拖尾长度系数（绝对值）：length = 弹速 × 该值，见 TrailLength。
+        // 0 = 未设定，继承全局 GunplaySettings.trailLengthFactor。
+        public float trailLengthFactor;
+
+        // 淡出时长（tick，绝对值），见 TrailFade。0 = 未设定，继承全局 GunplaySettings.trailFadeTicks。
+        public float trailFadeTicks;
+
+        // 两项都用 0 而不是各自的 Default 作哨兵，是因为「字段缺失」和「值恰好等于默认」必须区分开：
+        // 它们是后加的，存档里已有的覆写记录都没有。若哨兵取 Default，那些老记录会被当成
+        // 「用户手动设成了绝对值」，之后改全局设置它们不再跟随——而用户从没碰过这两项。
+        // 详见 ProjectileOverrides.TryGetTrailLength / TryGetTrailFade 里的 > 0 判定。
+
         public void ExposeData()
         {
             Scribe_Values.Look(ref trailEnabled, "trailEnabled", true);
             Scribe_Values.Look(ref trailWidth, "trailWidth", 0f);
+            Scribe_Values.Look(ref trailLengthFactor, "trailLengthFactor", 0f);
+            Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", 0f);
 
             Scribe_Values.Look(ref hasColor, "hasColor", false);
             ColorPickerWindow.LookColor(ref trailColor, "trailColor", Color.white);
@@ -63,6 +77,28 @@ namespace Gunplay
             return over != null;
         }
 
+        public static bool TryGetTrailLength(ThingDef? projectileDef, out float factor)
+        {
+            factor = 0f;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over == null || over.trailLengthFactor <= 0f) return false;
+
+            factor = over.trailLengthFactor;
+            return true;
+        }
+
+        public static bool TryGetTrailFade(ThingDef? projectileDef, out float ticks)
+        {
+            ticks = 0f;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over == null || over.trailFadeTicks <= 0f) return false;
+
+            ticks = over.trailFadeTicks;
+            return true;
+        }
+
         // 自定义颜色是否命中。未设（记录不存在或 hasColor=false）时返回 false。
         public static bool TryGetTrailColor(ThingDef? projectileDef, out Color color)
         {
@@ -74,12 +110,13 @@ namespace Gunplay
             return true;
         }
 
-        // 开启覆写：以当前计算出的宽度为起点，用户从「现状」开始调，不会看到轨迹突然变粗/变细。
+        // 开启覆写：以「当前生效值」为起点（宽度取计算值、时长取全局值），
+        // 用户从现状开始调，不会看到轨迹突然变粗/变细或拖尾长度突变。
         public static void Enable(ThingDef? projectileDef)
         {
             if (projectileDef == null) return;
 
-            Set(projectileDef, true, TrailWidth.EffectiveForDef(projectileDef));
+            Map[projectileDef.defName] = Create(projectileDef);
         }
 
         public static void SetTrailWidth(ThingDef? projectileDef, float width)
@@ -87,8 +124,49 @@ namespace Gunplay
             if (projectileDef == null) return;
 
             ProjectileOverride? over = Get(projectileDef);
-            if (over != null) over.trailWidth = width;
-            else Set(projectileDef, true, width);
+            if (over != null)
+            {
+                over.trailWidth = width;
+                return;
+            }
+
+            ProjectileOverride created = Create(projectileDef);
+            created.trailWidth = width;
+            Map[projectileDef.defName] = created;
+        }
+
+        // 拖尾长度系数。与宽度同约定：记录不存在时顺带开启覆写。
+        public static void SetTrailLength(ThingDef? projectileDef, float factor)
+        {
+            if (projectileDef == null) return;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over != null)
+            {
+                over.trailLengthFactor = factor;
+                return;
+            }
+
+            ProjectileOverride created = Create(projectileDef);
+            created.trailLengthFactor = factor;
+            Map[projectileDef.defName] = created;
+        }
+
+        // 淡出时长（tick）。同上。
+        public static void SetTrailFade(ThingDef? projectileDef, float ticks)
+        {
+            if (projectileDef == null) return;
+
+            ProjectileOverride? over = Get(projectileDef);
+            if (over != null)
+            {
+                over.trailFadeTicks = ticks;
+                return;
+            }
+
+            ProjectileOverride created = Create(projectileDef);
+            created.trailFadeTicks = ticks;
+            Map[projectileDef.defName] = created;
         }
 
         // 设置轨迹开关。记录不存在时按「顺带开启覆写」处理，调用方无需自己分两步。
@@ -97,8 +175,15 @@ namespace Gunplay
             if (projectileDef == null) return;
 
             ProjectileOverride? over = Get(projectileDef);
-            if (over != null) over.trailEnabled = enabled;
-            else Set(projectileDef, enabled, TrailWidth.EffectiveForDef(projectileDef));
+            if (over != null)
+            {
+                over.trailEnabled = enabled;
+                return;
+            }
+
+            ProjectileOverride created = Create(projectileDef);
+            created.trailEnabled = enabled;
+            Map[projectileDef.defName] = created;
         }
 
         // 设置自定义颜色。记录不存在时按「顺带开启覆写」处理（与轨迹开关同约定）。
@@ -114,13 +199,10 @@ namespace Gunplay
                 return;
             }
 
-            Map[projectileDef.defName] = new ProjectileOverride
-            {
-                trailEnabled = true,
-                trailWidth = TrailWidth.EffectiveForDef(projectileDef),
-                hasColor = true,
-                trailColor = color
-            };
+            ProjectileOverride created = Create(projectileDef);
+            created.hasColor = true;
+            created.trailColor = color;
+            Map[projectileDef.defName] = created;
         }
 
         // 清除自定义颜色 = 回到「继承该投射物所用轨迹 def 的颜色」。覆写记录本身保留。
@@ -130,12 +212,16 @@ namespace Gunplay
             if (over != null) over.hasColor = false;
         }
 
-        static void Set(ThingDef projectileDef, bool trailEnabled, float trailWidth)
+        // 新建一条覆写记录：所有字段都填成「当前生效值」，使开启覆写这一动作本身不改变画面，
+        // 之后改哪个字段只影响哪个字段。新增覆写项时在这里补默认值即可。
+        static ProjectileOverride Create(ThingDef projectileDef)
         {
-            Map[projectileDef.defName] = new ProjectileOverride
+            return new ProjectileOverride
             {
-                trailEnabled = trailEnabled,
-                trailWidth = trailWidth
+                trailEnabled = true,
+                trailWidth = TrailWidth.EffectiveForDef(projectileDef),
+                trailLengthFactor = GunplaySettings.trailLengthFactor,
+                trailFadeTicks = GunplaySettings.trailFadeTicks
             };
         }
 

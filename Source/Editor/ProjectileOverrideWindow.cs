@@ -36,6 +36,8 @@ namespace Gunplay
         const float SwatchHeight = 24f;
         const float ResetButtonWidth = 24f;
         const float WidthColumnWidth = 110f;
+        const float LengthColumnWidth = 100f;
+        const float FadeColumnWidth = 90f;
         const float ModButtonWidth = 220f;
         const float TrailFilterWidth = 190f;
         const float OnlyOverriddenWidth = 180f;
@@ -71,7 +73,53 @@ namespace Gunplay
             public ProjectileTrailDef? trailDef;    // 该投射物解析出的轨迹 def（颜色继承的来源）
             public float editWidth;         // 输入框绑定的当前值
             public string? widthBuffer;     // 输入框字符串缓冲；null 表示尚未输入过
+            public float editLength;        // 拖尾长度系数的输入框绑定值
+            public string? lengthBuffer;
+            public float editFade;          // 淡出时长（tick）的输入框绑定值
+            public string? fadeBuffer;
         }
+
+        // 数值列的定义。宽度 / 长度 / 淡出三列的绘制流程完全一致，差别只有这几项，
+        // 因此把差异抽出来，加第四个数值覆写项时只需再声明一个实例 + 一列宽度。
+        // 每行的输入值与其字符串缓冲仍留在 Row 上，由调用方以 ref 传入（见 DrawNumberCell）。
+        readonly struct NumberColumn
+        {
+            internal readonly float width;
+            internal readonly float min;
+            internal readonly float max;
+            internal readonly Func<float, string> format;
+            internal readonly string tipKey;
+            internal readonly Func<Row, float> effective;   // 该行当前生效值（未覆写时也用它做只读显示）
+            internal readonly Action<Row, float> apply;     // 写入覆写
+
+            internal NumberColumn(float width, float min, float max, Func<float, string> format,
+                string tipKey, Func<Row, float> effective, Action<Row, float> apply)
+            {
+                this.width = width;
+                this.min = min;
+                this.max = max;
+                this.format = format;
+                this.tipKey = tipKey;
+                this.effective = effective;
+                this.apply = apply;
+            }
+        }
+
+        // 宽度是绝对值（0~2 世界单位，3 位小数）；长度系数与淡出是整数刻度（tick）
+        static readonly NumberColumn WidthColumn = new NumberColumn(
+            WidthColumnWidth, MinWidth, MaxWidth, Format, "GunplayOverrideTipWidth",
+            row => TrailWidth.EffectiveForDef(row.projectile),
+            (row, v) => ProjectileOverrides.SetTrailWidth(row.projectile, v));
+
+        static readonly NumberColumn LengthColumn = new NumberColumn(
+            LengthColumnWidth, TrailLength.Min, TrailLength.Max, FormatInt, "GunplayOverrideTipLength",
+            row => TrailLength.Effective(row.projectile),
+            (row, v) => ProjectileOverrides.SetTrailLength(row.projectile, v));
+
+        static readonly NumberColumn FadeColumn = new NumberColumn(
+            FadeColumnWidth, TrailFade.Min, TrailFade.Max, FormatInt, "GunplayOverrideTipFade",
+            row => TrailFade.Effective(row.projectile),
+            (row, v) => ProjectileOverrides.SetTrailFade(row.projectile, v));
 
         readonly List<Row> rows = new List<Row>();
         readonly List<Row> visible = new List<Row>();
@@ -173,7 +221,11 @@ namespace Gunplay
                     weaponTip = BuildWeaponTip(weapons),
                     trailDef = (GunplaySetup.ProjectileProp(def) ?? GunplaySetup.DefaultProjectileProp)?.trail,
                     editWidth = 0f,
-                    widthBuffer = null
+                    widthBuffer = null,
+                    editLength = 0f,
+                    lengthBuffer = null,
+                    editFade = 0f,
+                    fadeBuffer = null
                 });
             }
 
@@ -244,11 +296,21 @@ namespace Gunplay
         {
             row.editWidth = TrailWidth.EffectiveForDef(row.projectile);
             row.widthBuffer = Format(row.editWidth);
+            row.editLength = TrailLength.Effective(row.projectile);
+            row.lengthBuffer = FormatInt(row.editLength);
+            row.editFade = TrailFade.Effective(row.projectile);
+            row.fadeBuffer = FormatInt(row.editFade);
         }
 
         static string Format(float value)
         {
             return value.ToString("0.###");
+        }
+
+        // 长度系数与淡出时长都以整数刻度显示（分数在这里没有视觉意义，见 TrailLength / TrailFade）
+        static string FormatInt(float value)
+        {
+            return Mathf.RoundToInt(value).ToString();
         }
 
         // ---------------- 是否显示轨迹 ----------------
@@ -445,36 +507,75 @@ namespace Gunplay
 
         void DrawHeader(Rect rect)
         {
-            Columns(rect.width, out float overrideX, out float trailX, out float colorX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW);
+            ColumnLayout layout = ColumnLayout.Compute(rect.width);
 
             Text.Anchor = TextAnchor.MiddleLeft;
             GUI.color = new Color(0.75f, 0.75f, 0.75f);
 
-            Widgets.Label(new Rect(overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
-            Widgets.Label(new Rect(trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
-            Widgets.Label(new Rect(colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
-            Widgets.Label(new Rect(projX, rect.y, projW, rect.height), "GunplayOverrideColProjectile".Translate());
-            Widgets.Label(new Rect(weaponX, rect.y, weaponW, rect.height), "GunplayOverrideColWeapon".Translate());
-            Widgets.Label(new Rect(widthX, rect.y, WidthColumnWidth, rect.height), "GunplayOverrideColWidth".Translate());
+            Widgets.Label(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
+            Widgets.Label(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
+            Widgets.Label(new Rect(layout.colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
+            Widgets.Label(new Rect(layout.projX, rect.y, layout.projW, rect.height), "GunplayOverrideColProjectile".Translate());
+            Widgets.Label(new Rect(layout.weaponX, rect.y, layout.weaponW, rect.height), "GunplayOverrideColWeapon".Translate());
+            Widgets.Label(new Rect(layout.widthX, rect.y, WidthColumnWidth, rect.height), "GunplayOverrideColWidth".Translate());
+            Widgets.Label(new Rect(layout.lengthX, rect.y, LengthColumnWidth, rect.height), "GunplayOverrideColLength".Translate());
+            Widgets.Label(new Rect(layout.fadeX, rect.y, FadeColumnWidth, rect.height), "GunplayOverrideColFade".Translate());
 
             GUI.color = Color.white;
             Text.Anchor = TextAnchor.UpperLeft;
         }
 
-        static void Columns(float width, out float overrideX, out float trailX, out float colorX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW)
+        // 各列的 x 坐标与两个弹性列（投射物 / 武器）的宽度。用结构体而不是一排 out 参数：
+        // 表头、行容器、行绘制三处都要用同一组值，逐个 out 传递既冗长又容易接错顺序。
+        readonly struct ColumnLayout
         {
-            float inner = Mathf.Max(0f, width - ScrollbarWidth);
-            float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - ColorColumnWidth - WidthColumnWidth);
+            internal readonly float overrideX;
+            internal readonly float trailX;
+            internal readonly float colorX;
+            internal readonly float projX;
+            internal readonly float weaponX;
+            internal readonly float widthX;
+            internal readonly float lengthX;
+            internal readonly float fadeX;
+            internal readonly float projW;
+            internal readonly float weaponW;
 
-            projW = rest * 0.5f;
-            weaponW = rest - projW;
+            internal ColumnLayout(float overrideX, float trailX, float colorX, float projX, float weaponX,
+                float widthX, float lengthX, float fadeX, float projW, float weaponW)
+            {
+                this.overrideX = overrideX;
+                this.trailX = trailX;
+                this.colorX = colorX;
+                this.projX = projX;
+                this.weaponX = weaponX;
+                this.widthX = widthX;
+                this.lengthX = lengthX;
+                this.fadeX = fadeX;
+                this.projW = projW;
+                this.weaponW = weaponW;
+            }
 
-            overrideX = 0f;
-            trailX = overrideX + OverrideToggleWidth;
-            colorX = trailX + TrailToggleWidth;
-            projX = colorX + ColorColumnWidth;
-            weaponX = projX + projW;
-            widthX = weaponX + weaponW;
+            // 固定宽度的列各占其位，剩余宽度由投射物 / 武器两列平分
+            internal static ColumnLayout Compute(float width)
+            {
+                float inner = Mathf.Max(0f, width - ScrollbarWidth);
+                float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - ColorColumnWidth
+                    - WidthColumnWidth - LengthColumnWidth - FadeColumnWidth);
+
+                float projW = rest * 0.5f;
+                float weaponW = rest - projW;
+
+                float overrideX = 0f;
+                float trailX = overrideX + OverrideToggleWidth;
+                float colorX = trailX + TrailToggleWidth;
+                float projX = colorX + ColorColumnWidth;
+                float weaponX = projX + projW;
+                float widthX = weaponX + weaponW;
+                float lengthX = widthX + WidthColumnWidth;
+
+                return new ColumnLayout(overrideX, trailX, colorX, projX, weaponX,
+                    widthX, lengthX, lengthX + LengthColumnWidth, projW, weaponW);
+            }
         }
 
         void DrawRows(Rect outRect)
@@ -487,7 +588,7 @@ namespace Gunplay
                 return;
             }
 
-            Columns(outRect.width, out float overrideX, out float trailX, out float colorX, out float projX, out float weaponX, out float widthX, out float projW, out float weaponW);
+            ColumnLayout layout = ColumnLayout.Compute(outRect.width);
 
             float viewWidth = Mathf.Max(0f, outRect.width - ScrollbarWidth);
             Rect viewRect = new Rect(0f, 0f, viewWidth, visible.Count * RowHeight);
@@ -499,14 +600,13 @@ namespace Gunplay
 
             for (int i = first; i <= last; i++)
             {
-                DrawRow(visible[i], i, viewWidth, overrideX, trailX, colorX, projX, weaponX, widthX, projW, weaponW);
+                DrawRow(visible[i], i, viewWidth, layout);
             }
 
             Widgets.EndScrollView();
         }
 
-        void DrawRow(Row row, int index, float viewWidth,
-            float overrideX, float trailX, float colorX, float projX, float weaponX, float widthX, float projW, float weaponW)
+        void DrawRow(Row row, int index, float viewWidth, in ColumnLayout layout)
         {
             float y = index * RowHeight;
             Widgets.DrawHighlightIfMouseover(new Rect(0f, y, viewWidth, RowHeight));
@@ -515,12 +615,14 @@ namespace Gunplay
             bool overridden = over != null;
             bool trailOn = TrailShown(row);   // 未覆写时是默认情况，不再是恒为勾选
 
-            DrawToggle(row, overrideX, y, overridden);
-            DrawTrailToggle(row, trailX, y, trailOn);
-            DrawColorCell(row, colorX, y, overridden, trailOn);
-            DrawNameCell(row.projectile, row.projectileLabel, row.projectile.defName, projX, y, projW, null);
-            DrawWeaponCell(row, weaponX, y, weaponW);
-            DrawWidthCell(row, widthX, y, overridden, trailOn);
+            DrawToggle(row, layout.overrideX, y, overridden);
+            DrawTrailToggle(row, layout.trailX, y, trailOn);
+            DrawColorCell(row, layout.colorX, y, overridden, trailOn);
+            DrawNameCell(row.projectile, row.projectileLabel, row.projectile.defName, layout.projX, y, layout.projW, null);
+            DrawWeaponCell(row, layout.weaponX, y, layout.weaponW);
+            DrawNumberCell(row, WidthColumn, layout.widthX, y, overridden, trailOn, ref row.editWidth, ref row.widthBuffer);
+            DrawNumberCell(row, LengthColumn, layout.lengthX, y, overridden, trailOn, ref row.editLength, ref row.lengthBuffer);
+            DrawNumberCell(row, FadeColumn, layout.fadeX, y, overridden, trailOn, ref row.editFade, ref row.fadeBuffer);
         }
 
         void DrawToggle(Row row, float x, float y, bool overridden)
@@ -689,39 +791,52 @@ namespace Gunplay
             }
         }
 
-        void DrawWidthCell(Row row, float x, float y, bool overridden, bool trailOn)
+        // 数值列（宽度 / 长度 / 淡出）的统一渲染。三列流程完全一致：
+        //   轨迹关掉 → 占位符；未覆写 → 只读显示当前生效值；覆写 → 可编辑输入框。
+        // 差异全部来自 col，见 NumberColumn 与三个静态实例。
+        // editValue / buffer 走 ref 是因为它们必须长期挂在 Row 上：缓冲跨帧保留，
+        // 否则滚出视野再滚回来会丢焦点、丢正在输入的内容。
+        void DrawNumberCell(Row row, in NumberColumn col, float x, float y, bool overridden, bool trailOn,
+            ref float editValue, ref string? buffer)
         {
-            Rect rect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, WidthColumnWidth - 8f), RowHeight - 10f);
+            Rect rect = new Rect(x + 4f, y + 5f, Mathf.Max(0f, col.width - 8f), RowHeight - 10f);
 
-            // 该投射物的轨迹被关掉时，宽度没有意义：不显示输入框
             if (overridden && !trailOn)
             {
-                GUI.color = new Color(0.55f, 0.55f, 0.55f);
-                Text.Anchor = TextAnchor.MiddleLeft;
-                Widgets.Label(rect, "—");
-                Text.Anchor = TextAnchor.UpperLeft;
-                GUI.color = Color.white;
+                DrawDash(rect);
                 return;
             }
 
             if (!overridden)
             {
-                // 未覆写：显示当前实际生效的宽度（随全局模式/系数实时变化），只读文本
+                // 显示随全局设置实时变化的生效值，只读文本
                 GUI.color = new Color(0.55f, 0.55f, 0.55f);
                 Text.Anchor = TextAnchor.MiddleLeft;
-                Widgets.Label(rect, Format(TrailWidth.EffectiveForDef(row.projectile)));
+                Widgets.Label(rect, col.format(col.effective(row)));
                 Text.Anchor = TextAnchor.UpperLeft;
                 GUI.color = Color.white;
+                TooltipHandler.TipRegion(rect, col.tipKey.Translate());
                 return;
             }
 
-            float before = row.editWidth;
-            Widgets.TextFieldNumeric(rect, ref row.editWidth, ref row.widthBuffer, MinWidth, MaxWidth);
+            float before = editValue;
+            Widgets.TextFieldNumeric(rect, ref editValue, ref buffer, col.min, col.max);
+            TooltipHandler.TipRegion(rect, col.tipKey.Translate());
 
-            if (row.editWidth == before) return;
+            if (editValue == before) return;
 
-            row.editWidth = Mathf.Clamp(row.editWidth, MinWidth, MaxWidth);
-            ProjectileOverrides.SetTrailWidth(row.projectile, row.editWidth);
+            editValue = Mathf.Clamp(editValue, col.min, col.max);
+            col.apply(row, editValue);
+        }
+
+        // 「无意义」占位符：该行的轨迹被关掉时，宽度 / 长度 / 淡出都不生效
+        static void DrawDash(Rect rect)
+        {
+            GUI.color = new Color(0.55f, 0.55f, 0.55f);
+            Text.Anchor = TextAnchor.MiddleLeft;
+            Widgets.Label(rect, "—");
+            Text.Anchor = TextAnchor.UpperLeft;
+            GUI.color = Color.white;
         }
     }
 }

@@ -16,6 +16,12 @@
   <GunplayParticleMultiplierDesc>对命中特效生成的粒子数量进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedName>子弹速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>将所有子弹的速度调整到指定的百分比(默认300%)</GunplayProjectileSpeedDesc>
+  <GunplayTrailLengthName>轨迹长度</GunplayTrailLengthName>
+  <GunplayTrailLengthDesc>长度 = 该值 × 投射物自身的（未缩放）弹速，所以快弹拖尾长、慢弹拖尾短。例如弹速70的子弹取默认值15时，拖尾长10.5格（默认15，范围1~120）。只对之后新发射的投射物生效.</GunplayTrailLengthDesc>
+  <GunplayTrailFadeName>轨迹淡出时长</GunplayTrailFadeName>
+  <GunplayTrailFadeDesc>弹体消失后，拖尾收缩到零所需的 tick 数（60 tick = 1 秒）。与拖尾长度互不影响（默认15，范围1~120）。只对之后新发射的投射物生效.</GunplayTrailFadeDesc>
+  <GunplayArcSegmentCountName>弧线段数</GunplayArcSegmentCountName>
+  <GunplayArcSegmentCountDesc>弧线轨迹（手榴弹、迫击炮弹等）被切成多少段绘制。段数越多越平滑，开销也越大（默认16，范围2~64）.</GunplayArcSegmentCountDesc>
   <GunplayTrailWidthModeDesc>决定子弹轨迹基础宽度的计算方式.</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>轨迹宽度：基于投射物伤害</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>轨迹宽度：基于投射物贴图尺寸</GunplayTrailWidthModeTexture>
@@ -28,7 +34,7 @@
   <GunplayUnarmedBulletsOnlyName>仅限子弹类无武器投射物</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>开启后，只有伤害类型为子弹（Bullet）的无武器投射物才会产生这些特效.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>投射物单项覆写...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹宽度和颜色。宽度覆写值是绝对值，不再乘上面的轨迹宽度倍率.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹宽度、长度、淡出时长和颜色。各项覆写值都是绝对值，不再受上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
   <GunplayTrailColorsName>轨迹颜色...</GunplayTrailColorsName>
   <GunplayTrailColorsDesc>自定义各类轨迹贴图的颜色。改动立即生效，但只对之后新发射的投射物生效.</GunplayTrailColorsDesc>
   <GunplayTrailColorsWindowTitle>轨迹颜色</GunplayTrailColorsWindowTitle>
@@ -73,6 +79,11 @@
   <GunplayOverrideColProjectile>投射物</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>轨迹宽度</GunplayOverrideColWidth>
+  <GunplayOverrideColLength>长度</GunplayOverrideColLength>
+  <GunplayOverrideColFade>淡出（tick）</GunplayOverrideColFade>
+  <GunplayOverrideTipWidth>轨迹宽度，世界单位。绝对值，既不看宽度模式也不乘全局倍率.</GunplayOverrideTipWidth>
+  <GunplayOverrideTipLength>长度 = 该值 × 投射物自身的（未缩放）弹速。绝对值，不受全局轨迹长度影响.</GunplayOverrideTipLength>
+  <GunplayOverrideTipFade>弹体消失后，拖尾收缩到零所需的 tick 数（60 tick = 1 秒）。绝对值，不受全局淡出时长影响.</GunplayOverrideTipFade>
   <GunplayOverrideNoWeapon>没有武器使用该投射物.</GunplayOverrideNoWeapon>
   <GunplayOverrideWeaponTipHeader>使用该投射物的武器：</GunplayOverrideWeaponTipHeader>
   <GunplayOverrideNoResults>没有符合当前过滤条件的投射物.</GunplayOverrideNoResults>

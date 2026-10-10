@@ -16,6 +16,12 @@
   <GunplayParticleMultiplierDesc>命中エフェクトで発生するパーティクル数の倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedName>発射体速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>全種類の発射体の飛翔速度を指定したパーセンテージに変更します。</GunplayProjectileSpeedDesc>
+  <GunplayTrailLengthName>弾道の長さ</GunplayTrailLengthName>
+  <GunplayTrailLengthDesc>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになるため、速い弾ほど弾道が長くなります。速度70の弾なら既定値15で10.5タイル（既定15、範囲1～120）。以後に発射される発射体にのみ適用されます。</GunplayTrailLengthDesc>
+  <GunplayTrailFadeName>弾道の消滅時間</GunplayTrailFadeName>
+  <GunplayTrailFadeDesc>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。弾道の長さとは無関係です（既定15、範囲1～120）。以後に発射される発射体にのみ適用されます。</GunplayTrailFadeDesc>
+  <GunplayArcSegmentCountName>弧状弾道の分割数</GunplayArcSegmentCountName>
+  <GunplayArcSegmentCountDesc>弧状の弾道（擲弾・迫撃砲弾など）を描画する際の分割数。多いほど滑らかになりますが、処理コストも増えます（既定16、範囲2～64）。</GunplayArcSegmentCountDesc>
   <GunplayTrailWidthModeDesc>弾道の基本幅の計算方法を指定します。</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>弾道の幅：発射体のダメージに基づく</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>弾道の幅：発射体のテクスチャサイズに基づく</GunplayTrailWidthModeTexture>
@@ -28,7 +34,7 @@
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>有効にすると、ダメージ種別が「弾（Bullet）」の発射体のみこれらのエフェクトを表示します。</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>発射体ごとの上書き...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅と色を個別に指定します。上書きした幅は絶対値であり、上記の「弾道の幅の倍率」は適用されません。</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>発射体ごとに弾道の幅・長さ・消滅時間・色を個別に指定します。上書きした値はすべて絶対値であり、上記の全体的な弾道設定は適用されません。</GunplayProjectileOverridesDesc>
   <GunplayTrailColorsName>弾道の色...</GunplayTrailColorsName>
   <GunplayTrailColorsDesc>弾道テクスチャの色を種類ごとに設定します。変更は即時反映されますが、以後に発射される発射体にのみ適用されます。</GunplayTrailColorsDesc>
   <GunplayTrailColorsWindowTitle>弾道の色</GunplayTrailColorsWindowTitle>
@@ -73,6 +79,11 @@
   <GunplayOverrideColProjectile>発射体</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
   <GunplayOverrideColWidth>弾道の幅</GunplayOverrideColWidth>
+  <GunplayOverrideColLength>長さ</GunplayOverrideColLength>
+  <GunplayOverrideColFade>消滅（tick）</GunplayOverrideColFade>
+  <GunplayOverrideTipWidth>弾道の幅（ワールド単位）。絶対値であり、幅の計算方法や全体的な倍率は適用されません。</GunplayOverrideTipWidth>
+  <GunplayOverrideTipLength>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになります。絶対値であり、全体的な弾道の長さの影響を受けません。</GunplayOverrideTipLength>
+  <GunplayOverrideTipFade>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。絶対値であり、全体的な消滅時間の影響を受けません。</GunplayOverrideTipFade>
   <GunplayOverrideNoWeapon>この発射体を使用する武器はありません。</GunplayOverrideNoWeapon>
   <GunplayOverrideWeaponTipHeader>この発射体を使用する武器：</GunplayOverrideWeaponTipHeader>
   <GunplayOverrideNoResults>現在の絞り込みに一致する発射体はありません。</GunplayOverrideNoResults>
