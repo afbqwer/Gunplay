@@ -148,7 +148,6 @@ namespace Gunplay
         // 阈值口径见 StationaryTicksBeforeDrop。
         int ticksIdle;
         Thing? projectile;
-        Func<Vector3>? exactPositionGetter;
         Vector3 a;
         Vector3 exactPosition;
         Vector3 previousPosition;
@@ -180,6 +179,11 @@ namespace Gunplay
         // CE 投射物（直线与弧线）每 tick 都跟踪"绘制位置"（含 CE 的高度屏幕偏移），
         // 使拖尾/弧线贴着弹体而不是地面投影。采样失败回退解析弧线时退回地面口径。
         bool ceTrackDrawnPosition;
+        // 该 def 的绘制映射器（worker 实例 + 它 ExactPosToDrawPos 的直调委托）。
+        // 两者都只由 def 决定，在 InitializeCE 里解析一次存这儿；Tick 直接用，不再每 tick
+        // 反射取 worker、也不再每 tick 查一次「worker 类型 → 委托」的字典（见 PatchCECompat.ResolveDrawMapper）。
+        object? ceWorker;
+        PatchCECompat.DrawPosAccessor? ceDrawAccessor;
         // 弧线 CE 投射物：发射时按 CE 绘制映射采样的整条弹道绘制点（世界坐标，y 为 altitude 层）
         // CE 投射物：null 表示未/无法采样，此时按解析抛物线取点（ceArcCumLen 同样可能仍为 null）
         List<Vector3>? ceArcSamples;
@@ -196,9 +200,6 @@ namespace Gunplay
             ticksUtilDeath = -1;
             ticksIdle = 0;
             projectile = proj;
-            // 原版路径不分配反射取值器：Tick 里直接用 projectile.ExactPosition（见该处注释）。
-            // 这里曾经写成 () => proj.ExactPosition，那是一发一次的闭包分配，纯多余。
-            exactPositionGetter = null;
             a = proj.ExactPosition;
             Vector3 b = destination;
             altitude = proj.def.Altitude + DepthEpsilon;
@@ -233,8 +234,9 @@ namespace Gunplay
             ticksUtilDeath = -1;
             ticksIdle = 0;
             projectile = proj;
-            exactPositionGetter = PatchCECompat.CreateExactPositionGetter(proj);
-            a = exactPositionGetter();
+            a = PatchCECompat.GetExactPosition(proj);
+            // 绘制映射器只由 def 决定：这一发解析一次，之后每 tick 直接用（见字段注释）
+            PatchCECompat.ResolveDrawMapper(proj.def.projectile, out ceWorker, out ceDrawAccessor);
             Vector3 b = destination;
             altitude = proj.def.Altitude + DepthEpsilon;
             a.y = b.y = altitude;
@@ -301,19 +303,18 @@ namespace Gunplay
                     // 弹体，得从新位置重开一条尾巴，即把位移累积清零）。原版与 CE 现有的投射物都没有
                     // 这条路：唯一的冻结入口是 Projectile_Explosive 的 landed，而它只通向爆炸。
                     projectile = null;
-                    exactPositionGetter = null;
                     ticksUtilDeath = Mathf.CeilToInt(fadeTicks);
                 }
                 else
                 {
                     // 只在投射物存活时读取位置；销毁后不再访问它。
                     // 位置来源按运行时类型分流，而不是看哪个 Initialize 被调用过：
-                    //   * 原版投射物本身是 Projectile —— 直接读 projectile.ExactPosition，
-                    //     无需反射取值器（Initialize 因此不分配那个委托，见其注释）；
-                    //   * CE 的 ProjectileCE 不是 Projectile 子类 —— 走反射取值器（直线取绘制位置，含高度偏移）。
+                    //   * 原版投射物本身就是 Projectile —— 直接读 projectile.ExactPosition；
+                    //   * CE 的 ProjectileCE 不是 Projectile 子类 —— 直线取绘制位置（含高度偏移），
+                    //     弧线采样失败时退回它的 ExactPosition。两条都走已缓存好的映射器，无反射。
                     Vector3? drawn = ceTrackDrawnPosition
-                        ? PatchCECompat.GetDrawPosition(projectile)
-                        : (projectile is Projectile vanilla ? vanilla.ExactPosition : exactPositionGetter?.Invoke());
+                        ? PatchCECompat.GetDrawPosition(projectile, ceWorker, ceDrawAccessor)
+                        : (projectile is Projectile vanilla ? vanilla.ExactPosition : PatchCECompat.GetExactPosition(projectile));
                     if (drawn.HasValue) ApplyPosition(drawn.Value);
                 }
             }
@@ -356,21 +357,19 @@ namespace Gunplay
 
             ApplyPosition(pos);
             projectile = null;
-            exactPositionGetter = null;
             ticksUtilDeath = Mathf.CeilToInt(fadeTicks);
         }
 
-        // CE 投射物销毁前锁定最终位置。取位置口径与飞行中一致：直线取绘制位置，弧线取地面投影。
+        // CE 投射物销毁前锁定最终位置。取位置口径与飞行中一致：直线取绘制位置，弧线取地面位置。
         public void CaptureFinalPositionCE(Thing proj)
         {
             if (projectile == null) return;
 
-            Vector3? drawn = ceTrackDrawnPosition
-                ? PatchCECompat.GetDrawPosition(proj)
-                : exactPositionGetter?.Invoke();
-            if (!drawn.HasValue) return;
+            Vector3 drawn = ceTrackDrawnPosition
+                ? PatchCECompat.GetDrawPosition(proj, ceWorker, ceDrawAccessor)
+                : PatchCECompat.GetExactPosition(proj);
 
-            CaptureFinalPosition(drawn.Value);
+            CaptureFinalPosition(drawn);
         }
 
         // ---------------- 剔除 ----------------

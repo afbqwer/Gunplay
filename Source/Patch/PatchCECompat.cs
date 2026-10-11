@@ -77,8 +77,19 @@ namespace Gunplay.Patch
         static Func<Thing, int>? flightTicksGetter;         // ProjectileCE.FlightTicks
         static Func<Thing, int>? truePosTicksGetter;        // ProjectileCE.ticksToTruePosition
 
-        // worker 的 ExactPosToDrawPos 签名：第 1 个参数是 worker 实例（开放实例委托）
-        delegate Vector3 DrawPosAccessor(object worker, Vector3 exactPos, int flightTicks, int ticksToTruePosition, float altitude);
+        // 投射物 def 侧的成员：接收者是 ProjectileProperties 而不是 Thing，所以与上面三个分开一类。
+        // worker 是「每个 def 一个实例」的常量，本该随 def 解析一次（见 ResolveDrawMapper）。
+        static Func<ProjectileProperties, object>? trajectoryWorkerGetter;  // ProjectilePropertiesCE.TrajectoryWorker
+
+        // 下面三个原先走裸反射（每次 GetValue 都装箱一个 float）。它们虽然只在登记时读一次，
+        // 但没有理由比同一路径上的其它成员更贵——统一编成委托。
+        static Func<Thing, float>? damageAmountGetter;      // ProjectileCE.DamageAmount（虚属性，含武器品质倍率）
+        static Func<Thing, float>? shotAngleGetter;         // ProjectileCE.shotAngle
+        static Func<Thing, float>? startingTicksGetter;     // ProjectileCE.startingTicksToImpact
+
+        // worker 的 ExactPosToDrawPos 签名：第 1 个参数是 worker 实例（开放实例委托）。
+        // internal：轨迹状态要按发缓存「worker + 它的绘制委托」，见 ResolveDrawMapper / GetDrawPosition。
+        internal delegate Vector3 DrawPosAccessor(object worker, Vector3 exactPos, int flightTicks, int ticksToTruePosition, float altitude);
 
         // 按 worker 运行时类型缓存（worker 实例随 def 而异，方法随类型固定）。null 值也要缓存：
         // 它表示「该类型构建不出委托」，避免每次调用都重试一遍并重复打日志。
@@ -127,7 +138,8 @@ namespace Gunplay.Patch
             }
         }
 
-        static Vector3 GetExactPosition(Thing proj)
+        // internal：轨迹状态在 CE 分支里直接读它（原版投射物读自己的 ExactPosition，见 ProjectileTrailState.Tick）
+        internal static Vector3 GetExactPosition(Thing proj)
         {
             // 反射取值失败时退回本体绘制位置，而不是在某次版本失配后每 tick 抛异常
             Func<Thing, Vector3>? fast = exactPositionGetter;
@@ -152,26 +164,28 @@ namespace Gunplay.Patch
             return ticksToTruePositionField?.GetValue(proj) is int ticks ? ticks : 0;
         }
 
-        // CE 投射物存活期间的实时位置读取器（由轨迹每 tick 调用）
-        internal static Func<Vector3> CreateExactPositionGetter(Thing proj)
-        {
-            return () => GetExactPosition(proj);
-        }
-
         // 逐项独立构建：某一项解析不了只影响它自己（回落反射），并在日志里点名是哪一个成员。
         // 上一次这三个挤在同一个 try/catch 里，一条 "method arguments are incompatible"
         // 完全看不出是谁的问题。整段都不影响补丁是否挂上。
         static void BuildFastAccessors()
         {
-            if (exactPositionProp != null) exactPositionGetter = BuildAccessor<Vector3>(exactPositionProp);
-            if (flightTicksField != null) flightTicksGetter = BuildAccessor<int>(flightTicksField);
-            if (ticksToTruePositionField != null) truePosTicksGetter = BuildAccessor<int>(ticksToTruePositionField);
+            if (exactPositionProp != null) exactPositionGetter = BuildAccessor<Thing, Vector3>(exactPositionProp);
+            if (flightTicksField != null) flightTicksGetter = BuildAccessor<Thing, int>(flightTicksField);
+            if (ticksToTruePositionField != null) truePosTicksGetter = BuildAccessor<Thing, int>(ticksToTruePositionField);
+
+            if (trajectoryWorkerProp != null) trajectoryWorkerGetter = BuildAccessor<ProjectileProperties, object>(trajectoryWorkerProp);
+            if (damageAmountProp != null) damageAmountGetter = BuildAccessor<Thing, float>(damageAmountProp);
+            if (shotAngleField != null) shotAngleGetter = BuildAccessor<Thing, float>(shotAngleField);
+            if (startingTicksToImpactField != null) startingTicksGetter = BuildAccessor<Thing, float>(startingTicksToImpactField);
         }
 
-        // 把「Thing 参数 → 读成员」编成无装箱委托。成员声明类型与 Thing 之间的那一步由 castclass 完成，
+        // 把「接收者参数 → 读成员」编成无装箱委托。成员声明类型与接收者类型之间的那一步由 castclass 完成，
         // 所以不要求第一个参数等于声明类型（这正是 CreateDelegate 在 Mono 上做不到的）；
         // 虚属性用 callvirt，分派语义与原来的 GetValue 一致。
-        static Func<Thing, T>? BuildAccessor<T>(MemberInfo member)
+        //
+        // 接收者类型是参数化的：CE 投射物成员挂在 ProjectileCE（以 Thing 传入），
+        // 而 TrajectoryWorker 挂在 ProjectilePropertiesCE（以 ProjectileProperties 传入）。
+        static Func<TReceiver, T>? BuildAccessor<TReceiver, T>(MemberInfo member)
         {
             Type? declaring = member.DeclaringType;
             if (declaring == null) return null;
@@ -183,7 +197,7 @@ namespace Gunplay.Patch
             try
             {
                 var accessor = new DynamicMethod(
-                    "GunplayCE_" + member.Name, typeof(T), new[] { typeof(Thing) },
+                    "GunplayCE_" + member.Name, typeof(T), new[] { typeof(TReceiver) },
                     typeof(Thing).Module, skipVisibility: true);
 
                 ILGenerator il = accessor.GetILGenerator();
@@ -193,7 +207,7 @@ namespace Gunplay.Patch
                 else il.Emit(OpCodes.Callvirt, getter!);
                 il.Emit(OpCodes.Ret);
 
-                return (Func<Thing, T>)accessor.CreateDelegate(typeof(Func<Thing, T>));
+                return (Func<TReceiver, T>)accessor.CreateDelegate(typeof(Func<TReceiver, T>));
             }
             catch (Exception e)
             {
@@ -205,32 +219,62 @@ namespace Gunplay.Patch
 
         internal static float GetDamageAmount(Thing proj)
         {
+            Func<Thing, float>? fast = damageAmountGetter;
+            if (fast != null) return fast(proj);
+
             return damageAmountProp?.GetValue(proj) is float damage ? damage : 10f;
         }
 
         internal static float GetShotAngle(Thing proj)
         {
+            Func<Thing, float>? fast = shotAngleGetter;
+            if (fast != null) return fast(proj);
+
             return shotAngleField?.GetValue(proj) is float angle ? angle : 0f;
         }
 
         // ---------------- 绘制位置（CE 高度映射）----------------
 
-        // 经 worker 的 ExactPosToDrawPos 计算投射物当前的实际绘制位置（y 为 altitude 层，z 含高度偏移）
-        internal static Vector3 GetDrawPosition(Thing proj)
+        // 解析该 def 的绘制映射器：worker 实例 + 它 ExactPosToDrawPos 的直调委托。
+        // 两者都只由投射物 def 决定（worker 来自 def.projectile，委托又由 worker 的类型决定），
+        // 所以每发解析一次、由轨迹状态持有——原先每 tick 都要重做一次反射取值和一次字典查找。
+        internal static void ResolveDrawMapper(ProjectileProperties props, out object? worker, out DrawPosAccessor? accessor)
         {
-            Vector3 exact = GetExactPosition(proj);
-            object? worker = trajectoryWorkerProp?.GetValue(proj.def.projectile);
-            int flightTicks = GetFlightTicks(proj);
-            return DrawViaWorker(proj, worker, exact, flightTicks);
+            worker = GetWorker(props);
+            accessor = worker != null ? GetDrawAccessor(worker.GetType()) : null;
         }
 
+        static object? GetWorker(ProjectileProperties props)
+        {
+            Func<ProjectileProperties, object>? fast = trajectoryWorkerGetter;
+            if (fast != null) return fast(props);
+
+            return trajectoryWorkerProp?.GetValue(props);
+        }
+
+        // 经 worker 的 ExactPosToDrawPos 计算投射物当前的实际绘制位置（y 为 altitude 层，z 含高度偏移）。
+        // worker / accessor 由调用方缓存（见 ResolveDrawMapper），这里只读每 tick 会变的那几项。
+        internal static Vector3 GetDrawPosition(Thing proj, object? worker, DrawPosAccessor? accessor)
+        {
+            Vector3 exact = GetExactPosition(proj);
+            int flightTicks = GetFlightTicks(proj);
+            return DrawViaWorker(proj, worker, accessor, exact, flightTicks);
+        }
+
+        // 一次性路径（PredictDrawPositions，每发最多调一次）用的形态：accessor 现查。
+        // GetDrawAccessor 自带按类型的缓存，这里多一次字典查找，但调用频率低，不值得为此多传一组状态。
         static Vector3 DrawViaWorker(Thing proj, object? worker, Vector3 exact, int flightTicks)
+        {
+            DrawPosAccessor? accessor = worker != null ? GetDrawAccessor(worker.GetType()) : null;
+            return DrawViaWorker(proj, worker, accessor, exact, flightTicks);
+        }
+
+        static Vector3 DrawViaWorker(Thing proj, object? worker, DrawPosAccessor? accessor, Vector3 exact, int flightTicks)
         {
             float altitude = proj.def.Altitude;
             if (worker == null) return new Vector3(exact.x, altitude, exact.z); // 无 worker 兜底：地面投影
 
-            DrawPosAccessor? fast = GetDrawAccessor(worker.GetType());
-            if (fast != null) return fast(worker, exact, flightTicks, GetTicksToTruePosition(proj), altitude);
+            if (accessor != null) return accessor(worker, exact, flightTicks, GetTicksToTruePosition(proj), altitude);
 
             // 兜底：委托构建失败时走反射。这条路径正常不会走到，只在 CE 改签名时兜一次
             MethodInfo? draw = AccessTools.Method(worker.GetType(), "ExactPosToDrawPos");
@@ -249,6 +293,9 @@ namespace Gunplay.Patch
         // 发射时的预测飞行时长（tick），用于弧线采样
         internal static int GetStartingTicksToImpact(Thing proj)
         {
+            Func<Thing, float>? fast = startingTicksGetter;
+            if (fast != null) return Mathf.CeilToInt(fast(proj));
+
             return startingTicksToImpactField != null ? Mathf.CeilToInt((float)startingTicksToImpactField.GetValue(proj)) : 0;
         }
 

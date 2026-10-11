@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -16,7 +17,38 @@ namespace Gunplay.Patch
     [HarmonyPatch(typeof(Projectile), "Launch", new Type[] { typeof(Thing), typeof(Vector3), typeof(LocalTargetInfo), typeof(LocalTargetInfo), typeof(ProjectileHitFlags), typeof(bool), typeof(Thing), typeof(ThingDef) })]
     class PatchProjectileLaunch
     {
-        static PropertyInfo? StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
+        static readonly PropertyInfo? StartingTicksToImpactProp = typeof(Projectile).GetProperty("StartingTicksToImpact", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // 每发都读一次 StartingTicksToImpact（见 RunPostfix），原先走 PropertyInfo.GetValue：
+        // 一次反射调用 + 一次装箱 float。编成无装箱委托后零分配。
+        //
+        // 用 callvirt 而不是 Delegate.CreateDelegate：后者在 Mono 上对虚方法绑定的是基类实现，
+        // 会漏掉子类覆写；DynamicMethod + callvirt 的分派语义与 GetValue 一致（同 PatchCECompat.BuildAccessor）。
+        static readonly Func<Projectile, float>? StartingTicksToImpactGetter = BuildStartingTicksGetter();
+
+        static Func<Projectile, float>? BuildStartingTicksGetter()
+        {
+            MethodInfo? getter = StartingTicksToImpactProp?.GetGetMethod(true);
+            if (getter == null) return null;
+
+            try
+            {
+                var dm = new DynamicMethod("GunplayStartingTicksToImpact", typeof(float), new[] { typeof(Projectile) },
+                    typeof(Projectile).Module, skipVisibility: true);
+
+                ILGenerator il = dm.GetILGenerator();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Callvirt, getter);
+                il.Emit(OpCodes.Ret);
+
+                return (Func<Projectile, float>)dm.CreateDelegate(typeof(Func<Projectile, float>));
+            }
+            catch (Exception e)
+            {
+                Log.Warning("[Gunplay] Could not bind Projectile.StartingTicksToImpact; it will be read via reflection. " + e.Message);
+                return null;
+            }
+        }
 
         // 无武器投射物的特效开关：总开关 + 仅子弹伤害过滤
         internal static bool UnarmedEffectsAllowed(Thing projectile)
@@ -62,10 +94,14 @@ namespace Gunplay.Patch
             {
                 ___origin += (___destination - ___origin).normalized * gunProp.barrelLength;
 
-                // 反射取值失败时（版本变动改名）保留原 tick 数，不在这条热路径上抛异常影响轨迹登记
-                if (StartingTicksToImpactProp?.GetValue(__instance) is float startingTicksToImpact)
+                // 取值失败时（绑定失败回落反射 / 版本变动改名）保留原 tick 数，
+                // 不在这条热路径上抛异常影响轨迹登记
+                float? startingTicksToImpact = StartingTicksToImpactGetter != null
+                    ? StartingTicksToImpactGetter(__instance)
+                    : (StartingTicksToImpactProp?.GetValue(__instance) as float?);
+                if (startingTicksToImpact.HasValue)
                 {
-                    ___ticksToImpact = Mathf.CeilToInt(startingTicksToImpact);
+                    ___ticksToImpact = Mathf.CeilToInt(startingTicksToImpact.Value);
                     if (___ticksToImpact < 1) ___ticksToImpact = 1;
                 }
             }
@@ -106,7 +142,6 @@ namespace Gunplay.Patch
 
             return value / GunplaySettings.projectileSpeed;
         }
-
     }
 
     [HarmonyPatch(typeof(Projectile), "Impact")]

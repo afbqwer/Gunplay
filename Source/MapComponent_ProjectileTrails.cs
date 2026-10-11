@@ -80,7 +80,10 @@ namespace Gunplay
                 if (!state.Dead) continue;
 
                 if (state.LookupKey != null) byProjectile.Remove(state.LookupKey);
-                trails.RemoveAt(i);
+
+                int last = trails.Count - 1;
+                trails[i] = trails[last];
+                trails.RemoveAt(last);
             }
         }
 
