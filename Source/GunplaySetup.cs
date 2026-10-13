@@ -109,7 +109,9 @@ namespace Gunplay
             List<(string keyword, ProjectilePropDef prop)> rules =
                 (from def in DefDatabase<ProjectilePropDef>.AllDefs
                  where def.matchKeywords != null
-                 from keyword in def.matchKeywords
+                 // ! 是必需的：查询的 from 会展开成一个返回 IEnumerable<string> 的 lambda，
+                 // 而 matchKeywords 是可空字段。上一行的 where 拦不住编译器的可空分析（它不看 where 做窄化）。
+                 from keyword in def.matchKeywords!
                  where !string.IsNullOrEmpty(keyword)
                  select (keyword, prop: def))
                 .OrderByDescending(r => r.keyword.Length)

@@ -1,29 +1,89 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<OutputPath>..\1.6\Assemblies</OutputPath>
-		<TargetFramework>net481</TargetFramework>
+		<!--
+			默认只编译 1.7(net10.0)；需要 1.6(net48) 时：dotnet build -p:IncludeRimWorld16=true
+			平时保持单目标，IDE 的分析上下文也就自然是 net10.0（1.7），1.7 特有的 API 缺失与
+			net10 可空性告警都会如实暴露，不会被 1.6 上下文掩盖。
+		-->
+		<IncludeRimWorld16 Condition="'$(IncludeRimWorld16)' == ''">false</IncludeRimWorld16>
+		<TargetFrameworks>net10.0</TargetFrameworks>
+		<TargetFrameworks Condition="'$(IncludeRimWorld16)' == 'true'">net10.0;net48</TargetFrameworks>
+
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<GenerateDependencyFile>false</GenerateDependencyFile>
+		<!-- 让 dll 直接落到 1.6/Assemblies、1.7/Assemblies，而不是 …/net48\ -->
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-		<DebugType>None</DebugType>
 		<LangVersion>latest</LangVersion>
-		<FileVersion></FileVersion>
 		<Nullable>enable</Nullable>
-	</PropertyGroup>
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
 		<DebugType>embedded</DebugType>
 	</PropertyGroup>
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<DebugType>embedded</DebugType>
+
+	<!--
+		坑位：AppendTargetFrameworkToOutputPath=false 会同时去掉中间目录的 TFM 后缀，
+		两个目标共用 obj\Release 会在并行编译时互相覆盖（报 "refint\xxx.dll 不存在"）。
+		必须为每个 TFM 单独指定 IntermediateOutputPath。
+	-->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+		<IntermediateOutputPath>obj\$(Configuration)\net48\</IntermediateOutputPath>
+		<OutputPath>..\1.6\Assemblies\</OutputPath>
+		<DefineConstants>$(DefineConstants);RIMWORLD_1_6</DefineConstants>
 	</PropertyGroup>
-	<ItemGroup>
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<IntermediateOutputPath>obj\$(Configuration)\net10.0\</IntermediateOutputPath>
+		<OutputPath>..\1.7\Assemblies\</OutputPath>
+		<DefineConstants>$(DefineConstants);RIMWORLD_1_7</DefineConstants>
+	</PropertyGroup>
+
+	<!--
+		1.7 引用游戏安装目录。本项目布局是 <游戏>\Mods\Gunplay\Source\，故向上三级即游戏根目录；
+		可用 -p:RimWorldDir=… 或环境变量 RIMWORLD_DIR 覆盖。
+	-->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<RimWorldDir Condition="'$(RimWorldDir)' == ''">$(RIMWORLD_DIR)</RimWorldDir>
+		<RimWorldDir Condition="'$(RimWorldDir)' == ''">$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '..', '..', '..'))</RimWorldDir>
+	</PropertyGroup>
+
+	<!-- 1.6：Krafs 引用包（锁在 1.6.x，避免 * 浮动到别的大版本） -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
 		<PackageReference Include="Krafs.Rimworld.Ref">
-			<Version>*</Version>
+			<Version>1.6.*</Version>
 			<ExcludeAssets>runtime</ExcludeAssets>
 			<IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
+	</ItemGroup>
+
+	<!--
+		1.7：直接引用游戏程序集；Unity 由 UnityStubs 提供（运行时由 runtimeconfig 把 UnityEngine* 重定向到它）。
+		Waylith 是 UnityStubs 的实现层：UnityEngine.Material 的字段、Graphics.DrawMesh 的
+		DrawPropertyBlock 重载、Graphics.DrawMesh.Now 等签名里都带 Waylith.Rendering.* 类型，
+		不引用它就会在用到这些类型的调用点报 CS0012。它不是 UnityEngine* 的映射目标，必须显式引用。
+	-->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<Reference Include="Assembly-CSharp">
+			<HintPath>$(RimWorldDir)Assembly-CSharp.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="UnityStubs">
+			<HintPath>$(RimWorldDir)UnityStubs.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Waylith">
+			<HintPath>$(RimWorldDir)Waylith.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+	<!-- Harmony 分 TFM 引用（运行时由游戏/依赖模组提供，不复制到输出） -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
 		<PackageReference Include="Lib.Harmony">
-			<Version>*</Version>
+			<Version>2.4.*</Version>
+			<ExcludeAssets>runtime</ExcludeAssets>
+		</PackageReference>
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<PackageReference Include="Lib.Harmony">
+			<Version>3.0.0-rc.2</Version>
 			<ExcludeAssets>runtime</ExcludeAssets>
 		</PackageReference>
 	</ItemGroup>

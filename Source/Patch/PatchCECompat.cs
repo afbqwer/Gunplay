@@ -287,7 +287,9 @@ namespace Gunplay.Patch
                 GetTicksToTruePosition(proj),
                 altitude
             };
-            return (Vector3)draw.Invoke(worker, args);
+            // 用 is 模式而不是 (Vector3)…! ：CE 万一改了签名、Invoke 返回别的类型，
+            // 这里安全回退成地面投影，而不是抛 InvalidCastException 把整帧绘制掀掉。
+            return draw.Invoke(worker, args) is Vector3 drawn ? drawn : new Vector3(exact.x, altitude, exact.z);
         }
 
         // 发射时的预测飞行时长（tick），用于弧线采样
@@ -296,7 +298,9 @@ namespace Gunplay.Patch
             Func<Thing, float>? fast = startingTicksGetter;
             if (fast != null) return Mathf.CeilToInt(fast(proj));
 
-            return startingTicksToImpactField != null ? Mathf.CeilToInt((float)startingTicksToImpactField.GetValue(proj)) : 0;
+            // 同上：反射值类型不符时返回 0（调用方按"取不到"处理），不给 InvalidCastException 机会
+            if (startingTicksToImpactField?.GetValue(proj) is float ticks) return Mathf.CeilToInt(ticks);
+            return 0;
         }
 
         // 采样整条弹道的实际绘制位置（含高度偏移与出膛渐升），供弧线轨迹构建带状网格。
@@ -327,7 +331,7 @@ namespace Gunplay.Patch
             }
 
             // 补上终点（PredictPositions 的覆盖范围可能差一 tick）
-            Vector2 dest2 = destinationField != null ? (Vector2)destinationField.GetValue(proj) : new Vector2(last.x, last.z);
+            Vector2 dest2 = destinationField?.GetValue(proj) is Vector2 dest ? dest : new Vector2(last.x, last.z);
             Vector3 destExact = new Vector3(dest2.x, 0f, dest2.y);
             if (HorizontalDist(last, destExact) > 0.05f)
             {
@@ -457,7 +461,7 @@ namespace Gunplay.Patch
             object? equipmentDef = equipmentDefField?.GetValue(__instance);
             if (equipmentDef == null && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
 
-            IntVec3 originCell = originIV3Field != null ? (IntVec3)originIV3Field.GetValue(__instance) : __instance.Position;
+            IntVec3 originCell = originIV3Field?.GetValue(__instance) is IntVec3 origin ? origin : __instance.Position;
             PatchProjectileImpact.PlayImpactEffects(__instance, hitThing, originCell);
         }
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using UnityEngine;
 using Verse;
 
@@ -50,7 +51,10 @@ namespace Gunplay
             byProjectile[proj] = state;
         }
 
-        public bool TryGet(Thing proj, out ProjectileTrailState state)
+        // 返回 false 时 state 为 null —— 把这个契约直接写进签名（NotNullWhen），而不是拿 ! 抹平。
+        // 好处是调用方 `if (Trails.TryGet(p, out var s))` 会被编译器确认 s 非空，那一侧也不用加 !：
+        // 可空信息沿着调用链传递，而不是在每个调用点各抹一次。
+        public bool TryGet(Thing proj, [NotNullWhen(true)] out ProjectileTrailState? state)
         {
             return byProjectile.TryGetValue(proj, out state);
         }
@@ -58,14 +62,14 @@ namespace Gunplay
         // 命中：锁定最终位置，并立刻从查找表移除（之后轨迹只做尾部淡出）
         public void CaptureFinalPosition(Thing proj, Vector3 pos)
         {
-            if (!byProjectile.TryGetValue(proj, out ProjectileTrailState state)) return;
+            if (!byProjectile.TryGetValue(proj, out ProjectileTrailState? state)) return;
             byProjectile.Remove(proj);
             state.CaptureFinalPosition(pos);
         }
 
         public void CaptureFinalPositionCE(Thing proj)
         {
-            if (!byProjectile.TryGetValue(proj, out ProjectileTrailState state)) return;
+            if (!byProjectile.TryGetValue(proj, out ProjectileTrailState? state)) return;
             byProjectile.Remove(proj);
             state.CaptureFinalPositionCE(proj);
         }

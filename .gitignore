@@ -9,3 +9,4 @@ Source/obj
 *.code-workspace
 PublishedFileId.txt
 *.dll
+Assets.zip*

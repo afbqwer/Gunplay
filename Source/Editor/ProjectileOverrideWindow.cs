@@ -253,7 +253,7 @@ namespace Gunplay
                     ThingDef projectile = verb.defaultProjectile;
                     if (projectile == null) continue;
 
-                    if (!map.TryGetValue(projectile, out List<ThingDef> list))
+                    if (!map.TryGetValue(projectile, out List<ThingDef>? list))
                     {
                         list = new List<ThingDef>();
                         map[projectile] = list;

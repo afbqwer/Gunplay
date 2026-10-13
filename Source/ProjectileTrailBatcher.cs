@@ -16,7 +16,8 @@ namespace Gunplay
     // 只是把原来的 TRS 矩阵变换展开成世界坐标后写入合并网格（见 ProjectileTrailState.AppendStraightGeometry）。
     internal static class ProjectileTrailBatcher
     {
-        // 合并网格上传时跳过 Unity 的包围盒重算与索引校验（包围盒由我们在下面自行设定）
+        // 上传时跳过 Unity 的包围盒重算与索引校验（包围盒由我们在下面自行设定）。
+        // 只能挂在 SetUVs 上：SetVertices 在 1.7 没有带 flags 的重载（见 UploadAndDraw 的注释）。
         const MeshUpdateFlags MeshFlags =
             MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices;
 
@@ -144,8 +145,14 @@ namespace Gunplay
 
                 mesh.Clear(true);
                 // 数组重载 + 显式区间：只上传 [0, count) 的有效段，尾部的陈旧数据不参与。
-                // SetVertices/SetUVs 的区间是 (start, length, flags)，顺序与直觉一致。
-                mesh.SetVertices(buffer.verts, 0, buffer.vertCount, MeshFlags);
+                // 区间参数顺序是 (start, length)，与直觉一致。
+                //
+                // SetVertices 这里刻意不带 MeshUpdateFlags：1.7 的 UnityStubs.Mesh 只有
+                // SetVertices(Vector3[], int, int)，没有 1.6 那个带 flags 的重载，硬带上会 CS1501。
+                // 少掉的 DontRecalculateBounds 无碍——下面紧接着就显式设了 mesh.bounds；
+                // DontValidateIndices 由 SetTriangles 的 calculateBounds:false 部分补偿。
+                // 写不带 flags 的形式，两个版本才能共用同一行代码。
+                mesh.SetVertices(buffer.verts, 0, buffer.vertCount);
                 mesh.SetUVs(0, buffer.uvs, 0, buffer.vertCount, MeshFlags);
                 // 注意 SetTriangles 的参数顺序与上面两个不同：(triangles, start, length, submesh, ...)。
                 // 写成 (tris, submesh, start, length, ...) 会因 baseVertex 有默认值而静默编译通过，
@@ -188,7 +195,7 @@ namespace Gunplay
             Material? material = TrailMaterial.For(def);
             TrailMaterialKey key = new TrailMaterialKey(material, trail.color);
 
-            if (!groups.TryGetValue(key, out MeshGroup group))
+            if (!groups.TryGetValue(key, out MeshGroup? group))
             {
                 group = new MeshGroup(material, trail.color);
                 groups[key] = group;

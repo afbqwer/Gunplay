@@ -374,11 +374,17 @@ namespace Gunplay
 
         // ---------------- 剔除 ----------------
 
+        // 剔除总体开关。目前关闭：CE 弧线的 AABB 计算有误，剔除会误杀仍在视野内的轨迹。
+        // 用 static readonly 而不是 const、也不是把下面的实现删掉/注释掉：
+        //   - 后者会让实现变成编译器眼里的死代码（CS0162），前面那句 return 一加就报警告；
+        //   - 用 static readonly 编译器无法常量折叠，下面的分支保持"可达"，恢复时改回 true 即可。
+        static readonly bool CullingEnabled = false;
+
         // 视野剔除。view 是已展开为世界坐标范围的相机视野（见 TrailViewRect）。
         public bool IsVisible(TrailViewRect view)
         {
-            //暂时禁用剔除，CE弧线的aabb计算有误
-            return true;
+            if (!CullingEnabled) return true;
+
             if (arcing)
             {
                 return arcAabbMax.x >= view.MinX && arcAabbMin.x <= view.MaxX
