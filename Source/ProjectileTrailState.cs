@@ -241,9 +241,10 @@ namespace Gunplay
             maxReach = length + width;
 
             // 是否曲线绘制，见 ProjectileRules.CurveEnabled（单项覆写 > 自动检测 > 默认规则）。
-            // 只有原版弧线投射物有可信的解析弧高（arcHeightFactor）；强制曲线、或自动检测
-            // 命中的非弧线投射物没有弧高可解析，改为沿实际飞行路径采样绘制（与 CE 同一套
-            // 带状网格）。自动检测开启时，按直线绘制的投射物也先记下路径，待偏离时切换。
+            // 只有原版弧线投射物有可信的解析弧高（arcHeightFactor）；强制曲线、自动检测命中、
+            // 或「原版投射物默认曲线绘制」开启时的非弧线投射物没有弧高可解析，改为沿实际
+            // 飞行路径采样绘制（与 CE 同一套带状网格）。自动检测开启时，按直线绘制的投射物
+            // 也先记下路径，待偏离时切换。
             arcing = ProjectileRules.CurveEnabled(proj.def);
             if (arcing)
             {

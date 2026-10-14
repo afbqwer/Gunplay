@@ -23,7 +23,7 @@ namespace Gunplay
         // 运行时登记（Initialize / InitializeCE）、CE 的抛射拦截门与覆写窗口的曲线列都只走这里。
         //
         // 优先级：单项覆写（命中即完全接管，可双向）> 运行时自动检测（仅内存，见下）>
-        // 各条「默认」规则。
+        // 各条「默认」规则（CE 看 ceStraightTrails；原版看弧高因子与 vanillaCurveTrails）。
         public static bool CurveEnabled(ThingDef? projectileDef)
         {
             if (projectileDef?.projectile == null) return false;
@@ -44,7 +44,10 @@ namespace Gunplay
             // CE 未安装时不存在前者，一并按原版口径（exotic def 本就走不到轨迹登记）。
             if (PatchCECompat.Detected && IsCEProjectileDef(projectileDef)) return !GunplaySettings.ceStraightTrails;
 
-            return IsArcing(projectileDef);
+            // 原版投射物：弧线投射物（手雷/炮弹）画解析抛物线（与 Vanilla 视觉一致）；
+            // 「原版投射物默认曲线绘制」开启时，其余投射物也默认走曲线——沿实际飞行路径
+            // 采样绘制（见 ProjectileTrailState.BeginPathTracking），弧高因子不再区分直线与曲线。
+            return IsArcing(projectileDef) || GunplaySettings.vanillaCurveTrails;
         }
 
         // 记住「这个 def 实际沿曲线飞行」。会话级（重开游戏重新检测），不写进设置——

@@ -54,6 +54,12 @@ namespace Gunplay
         // 直线投射物与 CE 投射物不受影响。由 ProjectileRules.TrailEnabled 统一读取。
         public static bool enableArcTrails = true;
 
+        // 原版（非CE）投射物默认使用曲线绘制。开启后 CurveEnabled 的默认判定由「是否弧线投射物」
+        // 变为恒真：弧线投射物（手雷/炮弹）仍走解析抛物线（与 Vanilla 视觉一致），原本按直线
+        // 绘制的投射物（子弹等）改用沿实际飞行路径的采样带状网格（与 CE 弧线同一套机制）。
+        // 这只是「默认」：单项覆写的「曲线」列与「自动检测曲线投射物」的判定仍优先于此处。
+        public static bool vanillaCurveTrails = false;
+
         // 自动检测曲线投射物：开启后，非 CE 情况下按直线轨迹绘制的投射物若实际沿曲线飞行
         // （某些 mod 投射物不设 arcHeightFactor，弹道却是追踪/波浪等曲线），则改用曲线轨迹
         // 绘制——沿实际飞行路径采样，与 CE 的弧线同一套带状网格（见 ProjectileTrailState）。
@@ -94,6 +100,7 @@ namespace Gunplay
             Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", TrailFade.Default);
             Scribe_Values.Look(ref arcSegmentCount, "arcSegmentCount", ArcSegments.Default);
             Scribe_Values.Look(ref enableArcTrails, "enableArcTrails", true);
+            Scribe_Values.Look(ref vanillaCurveTrails, "vanillaCurveTrails", false);
             Scribe_Values.Look(ref autoDetectCurvedProjectiles, "autoDetectCurvedProjectiles", true);
 
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
@@ -188,7 +195,12 @@ namespace Gunplay
                 trailFadeTicks = Mathf.Round(trailFadeTicks);
 
                 listing_Standard.CheckboxLabeled("GunplayEnableArcTrailsName".Translate(), ref enableArcTrails, "GunplayEnableArcTrailsDesc".Translate());
-                listing_Standard.CheckboxLabeled("GunplayAutoDetectCurvedName".Translate(), ref autoDetectCurvedProjectiles, "GunplayAutoDetectCurvedDesc".Translate());
+                if (enableArcTrails)
+                {
+                    listing_Standard.CheckboxLabeled("GunplayVanillaCurveTrailsName".Translate(), ref vanillaCurveTrails, "GunplayVanillaCurveTrailsDesc".Translate());
+                    listing_Standard.CheckboxLabeled("GunplayAutoDetectCurvedName".Translate(), ref autoDetectCurvedProjectiles, "GunplayAutoDetectCurvedDesc".Translate());
+                }
+
                 listing_Standard.Gap(4f);
 
                 listing_Standard.SliderLabeledInt("GunplayArcSegmentCountName".Translate(), ref arcSegmentCount, "GunplayArcSegmentCountDesc".Translate(),

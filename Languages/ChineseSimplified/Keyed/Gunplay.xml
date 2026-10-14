@@ -28,6 +28,8 @@
   <GunplayEnableArcTrailsDesc>为原版（非CE）的弧线投射物（迫击炮弹、手雷等）绘制弧线轨迹。关闭后这些投射物不再绘制轨迹；直线投射物与CE投射物不受影响。只对之后新发射的投射物生效.</GunplayEnableArcTrailsDesc>
   <GunplayAutoDetectCurvedName>自动检测曲线投射物</GunplayAutoDetectCurvedName>
   <GunplayAutoDetectCurvedDesc>开启后，非CE情况下按直线轨迹绘制的投射物若实际沿曲线飞行（如某些mod的追踪弹、波浪弹），将自动改用曲线轨迹绘制——沿实际飞行路径采样，与CE弧线为同一套带状网格。原版投射物严格沿直线飞行，不会误判。只对之后新发射的投射物生效.</GunplayAutoDetectCurvedDesc>
+  <GunplayVanillaCurveTrailsName>原版投射物默认曲线绘制</GunplayVanillaCurveTrailsName>
+  <GunplayVanillaCurveTrailsDesc>开启后，所有原版（非CE）投射物默认使用曲线轨迹绘制：原本按直线绘制的投射物（子弹等）将沿实际飞行路径绘制，弧线投射物（手雷/炮弹等）保持原有的解析抛物线.单项覆写的「曲线」列与「自动检测曲线投射物」仍优先于此默认值；采样绘制的开销略高于直线轨迹.只对之后新发射的投射物生效.</GunplayVanillaCurveTrailsDesc>
   <GunplayTrailWidthModeDesc>决定子弹轨迹基础宽度的计算方式.</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>轨迹宽度：基于投射物伤害</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>轨迹宽度：基于投射物贴图尺寸</GunplayTrailWidthModeTexture>
@@ -117,7 +119,7 @@
   <GunplayOverrideColorResetTip>清除自定义颜色，恢复为继承轨迹颜色.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>覆写该投射物的轨迹设置。关闭会丢弃本行覆写，恢复为继承/计算值.也可在某一行按住并上下拖动，把开关状态批量应用到扫过的行.</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>是否为该投射物绘制轨迹。关闭后该投射物完全没有轨迹，宽度覆写也不再生效。本行尚未开启覆写时调整此开关，会自动开启覆写.也可在某一行按住并上下拖动，把轨迹开关批量应用到扫过的行.</GunplayOverrideTipTrail>
-  <GunplayOverrideTipCurve>该投射物是否使用曲线轨迹绘制（弧线样式，而非直线四边形）。未覆写时显示默认判定：原版弧线投射物（手雷/炮弹）为曲线，CE投射物跟随「CE投射物直线轨迹」开关；自动检测开启时，运行时检测到沿曲线飞行的投射物也会显示为曲线。点击会顺带开启覆写；取消本行「覆写」即可回到默认判定。轨迹关闭时本项暂不生效，但覆写会保留.也可在某一行按住并上下拖动，把曲线开关批量应用到扫过的行.</GunplayOverrideTipCurve>
+  <GunplayOverrideTipCurve>该投射物是否使用曲线轨迹绘制（弧线样式，而非直线四边形）。未覆写时显示默认判定：原版弧线投射物（手雷/炮弹）为曲线，其余原版投射物跟随「原版投射物默认曲线绘制」开关，CE投射物跟随「CE投射物直线轨迹」开关；自动检测开启时，运行时检测到沿曲线飞行的投射物也会显示为曲线。点击会顺带开启覆写；取消本行「覆写」即可回到默认判定。轨迹关闭时本项暂不生效，但覆写会保留.也可在某一行按住并上下拖动，把曲线开关批量应用到扫过的行.</GunplayOverrideTipCurve>
   <GunplayOverrideTipSpeed>该投射物是否受全局弹速缩放。未覆写时显示默认判定：弧线投射物（手雷/炮弹）不缩放；点击会顺带开启覆写。上面的总开关关闭时，全部投射物都不缩放.也可在某一行按住并上下拖动，把弹速开关批量应用到扫过的行.</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>投射物</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
