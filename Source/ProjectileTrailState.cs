@@ -257,10 +257,11 @@ namespace Gunplay
                     BeginPathTracking();
                 }
             }
-            else if (GunplaySettings.autoDetectCurvedProjectiles && !ProjectileOverrides.HasCurveOverride(proj.def))
+            else if (GunplaySettings.autoDetectCurvedProjectiles && !ProjectileOverrides.HasCurveOverride(r.over))
             {
                 // 按默认规则画直线时才参与自动检测：用户显式覆写过绘制方式（无论曲线还是直线）
                 // 的，运行时观测不该改写它——强制直线就是要直线。
+                // 判定直接读本发已解析的覆写记录（r.over），不再按 defName 查一遍字典。
                 BeginPathTracking();
             }
         }
@@ -704,6 +705,11 @@ namespace Gunplay
         // 开始记录实际飞行路径（见 Initialize 的两处调用：强制曲线绘制的非弧线投射物、
         // 以及自动检测开启时按直线绘制的投射物）。发射点即第一个采样点，
         // 之后每 tick 由 ApplyPosition 追加当前位置（见 AppendPathSample）。
+        //
+        // 采样缓冲是每发一份的分配（初始约 350 字节，飞行超过 15 tick 扩容一次）。
+        // 刻意不惰性化：切换曲线时尾部窗口要回溯到发射点，中途才开始记录会出现
+        // 「切换那一帧轨迹突然缩短再长回来」的跳变；这个量级与每发必建的
+        // ProjectileTrailState、CE 每发整条弹道的预测采样（PredictDrawPositions）相同。
         void BeginPathTracking()
         {
             pathTracking = true;

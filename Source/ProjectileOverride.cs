@@ -207,10 +207,16 @@ namespace Gunplay
         // 该投射物是否被单项覆写显式指定了绘制方式（强制曲线 / 强制直线）。
         // 自动检测只对「按默认规则画直线」的投射物生效：用户显式设过的事
         // 不该被运行时观测改写（见 ProjectileTrailState.Initialize）。
+        // 已取出记录时的形态：不再查覆写字典（与 TrailDefFor(over, def) 同一约定）。
+        public static bool HasCurveOverride(ProjectileOverride? over)
+        {
+            return over != null && over.hasCurveOverride;
+        }
+
+        // 仅有 def 时的重载。
         public static bool HasCurveOverride(ThingDef? projectileDef)
         {
-            ProjectileOverride? over = Get(projectileDef);
-            return over != null && over.hasCurveOverride;
+            return HasCurveOverride(Get(projectileDef));
         }
 
         // 开启覆写：以「当前生效值」为起点（宽度取计算值、长度/淡出取全局值），

@@ -65,10 +65,20 @@ namespace Gunplay
         // Projectile 的某个子类（Bullet / Projectile_Explosive / mod 自定义类），
         // 而 CE 的 ProjectileCE 继承 ThingWithComps。缺失（理论上是配置错误）按原版口径，
         // 对窗口显示是安全的兜底。
+        //
+        // 结果按 def 缓存：thingClass 在 def 加载后不再变化，而 IsAssignableFrom 是运行时
+        // 继承链遍历，比一次字典查找贵得多——调用方有「每发两次」（CE 的登记与初始化）和
+        // 「覆写窗口每可见行每帧」两条，都没必要反复走。缓存上界就是被查询过的投射物 def 数。
+        static readonly Dictionary<ThingDef, bool> ceProjectileCache = new Dictionary<ThingDef, bool>();
+
         static bool IsCEProjectileDef(ThingDef projectileDef)
         {
+            if (ceProjectileCache.TryGetValue(projectileDef, out bool ce)) return ce;
+
             Type? thingClass = projectileDef.thingClass;
-            return thingClass != null && !typeof(Projectile).IsAssignableFrom(thingClass);
+            ce = thingClass != null && !typeof(Projectile).IsAssignableFrom(thingClass);
+            ceProjectileCache[projectileDef] = ce;
+            return ce;
         }
 
         // 该投射物「自己」是否受全局弹速缩放（不含全局总开关）。
