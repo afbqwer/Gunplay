@@ -26,6 +26,8 @@
   <GunplayArcSegmentCountDesc>How many segments an arcing trail (grenades, mortar shells) is split into. Higher is smoother and costs more. Default 16, range 2 to 64.</GunplayArcSegmentCountDesc>
   <GunplayEnableArcTrailsName>Arc trails for vanilla projectiles</GunplayEnableArcTrailsName>
   <GunplayEnableArcTrailsDesc>Draw arc trails for vanilla (non-CE) arcing projectiles such as mortar shells and grenades. When disabled these projectiles get no trail; straight and CE projectiles are unaffected. Applies only to projectiles fired afterwards.</GunplayEnableArcTrailsDesc>
+  <GunplayAutoDetectCurvedName>Auto-detect curved projectiles</GunplayAutoDetectCurvedName>
+  <GunplayAutoDetectCurvedDesc>When enabled, non-CE projectiles drawn with straight trails whose actual flight path is curved (e.g. some mods' homing or wobbling projectiles) are automatically drawn with curve trails that follow their real flight path, using the same ribbon mesh as CE arc trails. Vanilla projectiles fly exactly straight, so they are never misdetected. Applies only to projectiles fired afterwards.</GunplayAutoDetectCurvedDesc>
   <GunplayTrailWidthModeDesc>Determines how the base trail width is calculated.</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>Trail width: based on projectile damage</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>Trail width: based on projectile texture size</GunplayTrailWidthModeTexture>
@@ -38,7 +40,7 @@
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>When enabled, only weapon-less projectiles dealing Bullet damage get these effects.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>Per-projectile overrides...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>Override the trail material, width, length, fade duration and color of individual projectiles, and whether each projectile is affected by the global projectile speed. Trail values are absolute and ignore the material and the global trail settings above.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>Override the trail material, width, length, fade duration, color and curve style of individual projectiles, and whether each projectile is affected by the global projectile speed. Trail values are absolute and ignore the material and the global trail settings above.</GunplayProjectileOverridesDesc>
   <GunplayTrailMaterialName>Trail materials...</GunplayTrailMaterialName>
   <GunplayTrailMaterialDesc>Shape, width profile, color and geometry of each trail material (one material per ProjectileTrailDef). Changes apply instantly.</GunplayTrailMaterialDesc>
   <GunplayTrailMaterialWindowTitle>Trail material</GunplayTrailMaterialWindowTitle>
@@ -103,6 +105,7 @@
   <GunplayOverrideClearAllConfirm>Clear all {0} per-projectile overrides ({1} of them come from removed content and are not listed)? This cannot be undone.</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>Override</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>Trail</GunplayOverrideColTrail>
+  <GunplayOverrideColCurve>Curve</GunplayOverrideColCurve>
   <GunplayOverrideColSpeed>Speed</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>Color</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>Material</GunplayOverrideColMaterial>
@@ -114,6 +117,7 @@
   <GunplayOverrideColorResetTip>Clear the custom color and inherit the trail color again.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>Override the trail settings of this projectile. Turning this off discards the override, restoring inherited/calculated values. You can also press on a row and drag up or down to switch the rows you sweep over.</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>Draw a trail for this projectile. When off, this projectile gets no trail at all and its width override goes unused. Adjusting this on a row that is not overridden yet will enable the override automatically. You can also press on a row and drag up or down to set the swept rows the same way.</GunplayOverrideTipTrail>
+  <GunplayOverrideTipCurve>Draw this projectile's trail as a curve (arc style) instead of a straight quad. Not overridden, it shows the default: vanilla arcing projectiles (grenades, shells) are curved, and CE projectiles follow the "Straight trails for CE projectiles" switch; with auto-detection on, projectiles detected flying a curved path at runtime also show as curved. Clicking enables the override automatically, and turning off this row's override returns to the default. While the trail is off this has no effect, but the override is kept. You can also press on a row and drag up or down to set the swept rows the same way.</GunplayOverrideTipCurve>
   <GunplayOverrideTipSpeed>Whether this projectile is affected by the global projectile speed. Not overridden, it shows the default: arcing projectiles (grenades, shells) are never scaled. Clicking enables the override automatically. The master switch above stops all scaling while off. You can also press on a row and drag up or down to set the swept rows the same way.</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>Projectile</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>Weapon</GunplayOverrideColWeapon>

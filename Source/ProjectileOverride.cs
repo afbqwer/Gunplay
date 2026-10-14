@@ -6,19 +6,19 @@ using Verse;
 
 namespace Gunplay
 {
-    // 单个投射物的覆写记录。目前七项：轨迹开关 + 轨迹材质 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长 + 弹速。
+    // 单个投射物的覆写记录。目前八项：轨迹开关 + 曲线绘制 + 轨迹材质 + 轨迹宽度 + 轨迹颜色 + 拖尾长度 + 淡出时长 + 弹速。
     //
     // 加一项覆写的实际成本（别信「加个字段加一列」那种说法）：记录字段 + ExposeData +
-    // ProjectileOverrides 的 TryGet/Set + 一个 TrailXxx 口径类 + 窗口的一列 + 三份语言键，
-    // 大约五处。现在只有六项，为将来的第 N 项提前搭数据驱动的框架不划算，
+    // ProjectileOverrides 的 TryGet/Set + 一个口径类 + 窗口的一列 + 三份语言键，
+    // 大约五处。现在只有八项，为将来的第 N 项提前搭数据驱动的框架不划算，
     // 新项先照抄现有形状写；等真的到八项以上再谈抽象。
     // 存档格式始终向后兼容：缺失字段一律走默认值。
     //
     // 「是否命中」的统一契约 —— 用哨兵值表达「未设定」，而不是靠「记录存在」：
     //   宽度 / 拖尾长度 / 淡出时长 —— 0 表示未设定，回落到计算值或全局设置；
     //   轨迹材质 —— null 表示未设定，回落 ProjectilePropDef.trail（本体的引用天然可空，不需要哨兵）；
-    //   轨迹颜色 —— 单独用 hasColor 标记，因为白色是合法颜色，哨兵表达不了三态；
-    //   弹速 —— 同理用 hasSpeedOverride 标记，因为 false（不受全局弹速影响）也是合法值。
+    //   轨迹颜色 / 弹速 / 曲线绘制 —— 单独用 hasXxx 标记，因为白色是合法颜色、
+    //     false（不受全局弹速影响 / 强制直线）也是合法值，哨兵表达不了三态。
     // 记录本身存在 == 覆写已开启；关掉覆写即删除记录（Disable）。
     public class ProjectileOverride : IExposable
     {
@@ -54,6 +54,15 @@ namespace Gunplay
         public bool hasSpeedOverride;
         public bool speedAffected = true;
 
+        // 该投射物是否使用曲线绘制（弧线轨迹样式，而非直线四边形）。
+        // hasCurveOverride = false 表示未设定，回落到「默认」判定（见 ProjectileRules.CurveEnabled：
+        // 原版看 arcHeightFactor，CE 看 ceStraightTrails，自动检测开启时还看运行时检测结果）。
+        // 与 hasColor / hasSpeedOverride 同理：false（强制直线）也是合法值，靠显式标记表达三态。
+        // 注意它只决定「怎么画」：轨迹关掉后本项不生效，但覆写仍会保留（与弹速项一样，
+        // 不随轨迹开关变灰——重新打开轨迹时原设置继续有效）。
+        public bool hasCurveOverride;
+        public bool curveEnabled = true;
+
         // 三个数值字段都用 0 而不是各自的 Default 作哨兵，是因为「字段缺失」和「值恰好等于默认」
         // 必须区分开：后加的字段在老存档的已有记录里必然缺失。若哨兵取 Default，
         // 那些老记录会被当成「用户手动设成了绝对值」，之后改全局设置它们不再跟随。
@@ -67,6 +76,9 @@ namespace Gunplay
             Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", 0f);
             Scribe_Values.Look(ref hasSpeedOverride, "hasSpeedOverride", false);
             Scribe_Values.Look(ref speedAffected, "speedAffected", true);
+
+            Scribe_Values.Look(ref hasCurveOverride, "hasCurveOverride", false);
+            Scribe_Values.Look(ref curveEnabled, "curveEnabled", true);
 
             Scribe_Values.Look(ref hasColor, "hasColor", false);
             ColorPickerWindow.LookColor(ref trailColor, "trailColor", Color.white);
@@ -179,6 +191,28 @@ namespace Gunplay
             return true;
         }
 
+        // 单项曲线覆写是否命中。未设定（记录不存在或 hasCurveOverride=false）时返回 false，
+        // 调用方回落到「默认」判定（见 ProjectileRules.CurveEnabled）。
+        // 与弹速项同理：false（强制直线）是合法值，靠显式标记表达三态。
+        public static bool TryGetCurveEnabled(ProjectileOverride? over, out bool curve)
+        {
+            curve = true;
+
+            if (over == null || !over.hasCurveOverride) return false;
+
+            curve = over.curveEnabled;
+            return true;
+        }
+
+        // 该投射物是否被单项覆写显式指定了绘制方式（强制曲线 / 强制直线）。
+        // 自动检测只对「按默认规则画直线」的投射物生效：用户显式设过的事
+        // 不该被运行时观测改写（见 ProjectileTrailState.Initialize）。
+        public static bool HasCurveOverride(ThingDef? projectileDef)
+        {
+            ProjectileOverride? over = Get(projectileDef);
+            return over != null && over.hasCurveOverride;
+        }
+
         // 开启覆写：以「当前生效值」为起点（宽度取计算值、长度/淡出取全局值），
         // 用户从现状开始调，不会看到轨迹突然变粗/变细或拖尾长度突变。
         // 刻意不走 GetOrCreate：这里是「重置为当前生效值」，不是「保留已有设置」。
@@ -279,6 +313,17 @@ namespace Gunplay
             over.speedAffected = affected;
         }
 
+        // 设定该投射物是否使用曲线绘制。与 SetSpeedAffected 同形：
+        // 置 hasCurveOverride 表达「用户明确设过」，而不是默认判定算出来的值。
+        public static void SetCurveEnabled(ThingDef? projectileDef, bool curve)
+        {
+            if (projectileDef == null) return;
+
+            ProjectileOverride over = GetOrCreate(projectileDef);
+            over.hasCurveOverride = true;
+            over.curveEnabled = curve;
+        }
+
         // 取已有记录，没有就新建一条并登记。新记录的所有字段都是「当前生效值」，
         // 因此「开启覆写」这个动作本身不改变画面，之后改哪个字段只影响哪个字段。
         static ProjectileOverride GetOrCreate(ThingDef projectileDef)
@@ -310,7 +355,8 @@ namespace Gunplay
                 trailWidth = TrailWidth.EffectiveForDef(r, projectileDef),
                 trailLengthFactor = TrailLength.Effective(r),
                 trailFadeTicks = TrailFade.Effective(r),
-                hasSpeedOverride = false    // 新记录不接管弹速 = 继承默认判定，与开启覆写前的行为一致
+                hasSpeedOverride = false,   // 新记录不接管弹速 = 继承默认判定，与开启覆写前的行为一致
+                hasCurveOverride = false    // 新记录不接管绘制方式 = 继承默认判定（弧线规则 / CE 开关 / 自动检测）
             };
         }
 

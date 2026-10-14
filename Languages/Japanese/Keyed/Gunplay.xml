@@ -26,6 +26,8 @@
   <GunplayArcSegmentCountDesc>弧状の弾道（擲弾・迫撃砲弾など）を描画する際の分割数。多いほど滑らかになりますが、処理コストも増えます（既定16、範囲2～64）。</GunplayArcSegmentCountDesc>
   <GunplayEnableArcTrailsName>バニラ発射体の弧状弾道を許可</GunplayEnableArcTrailsName>
   <GunplayEnableArcTrailsDesc>バニラ（CE以外）の弧状発射体（迫撃砲弾・擲弾など）に弧状の弾道を描画します。無効にするとこれらの発射体には弾道が表示されず、直線発射体とCE発射体には影響しません。以後に発射される発射体にのみ適用されます。</GunplayEnableArcTrailsDesc>
+  <GunplayAutoDetectCurvedName>曲線飛翔の発射体を自動検出</GunplayAutoDetectCurvedName>
+  <GunplayAutoDetectCurvedDesc>有効にすると、CE以外で直線の弾道を描画している発射体の実際の飛翔経路が曲線だった場合（一部のModの追跡弾や波動弾など）、実際の飛翔経路に沿った弧状の弾道を自動的に描画します（CEの弧状弾道と同じリボンメッシュを使用）。バニラの発射体は厳密に直線飛翔するため誤検出しません。以後に発射される発射体にのみ適用されます。</GunplayAutoDetectCurvedDesc>
   <GunplayTrailWidthModeDesc>弾道の基本幅の計算方法を指定します。</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>弾道の幅：発射体のダメージに基づく</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>弾道の幅：発射体のテクスチャサイズに基づく</GunplayTrailWidthModeTexture>
@@ -38,7 +40,7 @@
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>有効にすると、ダメージ種別が「弾（Bullet）」の発射体のみこれらのエフェクトを表示します。</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>発射体ごとの上書き...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>発射体ごとに弾道マテリアル・幅・長さ・消滅時間・色、および全体の発射体速度の影響を受けるかどうかを個別に指定します。弾道の上書き値はすべて絶対値であり、マテリアルと上記の全体的な弾道設定は適用されません。</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>発射体ごとに弾道マテリアル・幅・長さ・消滅時間・色・曲線描画の有無、および全体の発射体速度の影響を受けるかどうかを個別に指定します。弾道の上書き値はすべて絶対値であり、マテリアルと上記の全体的な弾道設定は適用されません。</GunplayProjectileOverridesDesc>
   <GunplayTrailMaterialName>弾道マテリアル...</GunplayTrailMaterialName>
   <GunplayTrailMaterialDesc>各弾道マテリアル（マテリアル1つ＝ProjectileTrailDef 1つ）の形状・幅プロファイル・色・ジオメトリを編集します。変更は即時反映されます。</GunplayTrailMaterialDesc>
   <GunplayTrailMaterialWindowTitle>弾道マテリアル</GunplayTrailMaterialWindowTitle>
@@ -103,6 +105,7 @@
   <GunplayOverrideClearAllConfirm>発射体の上書き {0} 件をすべて解除しますか（うち {1} 件は削除されたコンテンツ由来で一覧に表示されません）？この操作は元に戻せません。</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>上書き</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>弾道</GunplayOverrideColTrail>
+  <GunplayOverrideColCurve>曲線</GunplayOverrideColCurve>
   <GunplayOverrideColSpeed>速度</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>色</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>マテリアル</GunplayOverrideColMaterial>
@@ -114,6 +117,7 @@
   <GunplayOverrideColorResetTip>カスタム色を解除し、継承した弾道の色に戻します。</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>この発射体の弾道設定を上書きします。オフにすると上書きを破棄し、継承値/計算値に戻ります。行を押したまま上下にドラッグすると、なぞった行のスイッチをまとめて切り替えられます。</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>この発射体に弾道を描画するかどうか。オフにすると弾道自体が表示されず、幅の上書きも使われません。行が未上書きの状態で操作すると、自動的に上書きが有効になります。行を押したまま上下にドラッグすると、なぞった行の弾道設定をまとめて切り替えられます。</GunplayOverrideTipTrail>
+  <GunplayOverrideTipCurve>この発射体の弾道を弧状で描画するかどうか（直線の四边形ではなく）。未上書きの場合は既定の判定を表示します：バニラの弧状発射体（擲弾・砲弾）は曲線、CE発射体は「CE発射体の直線弾道」スイッチに従います。自動検出が有効な場合、実行時に曲線飛翔と判定された発射体も曲線として表示されます。クリックすると自動的に上書きが有効になり、行の「上書き」をオフにすると既定の判定に戻ります。弾道がオフの間は効果がありませんが、上書きは保持されます。行を押したまま上下にドラッグすると、なぞった行の曲線設定をまとめて切り替えられます。</GunplayOverrideTipCurve>
   <GunplayOverrideTipSpeed>この発射体が全体の発射体速度の影響を受けるかどうか。未上書きの場合は既定の判定を表示します：弧状発射体（擲弾・砲弾）はスケールされず。クリックすると自動的に上書きが有効になります。上部の全体スイッチがオフのときは全発射体がスケールされません。行を押したまま上下にドラッグすると、なぞった行の速度設定をまとめて切り替えられます。</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>発射体</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>

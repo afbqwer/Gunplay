@@ -114,6 +114,19 @@ namespace Gunplay
         // 尾部至少占整段弧线的比例，避免低速抛射物（如手雷）的轨迹过短而不明显。
         const float ArcMinTailFraction = 0.1f;
 
+        // 运行时路径采样的数量上限。超出即丢弃最旧的一半并重建累计长度（见 AppendPathSample），
+        // 均摊 O(1)。512 已覆盖「拖尾长度系数拉满 + 弹速缩放拉到最小」之外的一切配置；
+        // 真出现那种病态组合时轨迹会短于设定值，但依然完整可画（见该方法注释）。
+        const int MaxPathSamples = 512;
+
+        // 自动检测曲线投射物的偏离阈值（格）：当前位置相对「发射点 + 发射方向」的垂直距离。
+        // 原版投射物严格沿发射直线飞行——ExactPosition 就是 origin→destination 的线性插值，
+        // 弧线只是绘制效果（见 Verse.Projectile.ExactPosition），偏离量恒为 0；
+        // 自定义弹道的 mod 投射物（追踪弹、波浪弹等）会持续偏离。
+        // 阈值远大于浮点噪声（位置分量可达数百格，float 精度约 1e-4 格），也小于一格——
+        // 肉眼可辨的弯曲才触发，轻微的绘制偏移不会误判。
+        const float CurveDetectThreshold = 0.2f;
+
         // 弧线的"上升"方向。RimWorld 的地图相机是正交俯视（沿 -Y 观察），
         // 世界 +Y 只承担深度/排序，在屏幕上不可见；屏幕竖直方向对应世界 +Z（北）。
         // 必须与 Vanilla 保持一致：Projectile.DrawAt 用 (0,0,1)，PawnFlyer 用 Vector3.forward。
@@ -175,6 +188,14 @@ namespace Gunplay
         // 作为以头部为中心的保守 AABB 半边长用于剔除：必然包住整条轨迹，绝不会漏。
         float maxReach;
 
+        // ---------------- 运行时路径跟踪（自动检测曲线投射物 / 强制曲线绘制的非弧线投射物）----------------
+        // 非弧线投射物没有可信的解析弧高（arcHeightFactor 为 0，InitializeArc 会退化成直线），
+        // 「曲线绘制」只能沿实际飞行路径取点——与 CE 的采样带状网格（pathSamples）是同一套机制，
+        // 区别只在采样时机：CE 在 Launch 时按绘制映射一次预测整条弹道（见 InitializeCE），
+        // 这里在发射后逐 tick 记录真实位置（见 AppendPathSample）。
+        bool pathTracking;      // 是否正在记录飞行路径（发射时决定，之后不再关闭）
+        Vector3 trackDir;       // 发射方向：偏离检测的基准（dir 每 tick 被实际位移覆盖，必须另存）
+
         // ---------------- CE 专用状态 ----------------
         // CE 投射物（直线与弧线）每 tick 都跟踪"绘制位置"（含 CE 的高度屏幕偏移），
         // 使拖尾/弧线贴着弹体而不是地面投影。采样失败回退解析弧线时退回地面口径。
@@ -184,11 +205,14 @@ namespace Gunplay
         // 反射取 worker、也不再每 tick 查一次「worker 类型 → 委托」的字典（见 PatchCECompat.ResolveDrawMapper）。
         object? ceWorker;
         PatchCECompat.DrawPosAccessor? ceDrawAccessor;
-        // 弧线 CE 投射物：发射时按 CE 绘制映射采样的整条弹道绘制点（世界坐标，y 为 altitude 层）
-        // CE 投射物：null 表示未/无法采样，此时按解析抛物线取点（ceArcCumLen 同样可能仍为 null）
-        List<Vector3>? ceArcSamples;
-        float[]? ceArcCumLen;   // 采样点间绘制路径的累计长度（与 traveled 的绘制口径一致）
-        float ceArcTotalLen;
+        // 弧线轨迹的采样点列（绘制坐标，y 为 altitude 层）。两个来源：
+        //   * CE —— 发射时按 CE 绘制映射预测的整条弹道（见 InitializeCE / InitializeArcFromSamples）；
+        //   * 原版非弧线投射物 —— 自动检测或强制曲线时逐 tick 记录的真实飞行路径
+        //     （见 AppendPathSample）。
+        // null = 未/无法采样，按解析抛物线取点（pathTotalLen 同样可能仍为 null）
+        List<Vector3>? pathSamples;
+        float[]? pathCumLen;   // 采样点间绘制路径的累计长度（与 traveled 的绘制口径一致）
+        float pathTotalLen;
 
         // ---------------- 初始化 ----------------
 
@@ -216,12 +240,28 @@ namespace Gunplay
             ComputeWidth(r, proj.def, proj.DamageAmount);
             maxReach = length + width;
 
-            // 只有弧线投射物才需要额外的弧线几何；直线投射物到此为止，不执行任何弧线代码
-            arcing = ProjectileRules.IsArcing(proj.def);
+            // 是否曲线绘制，见 ProjectileRules.CurveEnabled（单项覆写 > 自动检测 > 默认规则）。
+            // 只有原版弧线投射物有可信的解析弧高（arcHeightFactor）；强制曲线、或自动检测
+            // 命中的非弧线投射物没有弧高可解析，改为沿实际飞行路径采样绘制（与 CE 同一套
+            // 带状网格）。自动检测开启时，按直线绘制的投射物也先记下路径，待偏离时切换。
+            arcing = ProjectileRules.CurveEnabled(proj.def);
             if (arcing)
             {
-                // 与 Vanilla Projectile.DrawAt 一致的弧高取值（收缩在 InitializeArc 内统一处理）
-                InitializeArc(b, proj.def.projectile.arcHeightFactor);
+                if (ProjectileRules.IsArcing(proj.def))
+                {
+                    // 与 Vanilla Projectile.DrawAt 一致的弧高取值（收缩在 InitializeArc 内统一处理）
+                    InitializeArc(b, proj.def.projectile.arcHeightFactor);
+                }
+                else
+                {
+                    BeginPathTracking();
+                }
+            }
+            else if (GunplaySettings.autoDetectCurvedProjectiles && !ProjectileOverrides.HasCurveOverride(proj.def))
+            {
+                // 按默认规则画直线时才参与自动检测：用户显式覆写过绘制方式（无论曲线还是直线）
+                // 的，运行时观测不该改写它——强制直线就是要直线。
+                BeginPathTracking();
             }
         }
 
@@ -253,13 +293,13 @@ namespace Gunplay
             ComputeWidth(r, proj.def, PatchCECompat.GetDamageAmount(proj));
             maxReach = length + width;
 
-            // CE 轨迹样式由设置开关决定（ceStraightTrails，默认开启）：
-            //   * 开启 → CE 投射物绘制直线拖尾（跟随弹体绘制位置）；抛射类投射物
-            //     （出射仰角超过 ArcAngleThreshold）在入口处被拦截，不显示轨迹；
-            //   * 关闭 → 全部 CE 投射物绘制弧线轨迹：按 CE 自己的绘制映射采样整条弹道的绘制位置。
+            // CE 轨迹样式由设置开关与单项覆写共同决定（见 ProjectileRules.CurveEnabled）：
+            //   * 直线（默认）→ CE 投射物绘制直线拖尾（跟随弹体绘制位置）；抛射类投射物
+            //     （出射仰角超过 ArcAngleThreshold）在登记处被拦截，不显示轨迹；
+            //   * 曲线 → 全部 CE 投射物绘制弧线轨迹：按 CE 自己的绘制映射采样整条弹道的绘制位置。
             // 弧线采样失败时回退为地面解析抛物线（原版算法，弧高 tan(θ)*L/4）。
             float shotAngle = PatchCECompat.GetShotAngle(proj);
-            arcing = !GunplaySettings.ceStraightTrails;
+            arcing = ProjectileRules.CurveEnabled(proj.def);
             ceTrackDrawnPosition = true;
             if (arcing)
             {
@@ -267,8 +307,8 @@ namespace Gunplay
                 if (samples == null || !InitializeArcFromSamples(samples))
                 {
                     ceTrackDrawnPosition = false;
-                    // 采样退化：必须清空，否则绘制仍会走上面的采样分支（且 ceArcCumLen 可能为 null）
-                    ceArcSamples = null;
+                    // 采样退化：必须清空，否则绘制仍会走上面的采样分支（且 pathCumLen 可能为 null）
+                    pathSamples = null;
                     InitializeArc(b, Mathf.Tan(shotAngle) * (b - a).magnitude / 4f);
                 }
             }
@@ -316,6 +356,10 @@ namespace Gunplay
                         ? PatchCECompat.GetDrawPosition(projectile, ceWorker, ceDrawAccessor)
                         : (projectile is Projectile vanilla ? vanilla.ExactPosition : PatchCECompat.GetExactPosition(projectile));
                     if (drawn.HasValue) ApplyPosition(drawn.Value);
+
+                    // 自动检测：实际飞行路线偏离发射直线即切换为曲线绘制（某些 mod 投射物
+                    // 不设 arcHeightFactor 却沿曲线飞行）。强制曲线的轨迹已在画弧线，不参与判定。
+                    if (pathTracking && !arcing && DetectPathCurvature(exactPosition)) SwitchToArcDrawing();
                 }
             }
 
@@ -342,6 +386,8 @@ namespace Gunplay
                 // 静止计数必须是「连续」的：一旦动了就清零。少了这一句它就成了全生命周期累计值，
                 // 离屏飞行每 15 tick 攒 14 个静止 tick，累计值迟早越过阈值把还在飞的轨迹判死。
                 ticksIdle = 0;
+                // 记录飞行路径采样（自动检测 / 强制曲线时开启，见 BeginPathTracking）
+                if (pathTracking) AppendPathSample(pos);
             }
             else
             {
@@ -526,7 +572,12 @@ namespace Gunplay
             float cLoX = float.PositiveInfinity, cLoY = float.PositiveInfinity, cLoZ = float.PositiveInfinity;
             float cHiX = float.NegativeInfinity, cHiY = float.NegativeInfinity, cHiZ = float.NegativeInfinity;
 
-            // CE 采样点列存在时沿绘制路径取点，否则按解析抛物线取点
+            // 采样点列存在时（CE 的发射时预测 / 运行时的真实路径记录）沿绘制路径取点，
+            // 否则按解析抛物线取点。
+            // 循环上界取采样点列的长度而不是 pathCumLen.Length：运行时采样的数组容量
+            // 允许长于点列（2 倍扩容 + 上限丢弃后不收缩），用数组长度会把段指针
+            // 带过点列末尾（见 AppendPathSample）。
+            int sampleLast = pathSamples != null ? pathSamples.Count - 2 : -1;
             int seg = 0;
             for (int i = 0; i <= segCount; i++)
             {
@@ -535,21 +586,21 @@ namespace Gunplay
                 float tt = tail + headMinusTail * f;
 
                 Vector3 center;
-                if (ceArcSamples != null && ceArcCumLen != null)
+                if (pathSamples != null && pathCumLen != null)
                 {
                     // 按绘制路径累计长度在采样点间插值（tt 单调递增，段指针只前进）
-                    float d = tt * ceArcTotalLen;
-                    while (seg < ceArcCumLen.Length - 2 && ceArcCumLen[seg + 1] < d) seg++;
-                    float span = ceArcCumLen[seg + 1] - ceArcCumLen[seg];
+                    float d = tt * pathTotalLen;
+                    while (seg < sampleLast && pathCumLen[seg + 1] < d) seg++;
+                    float span = pathCumLen[seg + 1] - pathCumLen[seg];
                     float k = 0f;
                     if (span > 0.000001f)
                     {
-                        k = (d - ceArcCumLen[seg]) / span;
+                        k = (d - pathCumLen[seg]) / span;
                         k = k < 0f ? 0f : (k > 1f ? 1f : k);
                     }
                     // 展开 Vector3.Lerp（其内部会调 Mathf.Clamp01，同样不内联）
-                    Vector3 p0 = ceArcSamples[seg];
-                    Vector3 p1 = ceArcSamples[seg + 1];
+                    Vector3 p0 = pathSamples[seg];
+                    Vector3 p1 = pathSamples[seg + 1];
                     center = new Vector3(p0.x + (p1.x - p0.x) * k, p0.y + (p1.y - p0.y) * k, p0.z + (p1.z - p0.z) * k);
                 }
                 else
@@ -616,11 +667,11 @@ namespace Gunplay
         // 返回 false 表示采样点退化（不足两个或无路径跨度），调用方应回退解析抛物线。
         bool InitializeArcFromSamples(List<Vector3> samples)
         {
-            ceArcSamples = samples;
+            pathSamples = samples;
             if (!RebuildSampledArcLengths()) return false;
 
             // 弧线参数化分母 = 绘制路径总长（注意：此时 traveled 按绘制位置累计，口径一致）
-            arcHorizontalLength = ceArcTotalLen;
+            arcHorizontalLength = pathTotalLen;
             arcSide = new Vector3(-dir.z, 0f, dir.x);
 
             // 尾部长度与直线轨迹同为「弹速 × 时长」世界单位，换算成弧线比例并保留下限
@@ -635,17 +686,131 @@ namespace Gunplay
         // 由采样点重建绘制路径累计长度；总跨度为零时返回 false
         bool RebuildSampledArcLengths()
         {
-            if (ceArcSamples == null || ceArcSamples.Count < 2) return false;
+            if (pathSamples == null || pathSamples.Count < 2) return false;
 
-            ceArcCumLen = new float[ceArcSamples.Count];
+            pathCumLen = new float[pathSamples.Count];
             float total = 0f;
-            for (int i = 1; i < ceArcSamples.Count; i++)
+            for (int i = 1; i < pathSamples.Count; i++)
             {
-                total += Vector3.Distance(ceArcSamples[i - 1], ceArcSamples[i]);
-                ceArcCumLen[i] = total;
+                total += Vector3.Distance(pathSamples[i - 1], pathSamples[i]);
+                pathCumLen[i] = total;
             }
-            ceArcTotalLen = total;
+            pathTotalLen = total;
             return total > 0.01f;
+        }
+
+        // ---------------- 运行时路径跟踪（自动检测 / 强制曲线）----------------
+
+        // 开始记录实际飞行路径（见 Initialize 的两处调用：强制曲线绘制的非弧线投射物、
+        // 以及自动检测开启时按直线绘制的投射物）。发射点即第一个采样点，
+        // 之后每 tick 由 ApplyPosition 追加当前位置（见 AppendPathSample）。
+        void BeginPathTracking()
+        {
+            pathTracking = true;
+            pathSamples = new List<Vector3>(16) { a };
+            pathCumLen = new float[16];
+            pathCumLen[0] = 0f;
+            pathTotalLen = 0f;
+            // 偏离检测的基准：发射点与发射方向（dir 随后会被每 tick 的实际位移覆盖，必须另存）
+            trackDir = dir;
+            // 宽度方向垂直于发射方向（与 InitializeArc 同一取法；检测切换时按当前方向刷新）
+            arcSide = new Vector3(-dir.z, 0f, dir.x);
+            // 采样参数化初值：路径总长 0 时 AppendArcGeometry 直接返回，写入首个采样点后才开始绘制
+            arcHorizontalLength = 0f;
+            arcTailFraction = 1f;
+            // 包围盒从发射点起增量维护（与 ComputeSampledArcBounds 同一口径）
+            Vector3 pad = new Vector3(width + 1f, 1f, width + 1f);
+            arcAabbMin = a - pad;
+            arcAabbMax = a + pad;
+        }
+
+        // 追加一个路径采样点，由 ApplyPosition 在「这一 tick 移动了」时调用。
+        // 与 traveled 同步推进：pathTotalLen 与 traveled 是同一个增量序列（步长都是
+        // 这一 tick 的位移量），恒相等——因此 AppendArcGeometry 里
+        // head = traveled / arcHorizontalLength 恒为 1，弹体永远在采样路径末端。
+        // 触发上限丢弃后二者不再相等（保留窗口变短），那时 head 被夹到 1，结论不变。
+        void AppendPathSample(Vector3 pos)
+        {
+            if (pathSamples == null || pathCumLen == null) return;
+
+            if (pathSamples.Count >= MaxPathSamples)
+            {
+                // 超出上限：丢弃最旧的一半并重建累计长度。保留窗口仍覆盖整个拖尾长度，
+                // 只有「拖尾长度系数拉满 + 弹速缩放拉到最小」这种病态组合才会短于设定值。
+                // 均摊 O(1)：每丢一半才付一次 O(n)。
+                pathSamples.RemoveRange(0, pathSamples.Count / 2);
+                RebuildPathCumLen();
+            }
+
+            // 容量不足才扩容（2 倍）。pathCumLen 允许长于采样点列——插值循环的上界取
+            // 采样点列的长度而不是数组长度（见 AppendArcGeometry）。
+            if (pathSamples.Count >= pathCumLen.Length)
+            {
+                Array.Resize(ref pathCumLen, Mathf.Max(pathCumLen.Length * 2, 16));
+            }
+
+            float step = Vector3.Distance(pathSamples[pathSamples.Count - 1], pos);
+            pathTotalLen += step;
+            pathCumLen[pathSamples.Count] = pathTotalLen;
+            pathSamples.Add(pos);
+
+            // 采样参数化随路径增长更新：尾窗比例 = 拖尾长度 / 已走过的路径长
+            arcHorizontalLength = pathTotalLen;
+            arcTailFraction = pathTotalLen > 0.0001f
+                ? Mathf.Clamp(length / pathTotalLen, ArcMinTailFraction, 1f)
+                : 1f;
+
+            // 包围盒增量维护（剔除总开关当前关闭，见 CullingEnabled；真开了也不必逐帧重算）
+            Vector3 lo = pos - new Vector3(width + 1f, 1f, width + 1f);
+            Vector3 hi = pos + new Vector3(width + 1f, 1f, width + 1f);
+            if (lo.x < arcAabbMin.x) arcAabbMin.x = lo.x;
+            if (lo.y < arcAabbMin.y) arcAabbMin.y = lo.y;
+            if (lo.z < arcAabbMin.z) arcAabbMin.z = lo.z;
+            if (hi.x > arcAabbMax.x) arcAabbMax.x = hi.x;
+            if (hi.y > arcAabbMax.y) arcAabbMax.y = hi.y;
+            if (hi.z > arcAabbMax.z) arcAabbMax.z = hi.z;
+        }
+
+        // 重建累计长度（丢弃旧采样后调用）。O(n)，只在触发上限丢弃时走。
+        // 之后 pathTotalLen 只覆盖保留窗口，与 traveled 不再相等（见 AppendPathSample）。
+        void RebuildPathCumLen()
+        {
+            if (pathSamples == null || pathCumLen == null) return;
+
+            float total = 0f;
+            for (int i = 1; i < pathSamples.Count; i++)
+            {
+                total += Vector3.Distance(pathSamples[i - 1], pathSamples[i]);
+                pathCumLen[i] = total;
+            }
+            pathCumLen[0] = 0f;
+            pathTotalLen = total;
+        }
+
+        // 自动检测命中：切换为曲线绘制。几何参数已由 AppendPathSample 逐 tick 维护
+        // （采样点列、累计长度、尾窗比例、包围盒），这里只补方向量并记住这个 def。
+        void SwitchToArcDrawing()
+        {
+            arcing = true;
+            // 宽度方向垂直于当前飞行方向（与 InitializeArc 同一取法）
+            arcSide = new Vector3(-dir.z, 0f, dir.x);
+            // 记住这个 def：后续发射直接按曲线绘制，不必每发都重新经历「先画一小段直线
+            // 再切曲线」。仅内存、不进存档；重开游戏重新检测（见 ProjectileRules）。
+            ProjectileRules.MarkAutoDetectedCurved(projectile?.def);
+        }
+
+        // 自动检测：当前位置是否已偏离「发射点 + 发射方向」确定的直线。
+        // 原版投射物严格沿该直线飞行（ExactPosition 就是 origin→destination 的线性插值，
+        // 弧线只是绘制效果），偏离量恒为 0；自定义弹道的 mod 投射物（追踪弹、波浪弹等）
+        // 会持续偏离。阈值见 CurveDetectThreshold。
+        bool DetectPathCurvature(Vector3 pos)
+        {
+            float rx = pos.x - a.x;
+            float rz = pos.z - a.z;
+            float along = rx * trackDir.x + rz * trackDir.z;
+            float px = rx - trackDir.x * along;
+            float pz = rz - trackDir.z * along;
+            return px * px + pz * pz > CurveDetectThreshold * CurveDetectThreshold;
         }
 
         // 解析抛物线的包围盒（原版与 CE 采样失败回退共用）。

@@ -17,12 +17,17 @@ namespace Gunplay
     // 一行 = 一个投射物 ThingDef；武器列只是上下文（轨迹本身只由投射物 def 决定，见 PatchProjectileLaunch），
     // 多个武器共用同一投射物时显示第一个并在 defName 后加「+N」，悬浮列出全部。
     //
-    // 每行若干开关 / 选择（列序：覆写 | 轨迹 | 弹速 | 材质 | 颜色 | 投射物 | 武器 | 宽度 | 长度 | 淡出；
+    // 每行若干开关 / 选择（列序：覆写 | 轨迹 | 曲线 | 弹速 | 材质 | 颜色 | 投射物 | 武器 | 宽度 | 长度 | 淡出；
     // CE 在场时「弹速」整列不参与布局，见 SpeedColumnShown）：
     //   「覆写」—— 该行是否有覆写记录。关掉即丢弃记录（轨迹开关、材质与宽度一起回到继承/计算值）。
     //   「轨迹」—— 是否绘制该投射物的轨迹。未覆写时显示该投射物的「默认」值
     //              （见 ProjectileRules.TrailEnabled：可能因本体无贴图、弧线开关关闭而不勾选）。
     //              直接点它会顺带把覆写打开，省掉「先开覆写再关轨迹」两步。
+    //   「曲线」—— 该投射物是否使用曲线轨迹绘制（弧线样式，而非直线四边形）。未覆写时显示
+    //              该投射物的「默认」判定（见 ProjectileRules.CurveEnabled：原版弧线投射物为曲线，
+    //              CE 投射物跟随 ceStraightTrails；自动检测开启时，运行时检测到沿曲线飞行的
+    //              投射物也会显示为曲线）。与轨迹开关同约定：点一下顺带开启覆写。
+    //              轨迹关掉时本项暂时不生效，但覆写会保留（重新打开轨迹时继续有效）。
     //   「弹速」—— 该投射物是否受全局弹速缩放影响。唯一与轨迹无关的覆写项：轨迹关掉它照样生效，
     //              因此不像材质/颜色/数值那样随轨迹开关变灰。未覆写时显示该投射物的「默认」判定
     //              （见 ProjectileRules.SpeedAffected：弧线投射物不缩放，配置包可用 preserveSpeed 豁免），
@@ -56,6 +61,7 @@ namespace Gunplay
         const float IconSize = 32f;
         const float OverrideToggleWidth = 60f;
         const float TrailToggleWidth = 40f;
+        const float CurveToggleWidth = 40f;
         const float SpeedColumnWidth = 60f;
         const float ColorColumnWidth = 70f;
         const float SwatchWidth = 50f;
@@ -92,7 +98,7 @@ namespace Gunplay
         // 横向拖出去时要靠它把「涂材质」挡在材质列内，否则颜色格会拿到一个 ProjectileTrailDef 转不成 Color。
         // 数值三列各一个，免得 Shift 涂抹横着划过去时把宽度涂到长度列上。
         // 全部 internal：顶层的光标图标补丁按它决定画什么，见 PatchDrawDragPaintIcon。
-        // 后三个是开关列——它们的涂抹由本体复选框接管（见 DrawToggleBox），
+        // 后四个是开关列——它们的涂抹由本体复选框接管（见 DrawToggleBox），
         // 这里只借 tag 给"涂过哪个格子"的位掩码编号，不参与 DragPaint.Cell。
         internal const int MaterialPaintTag = 1;
         internal const int ColorPaintTag = 2;
@@ -102,6 +108,7 @@ namespace Gunplay
         const int OverridePaintTag = 6;
         const int TrailPaintTag = 7;
         const int SpeedPaintTag = 8;
+        const int CurvePaintTag = 9;
 
         // 「本轮拖拽涂过」的高光。淡蓝一层，盖在格子内容之上（理由见 DrawPaintedHighlights）。
         static readonly Color PaintedHighlightColor = new Color(0.35f, 0.65f, 1f, 0.25f);
@@ -641,11 +648,12 @@ namespace Gunplay
             Text.Anchor = TextAnchor.MiddleLeft;
             GUI.color = new Color(0.75f, 0.75f, 0.75f);
 
-            // 三个开关列（覆写 / 轨迹 / 弹速）的图标在格子里居中（见 DrawToggleBox），表头也居中才对得上；
+            // 四个开关列（覆写 / 轨迹 / 曲线 / 弹速）的图标在格子里居中（见 DrawToggleBox），表头也居中才对得上；
             // 其余列的内容都是左对齐（按钮 / 色块 / 输入框统一内缩 4px），表头保持左对齐。
             Text.Anchor = TextAnchor.MiddleCenter;
             Widgets.Label(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
             Widgets.Label(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
+            Widgets.Label(new Rect(layout.curveX, rect.y, CurveToggleWidth, rect.height), "GunplayOverrideColCurve".Translate());
             if (SpeedColumnShown)
                 Widgets.Label(new Rect(layout.speedX, rect.y, SpeedColumnWidth, rect.height), "GunplayOverrideColSpeed".Translate());
 
@@ -668,6 +676,7 @@ namespace Gunplay
         {
             internal readonly float overrideX;
             internal readonly float trailX;
+            internal readonly float curveX;
             internal readonly float speedX;
             internal readonly float colorX;
             internal readonly float materialX;
@@ -679,11 +688,12 @@ namespace Gunplay
             internal readonly float projW;
             internal readonly float weaponW;
 
-            internal ColumnLayout(float overrideX, float trailX, float speedX, float materialX, float colorX, float projX, float weaponX,
+            internal ColumnLayout(float overrideX, float trailX, float curveX, float speedX, float materialX, float colorX, float projX, float weaponX,
                 float widthX, float lengthX, float fadeX, float projW, float weaponW)
             {
                 this.overrideX = overrideX;
                 this.trailX = trailX;
+                this.curveX = curveX;
                 this.speedX = speedX;
                 this.materialX = materialX;
                 this.colorX = colorX;
@@ -697,7 +707,7 @@ namespace Gunplay
             }
 
             // 固定宽度的列各占其位，剩余宽度由投射物 / 武器两列平分。
-            // 列序：左边三个行为开关（覆写 / 轨迹 / 弹速）→ 轨迹外观（材质 → 颜色，颜色比材质具体，
+            // 列序：左边四个行为开关（覆写 / 轨迹 / 曲线 / 弹速）→ 轨迹外观（材质 → 颜色，颜色比材质具体，
             // 单项覆写的颜色会盖住材质色）→ 投射物 / 武器两列上下文 → 轨迹的三个数值。
             //
             // 弹速列隐藏时不是「占着位置留空」，而是整列宽度归零：省下的 60px 直接还给
@@ -707,7 +717,7 @@ namespace Gunplay
                 float speedWidth = SpeedColumnShown ? SpeedColumnWidth : 0f;
 
                 float inner = Mathf.Max(0f, width - ScrollbarWidth);
-                float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - speedWidth - ColorColumnWidth
+                float rest = Mathf.Max(0f, inner - OverrideToggleWidth - TrailToggleWidth - CurveToggleWidth - speedWidth - ColorColumnWidth
                     - MaterialColumnWidth - WidthColumnWidth - LengthColumnWidth - FadeColumnWidth);
 
                 float projW = rest * 0.5f;
@@ -715,7 +725,8 @@ namespace Gunplay
 
                 float overrideX = 0f;
                 float trailX = overrideX + OverrideToggleWidth;
-                float speedX = trailX + TrailToggleWidth;
+                float curveX = trailX + TrailToggleWidth;
+                float speedX = curveX + CurveToggleWidth;
                 float materialX = speedX + speedWidth;
                 float colorX = materialX + MaterialColumnWidth;
                 float projX = colorX + ColorColumnWidth;
@@ -723,7 +734,7 @@ namespace Gunplay
                 float widthX = weaponX + weaponW;
                 float lengthX = widthX + WidthColumnWidth;
 
-                return new ColumnLayout(overrideX, trailX, speedX, materialX, colorX, projX, weaponX,
+                return new ColumnLayout(overrideX, trailX, curveX, speedX, materialX, colorX, projX, weaponX,
                     widthX, lengthX, lengthX + LengthColumnWidth, projW, weaponW);
             }
         }
@@ -771,6 +782,7 @@ namespace Gunplay
 
             DrawToggle(row, layout.overrideX, y, overridden);
             DrawTrailToggle(row, layout.trailX, y, trailOn);
+            DrawCurveToggle(row, layout.curveX, y, ProjectileRules.CurveEnabled(row.projectile));
 
             // CE 下这一列不参与布局（见 SpeedColumnShown），连取值都省掉
             if (SpeedColumnShown)
@@ -825,6 +837,7 @@ namespace Gunplay
 
             if (IsPainted(row, OverridePaintTag)) HighlightCell(layout.overrideX, y, OverrideToggleWidth);
             if (IsPainted(row, TrailPaintTag)) HighlightCell(layout.trailX, y, TrailToggleWidth);
+            if (IsPainted(row, CurvePaintTag)) HighlightCell(layout.curveX, y, CurveToggleWidth);
             if (SpeedColumnShown && IsPainted(row, SpeedPaintTag)) HighlightCell(layout.speedX, y, SpeedColumnWidth);
             if (IsPainted(row, MaterialPaintTag)) HighlightCell(layout.materialX, y, MaterialColumnWidth);
             if (IsPainted(row, ColorPaintTag)) HighlightCell(layout.colorX, y, ColorColumnWidth);
@@ -904,6 +917,28 @@ namespace Gunplay
 
             EnsureOverridden(row);
             ProjectileOverrides.SetTrailEnabled(row.projectile, state);
+            AfterOverrideChanged();
+        }
+
+        // 曲线列：该投射物是否使用曲线轨迹绘制（弧线样式，而非直线四边形）。
+        // 与轨迹列同约定（未覆写时显示生效值、点一下顺带开启覆写），口径统一走
+        // ProjectileRules.CurveEnabled（单项覆写 > 自动检测 > 默认规则）。
+        // 与弹速列一样不随轨迹开关变灰：轨迹关掉时它只是暂不生效，覆写仍保留。
+        void DrawCurveToggle(Row row, float x, float y, bool curveOn)
+        {
+            bool state = curveOn;
+            bool before = state;
+
+            Rect rect = new Rect(x, y, CurveToggleWidth, RowHeight);
+            DrawToggleBox(x + (CurveToggleWidth - ToggleSize) * 0.5f, y, state);
+            Widgets.ToggleInvisibleDraggable(rect, ref state, true, true);
+            TooltipHandler.TipRegion(rect, "GunplayOverrideTipCurve".Translate());
+
+            if (state == before) return;
+            if (IsDragPaint) MarkPainted(row, CurvePaintTag);
+
+            EnsureOverridden(row);
+            ProjectileOverrides.SetCurveEnabled(row.projectile, state);
             AfterOverrideChanged();
         }
 

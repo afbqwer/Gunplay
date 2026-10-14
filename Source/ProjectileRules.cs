@@ -1,9 +1,12 @@
+using System;
+using System.Collections.Generic;
+using Gunplay.Patch;
 using Verse;
 
 namespace Gunplay
 {
-    // 弧线投射物（炮弹/手雷等）的统一门控。
-    // 轨迹生成与速度缩放共用“是否弧线”的判断，便于未来替换判定方式（如改为弧线拖尾时只改此处）。
+    // 投射物绘制规则的统一门控：是否绘制轨迹（TrailEnabled）、怎么画（CurveEnabled）、
+    // 是否受全局弹速缩放（SpeedAffected / ShouldScaleSpeed）都在这里，便于未来替换判定方式。
     public static class ProjectileRules
     {
         // 与既有轨迹门控保持一致
@@ -13,6 +16,59 @@ namespace Gunplay
         {
             return projectileDef?.projectile != null
                 && projectileDef.projectile.arcHeightFactor > ArcHeightThreshold;
+        }
+
+        // 该投射物是否使用曲线绘制（弧线轨迹样式，而非直线四边形）。
+        // 与 TrailEnabled / SpeedAffected 同构：这是「怎么画」的唯一口径，
+        // 运行时登记（Initialize / InitializeCE）、CE 的抛射拦截门与覆写窗口的曲线列都只走这里。
+        //
+        // 优先级：单项覆写（命中即完全接管，可双向）> 运行时自动检测（仅内存，见下）>
+        // 各条「默认」规则。
+        public static bool CurveEnabled(ThingDef? projectileDef)
+        {
+            if (projectileDef?.projectile == null) return false;
+
+            // 单项覆写命中即接管，可双向覆盖下面的「默认」规则
+            if (ProjectileOverrides.TryGetCurveEnabled(ProjectileOverrides.Get(projectileDef), out bool curve)) return curve;
+
+            // 运行时自动检测的结果（仅内存、不进存档）：某个 def 第一次被检测到沿曲线飞行后，
+            // 后续发射直接按曲线绘制，省得每发都重新经历「先画一小段直线再切曲线」。
+            // 只在开关开启时查询——关闭后连已检测出的 def 也回到默认判定。
+            if (GunplaySettings.autoDetectCurvedProjectiles && autoDetectedCurved.Contains(projectileDef.defName)) return true;
+
+            // ---- 以下为该投射物的「默认」绘制方式 ----
+
+            // CE 投射物（thingClass 不是 Projectile 子类，见 PatchCECompat 顶部说明）跟随
+            // ceStraightTrails：开启（默认）画直线，关闭画弧线。原版与自定义弹道的 mod 投射物
+            // 都是 Projectile 子类、走原版 Launch 补丁，因此看弧高因子——自动检测的对象正是它们。
+            // CE 未安装时不存在前者，一并按原版口径（exotic def 本就走不到轨迹登记）。
+            if (PatchCECompat.Detected && IsCEProjectileDef(projectileDef)) return !GunplaySettings.ceStraightTrails;
+
+            return IsArcing(projectileDef);
+        }
+
+        // 记住「这个 def 实际沿曲线飞行」。会话级（重开游戏重新检测），不写进设置——
+        // 它是运行时观测，不是用户配置，见 ProjectileTrailState.SwitchToArcDrawing。
+        public static void MarkAutoDetectedCurved(ThingDef? projectileDef)
+        {
+            if (projectileDef == null) return;
+
+            autoDetectedCurved.Add(projectileDef.defName);
+        }
+
+        // 运行时自动检测出的曲线飞行投射物（defName）。只增不减、有界：
+        // 上界就是加载的投射物 def 数，且只在本开关开启时被查询与写入。
+        static readonly HashSet<string> autoDetectedCurved = new HashSet<string>();
+
+        // 该 def 是否走 CE 路径（ProjectileCE 而非原版 Projectile）。
+        // 判据是 thingClass：ThingMaker.MakeThing 用它实例化，投射物 def 的值必然是
+        // Projectile 的某个子类（Bullet / Projectile_Explosive / mod 自定义类），
+        // 而 CE 的 ProjectileCE 继承 ThingWithComps。缺失（理论上是配置错误）按原版口径，
+        // 对窗口显示是安全的兜底。
+        static bool IsCEProjectileDef(ThingDef projectileDef)
+        {
+            Type? thingClass = projectileDef.thingClass;
+            return thingClass != null && !typeof(Projectile).IsAssignableFrom(thingClass);
         }
 
         // 该投射物「自己」是否受全局弹速缩放（不含全局总开关）。

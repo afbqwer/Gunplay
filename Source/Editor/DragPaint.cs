@@ -12,7 +12,7 @@ namespace Gunplay
     //   * 下拉 —— Widgets.Dropdown(..., paintable: true)。
     // 它们靠 Widgets.checkboxPainting / dropdownPainting 两个全局状态工作，
     // 由 Widgets.WidgetsOnGUI 在松开鼠标时清掉，并顺带画一个跟随光标的图标。
-    // 本窗口的三个开关列用的就是前者（见 ProjectileOverrideWindow.DrawToggleBox）。
+    // 本窗口的四个开关列（覆写 / 轨迹 / 曲线 / 弹速）用的就是前者（见 ProjectileOverrideWindow.DrawToggleBox）。
     //
     // 本类只服务剩下那种情况：格子不是复选框也不是下拉，而是一个自绘的按钮 / 色块 / 输入框。
     // 判定方式参考 telardo.DragSelect 的 DraggingUtility —— 只用 Input 与 Mouse.IsOver

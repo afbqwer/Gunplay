@@ -26,6 +26,8 @@
   <GunplayArcSegmentCountDesc>弧线轨迹（手榴弹、迫击炮弹等）被切成多少段绘制。段数越多越平滑，开销也越大（默认16，范围2~64）.</GunplayArcSegmentCountDesc>
   <GunplayEnableArcTrailsName>开启原版投射物的弧线轨迹</GunplayEnableArcTrailsName>
   <GunplayEnableArcTrailsDesc>为原版（非CE）的弧线投射物（迫击炮弹、手雷等）绘制弧线轨迹。关闭后这些投射物不再绘制轨迹；直线投射物与CE投射物不受影响。只对之后新发射的投射物生效.</GunplayEnableArcTrailsDesc>
+  <GunplayAutoDetectCurvedName>自动检测曲线投射物</GunplayAutoDetectCurvedName>
+  <GunplayAutoDetectCurvedDesc>开启后，非CE情况下按直线轨迹绘制的投射物若实际沿曲线飞行（如某些mod的追踪弹、波浪弹），将自动改用曲线轨迹绘制——沿实际飞行路径采样，与CE弧线为同一套带状网格。原版投射物严格沿直线飞行，不会误判。只对之后新发射的投射物生效.</GunplayAutoDetectCurvedDesc>
   <GunplayTrailWidthModeDesc>决定子弹轨迹基础宽度的计算方式.</GunplayTrailWidthModeDesc>
   <GunplayTrailWidthModeDamage>轨迹宽度：基于投射物伤害</GunplayTrailWidthModeDamage>
   <GunplayTrailWidthModeTexture>轨迹宽度：基于投射物贴图尺寸</GunplayTrailWidthModeTexture>
@@ -38,7 +40,7 @@
   <GunplayUnarmedBulletsOnlyName>仅限子弹类无武器投射物</GunplayUnarmedBulletsOnlyName>
   <GunplayUnarmedBulletsOnlyDesc>开启后，只有伤害类型为子弹（Bullet）的无武器投射物才会产生这些特效.</GunplayUnarmedBulletsOnlyDesc>
   <GunplayProjectileOverridesName>投射物单项覆写...</GunplayProjectileOverridesName>
-  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹材质、宽度、长度、淡出时长、颜色，以及是否受全局弹速缩放。轨迹各项覆写值都是绝对值，不再受材质与上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
+  <GunplayProjectileOverridesDesc>为单个投射物单独指定轨迹材质、宽度、长度、淡出时长、颜色、是否使用曲线绘制，以及是否受全局弹速缩放。轨迹各项覆写值都是绝对值，不再受材质与上面的全局轨迹设置影响.</GunplayProjectileOverridesDesc>
   <GunplayTrailMaterialName>轨迹材质...</GunplayTrailMaterialName>
   <GunplayTrailMaterialDesc>编辑各类轨迹材质（一种材质对应一个 ProjectileTrailDef）的形状、宽度轮廓、颜色与几何。改动立即生效.</GunplayTrailMaterialDesc>
   <GunplayTrailMaterialWindowTitle>轨迹材质</GunplayTrailMaterialWindowTitle>
@@ -103,6 +105,7 @@
   <GunplayOverrideClearAllConfirm>确定要清除全部 {0} 项投射物覆写吗（其中 {1} 项来自已移除的内容、列表中不可见）？此操作无法撤销。</GunplayOverrideClearAllConfirm>
   <GunplayOverrideColEnabled>覆写</GunplayOverrideColEnabled>
   <GunplayOverrideColTrail>轨迹</GunplayOverrideColTrail>
+  <GunplayOverrideColCurve>曲线</GunplayOverrideColCurve>
   <GunplayOverrideColSpeed>弹速</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>颜色</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>材质</GunplayOverrideColMaterial>
@@ -114,6 +117,7 @@
   <GunplayOverrideColorResetTip>清除自定义颜色，恢复为继承轨迹颜色.</GunplayOverrideColorResetTip>
   <GunplayOverrideTipEnabled>覆写该投射物的轨迹设置。关闭会丢弃本行覆写，恢复为继承/计算值.也可在某一行按住并上下拖动，把开关状态批量应用到扫过的行.</GunplayOverrideTipEnabled>
   <GunplayOverrideTipTrail>是否为该投射物绘制轨迹。关闭后该投射物完全没有轨迹，宽度覆写也不再生效。本行尚未开启覆写时调整此开关，会自动开启覆写.也可在某一行按住并上下拖动，把轨迹开关批量应用到扫过的行.</GunplayOverrideTipTrail>
+  <GunplayOverrideTipCurve>该投射物是否使用曲线轨迹绘制（弧线样式，而非直线四边形）。未覆写时显示默认判定：原版弧线投射物（手雷/炮弹）为曲线，CE投射物跟随「CE投射物直线轨迹」开关；自动检测开启时，运行时检测到沿曲线飞行的投射物也会显示为曲线。点击会顺带开启覆写；取消本行「覆写」即可回到默认判定。轨迹关闭时本项暂不生效，但覆写会保留.也可在某一行按住并上下拖动，把曲线开关批量应用到扫过的行.</GunplayOverrideTipCurve>
   <GunplayOverrideTipSpeed>该投射物是否受全局弹速缩放。未覆写时显示默认判定：弧线投射物（手雷/炮弹）不缩放；点击会顺带开启覆写。上面的总开关关闭时，全部投射物都不缩放.也可在某一行按住并上下拖动，把弹速开关批量应用到扫过的行.</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>投射物</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>

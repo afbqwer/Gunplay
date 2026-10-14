@@ -54,6 +54,13 @@ namespace Gunplay
         // 直线投射物与 CE 投射物不受影响。由 ProjectileRules.TrailEnabled 统一读取。
         public static bool enableArcTrails = true;
 
+        // 自动检测曲线投射物：开启后，非 CE 情况下按直线轨迹绘制的投射物若实际沿曲线飞行
+        // （某些 mod 投射物不设 arcHeightFactor，弹道却是追踪/波浪等曲线），则改用曲线轨迹
+        // 绘制——沿实际飞行路径采样，与 CE 的弧线同一套带状网格（见 ProjectileTrailState）。
+        // 判定是逐 tick 的「偏离发射直线」检测，原版投射物严格沿直线飞行，不会误判；
+        // 检测出的 def 会在本次游戏会话内被记住，后续发射直接按曲线绘制。
+        public static bool autoDetectCurvedProjectiles = true;
+
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
         public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
@@ -87,6 +94,7 @@ namespace Gunplay
             Scribe_Values.Look(ref trailFadeTicks, "trailFadeTicks", TrailFade.Default);
             Scribe_Values.Look(ref arcSegmentCount, "arcSegmentCount", ArcSegments.Default);
             Scribe_Values.Look(ref enableArcTrails, "enableArcTrails", true);
+            Scribe_Values.Look(ref autoDetectCurvedProjectiles, "autoDetectCurvedProjectiles", true);
 
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
@@ -180,6 +188,7 @@ namespace Gunplay
                 trailFadeTicks = Mathf.Round(trailFadeTicks);
 
                 listing_Standard.CheckboxLabeled("GunplayEnableArcTrailsName".Translate(), ref enableArcTrails, "GunplayEnableArcTrailsDesc".Translate());
+                listing_Standard.CheckboxLabeled("GunplayAutoDetectCurvedName".Translate(), ref autoDetectCurvedProjectiles, "GunplayAutoDetectCurvedDesc".Translate());
                 listing_Standard.Gap(4f);
 
                 listing_Standard.SliderLabeledInt("GunplayArcSegmentCountName".Translate(), ref arcSegmentCount, "GunplayArcSegmentCountDesc".Translate(),

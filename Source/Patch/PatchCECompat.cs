@@ -418,8 +418,11 @@ namespace Gunplay.Patch
             bool unarmed = equipment == null;
             if (unarmed && !PatchProjectileLaunch.UnarmedEffectsAllowed(__instance)) return;
 
-            // 直线轨迹模式下，抛射类投射物（迫击炮弹/榴弹等大仰角发射）不显示轨迹
-            if (GunplaySettings.ceStraightTrails && GetShotAngle(__instance) > ArcAngleThreshold) return;
+            // 直线轨迹模式下，抛射类投射物（迫击炮弹/榴弹等大仰角发射）不显示轨迹——
+            // 它们的实际弹道是弧线，画成直线只会是一条与弹体不符的假轨迹。
+            // 单项覆写强制曲线时放行：那时轨迹沿 CE 自己的绘制映射采样绘制，
+            // 正是大仰角投射物要的形状（判据见 ProjectileRules.CurveEnabled）。
+            if (!ProjectileRules.CurveEnabled(__instance.def) && GetShotAngle(__instance) > ArcAngleThreshold) return;
 
             // 投射物在 Launch/Throw 之前已 Spawn，本体的 Map 可作为无发射者时的兜底
             Map? map = __instance.Map ?? launcher?.Map;
