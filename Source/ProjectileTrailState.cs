@@ -193,8 +193,16 @@ namespace Gunplay
         // 「曲线绘制」只能沿实际飞行路径取点——与 CE 的采样带状网格（pathSamples）是同一套机制，
         // 区别只在采样时机：CE 在 Launch 时按绘制映射一次预测整条弹道（见 InitializeCE），
         // 这里在发射后逐 tick 记录真实位置（见 AppendPathSample）。
-        bool pathTracking;      // 是否正在记录飞行路径（发射时决定，之后不再关闭）
-        Vector3 trackDir;       // 发射方向：偏离检测的基准（dir 每 tick 被实际位移覆盖，必须另存）
+        //
+        // 记录与判定分开，因为两者需要的东西完全不同：
+        //   * 判定只需要「当前位置」，基准直线是发射时精确已知的（发射点 + 发射方向），
+        //     所以是每 tick 一次 O(1) 的投影比较，不采样、不分配（见 DetectPathCurvature）；
+        //   * 记录只在真的要画曲线时才需要：强制曲线从发射起就开始（见 BeginPathRecording），
+        //     自动检测则等到命中那一刻才播种已飞的那段（见 SwitchToArcDrawing）。
+        // 于是「大概率一生都不会弯」的直线投射物不再为检测付出任何采样成本。
+        bool pathRecording;     // 正在逐 tick 记录路径（强制曲线从发射起、自动检测命中后）
+        bool curveDetecting;    // 正在逐 tick 做偏离判定（自动检测开启且尚未命中）
+        Vector3 trackDir;       // 发射方向：偏离判定的基准（dir 每 tick 被实际位移覆盖，必须另存）
 
         // ---------------- CE 专用状态 ----------------
         // CE 投射物（直线与弧线）每 tick 都跟踪"绘制位置"（含 CE 的高度屏幕偏移），
@@ -207,8 +215,9 @@ namespace Gunplay
         PatchCECompat.DrawPosAccessor? ceDrawAccessor;
         // 弧线轨迹的采样点列（绘制坐标，y 为 altitude 层）。两个来源：
         //   * CE —— 发射时按 CE 绘制映射预测的整条弹道（见 InitializeCE / InitializeArcFromSamples）；
-        //   * 原版非弧线投射物 —— 自动检测或强制曲线时逐 tick 记录的真实飞行路径
-        //     （见 AppendPathSample）。
+        //   * 原版非弧线投射物 —— 强制曲线从发射起、自动检测命中后逐 tick 记录的真实飞行路径
+        //     （见 BeginPathRecording / SwitchToArcDrawing / AppendPathSample）。
+        // 直线飞行阶段（自动检测尚未命中）不做任何记录，因此这里可以是 null。
         // null = 未/无法采样，按解析抛物线取点（pathTotalLen 同样可能仍为 null）
         List<Vector3>? pathSamples;
         float[]? pathCumLen;   // 采样点间绘制路径的累计长度（与 traveled 的绘制口径一致）
@@ -243,8 +252,7 @@ namespace Gunplay
             // 是否曲线绘制，见 ProjectileRules.CurveEnabled（单项覆写 > 自动检测 > 默认规则）。
             // 只有原版弧线投射物有可信的解析弧高（arcHeightFactor）；强制曲线、自动检测命中、
             // 或「原版投射物默认曲线绘制」开启时的非弧线投射物没有弧高可解析，改为沿实际
-            // 飞行路径采样绘制（与 CE 同一套带状网格）。自动检测开启时，按直线绘制的投射物
-            // 也先记下路径，待偏离时切换。
+            // 飞行路径采样绘制（与 CE 同一套带状网格）。
             arcing = ProjectileRules.CurveEnabled(proj.def);
             if (arcing)
             {
@@ -255,7 +263,8 @@ namespace Gunplay
                 }
                 else
                 {
-                    BeginPathTracking();
+                    // 强制曲线：弧线几何直接沿真实路径生成，没有别的来源，必须从发射起记录
+                    BeginPathRecording();
                 }
             }
             else if (GunplaySettings.autoDetectCurvedProjectiles && !ProjectileOverrides.HasCurveOverride(r.over))
@@ -263,7 +272,7 @@ namespace Gunplay
                 // 按默认规则画直线时才参与自动检测：用户显式覆写过绘制方式（无论曲线还是直线）
                 // 的，运行时观测不该改写它——强制直线就是要直线。
                 // 判定直接读本发已解析的覆写记录（r.over），不再按 defName 查一遍字典。
-                BeginPathTracking();
+                BeginCurveDetection();
             }
         }
 
@@ -360,8 +369,8 @@ namespace Gunplay
                     if (drawn.HasValue) ApplyPosition(drawn.Value);
 
                     // 自动检测：实际飞行路线偏离发射直线即切换为曲线绘制（某些 mod 投射物
-                    // 不设 arcHeightFactor 却沿曲线飞行）。强制曲线的轨迹已在画弧线，不参与判定。
-                    if (pathTracking && !arcing && DetectPathCurvature(exactPosition)) SwitchToArcDrawing();
+                    // 不设 arcHeightFactor 却沿曲线飞行）。判定只用当前位置，不读历史采样。
+                    if (curveDetecting && DetectPathCurvature(exactPosition)) SwitchToArcDrawing(exactPosition);
                 }
             }
 
@@ -388,8 +397,8 @@ namespace Gunplay
                 // 静止计数必须是「连续」的：一旦动了就清零。少了这一句它就成了全生命周期累计值，
                 // 离屏飞行每 15 tick 攒 14 个静止 tick，累计值迟早越过阈值把还在飞的轨迹判死。
                 ticksIdle = 0;
-                // 记录飞行路径采样（自动检测 / 强制曲线时开启，见 BeginPathTracking）
-                if (pathTracking) AppendPathSample(pos);
+                // 记录飞行路径采样（强制曲线从发射起、自动检测命中后，见 BeginPathRecording）
+                if (pathRecording) AppendPathSample(pos);
             }
             else
             {
@@ -706,24 +715,22 @@ namespace Gunplay
 
         // ---------------- 运行时路径跟踪（自动检测 / 强制曲线）----------------
 
-        // 开始记录实际飞行路径（见 Initialize 的两处调用：强制曲线绘制的非弧线投射物、
-        // 以及自动检测开启时按直线绘制的投射物）。发射点即第一个采样点，
+        // 开始逐 tick 记录实际飞行路径（强制曲线绘制：单项覆写的「曲线」列，
+        // 或「原版投射物默认曲线绘制」开启时的原版投射物）。发射点即第一个采样点，
         // 之后每 tick 由 ApplyPosition 追加当前位置（见 AppendPathSample）。
         //
-        // 采样缓冲是每发一份的分配（初始约 350 字节，飞行超过 15 tick 扩容一次）。
-        // 刻意不惰性化：切换曲线时尾部窗口要回溯到发射点，中途才开始记录会出现
-        // 「切换那一帧轨迹突然缩短再长回来」的跳变；这个量级与每发必建的
-        // ProjectileTrailState、CE 每发整条弹道的预测采样（PredictDrawPositions）相同。
-        void BeginPathTracking()
+        // 强制曲线必须从发射起就记录：弧线几何直接沿这条路径生成，没有别的来源。
+        // 自动检测那条路不走这里——命中时才播种（见 SwitchToArcDrawing），
+        // 因此直线投射物在未被判定为曲线之前不会分配任何采样缓冲。
+        void BeginPathRecording()
         {
-            pathTracking = true;
+            pathRecording = true;
             pathSamples = new List<Vector3>(16) { a };
             pathCumLen = new float[16];
             pathCumLen[0] = 0f;
             pathTotalLen = 0f;
-            // 偏离检测的基准：发射点与发射方向（dir 随后会被每 tick 的实际位移覆盖，必须另存）
-            trackDir = dir;
-            // 宽度方向垂直于发射方向（与 InitializeArc 同一取法；检测切换时按当前方向刷新）
+            // 宽度方向垂直于「开始记录那一刻的飞行方向」（发射时的 dir / 命中时的当前切线，
+            // 与 InitializeArc 同一取法）
             arcSide = new Vector3(-dir.z, 0f, dir.x);
             // 采样参数化初值：路径总长 0 时 AppendArcGeometry 直接返回，写入首个采样点后才开始绘制
             arcHorizontalLength = 0f;
@@ -734,11 +741,21 @@ namespace Gunplay
             arcAabbMax = a + pad;
         }
 
+        // 开始逐 tick 判定「实际飞行是否偏离发射直线」。只记下判定基准（发射点即 a、
+        // 发射方向即 trackDir），不分配采样缓冲、不记录路径——判定只需要当前位置，
+        // 历史采样在这里派不上用场（见 DetectPathCurvature）。
+        void BeginCurveDetection()
+        {
+            curveDetecting = true;
+            trackDir = dir;
+        }
+
         // 追加一个路径采样点，由 ApplyPosition 在「这一 tick 移动了」时调用。
-        // 与 traveled 同步推进：pathTotalLen 与 traveled 是同一个增量序列（步长都是
-        // 这一 tick 的位移量），恒相等——因此 AppendArcGeometry 里
-        // head = traveled / arcHorizontalLength 恒为 1，弹体永远在采样路径末端。
-        // 触发上限丢弃后二者不再相等（保留窗口变短），那时 head 被夹到 1，结论不变。
+        // 与 traveled 从同一个增量序列累加（步长都是这一 tick 的位移量），因此差值恒定，
+        // 且恒有 traveled ≥ pathTotalLen——AppendArcGeometry 里
+        // head = traveled / arcHorizontalLength 于是恒被夹到 1，弹体永远在采样路径末端。
+        // （强制曲线从发射起记录时二者相等；自动检测命中时播种的弦比真实路径短，差一个常量。）
+        // 触发上限丢弃后保留窗口变短，同一条结论依然成立。
         void AppendPathSample(Vector3 pos)
         {
             if (pathSamples == null || pathCumLen == null) return;
@@ -797,13 +814,23 @@ namespace Gunplay
             pathTotalLen = total;
         }
 
-        // 自动检测命中：切换为曲线绘制。几何参数已由 AppendPathSample 逐 tick 维护
-        // （采样点列、累计长度、尾窗比例、包围盒），这里只补方向量并记住这个 def。
-        void SwitchToArcDrawing()
+        // 自动检测命中：切换为曲线绘制，并从此开始记录路径。
+        //
+        // 已飞的那一段用「发射点 → 当前位置」的直线弦播种，而不是逐 tick 的真实路径：
+        // 能走到这里，说明此前每个 tick 的偏离都小于阈值（否则早就触发了），弦与真实路径
+        // 的差异必然在同一量级（2~15°/tick 的连续转向下实测 0.05~0.10 格，远小于阈值），
+        // 而尾部窗口要回溯到发射点的需求由此得到满足——切换那一帧轨迹不会缩短，
+        // 且顺带修掉旧直线四边形沿切线回退带来的尾部偏差（同场景实测 0.7 格）。
+        // 代价是直线投射物（大概率一生都不会弯）在命中前不分配采样缓冲、也不做逐 tick 的追加。
+        void SwitchToArcDrawing(Vector3 pos)
         {
             arcing = true;
-            // 宽度方向垂直于当前飞行方向（与 InitializeArc 同一取法）
-            arcSide = new Vector3(-dir.z, 0f, dir.x);
+            curveDetecting = false;
+            // 播种：BeginPathRecording 先放发射点（并按下「此刻的飞行方向」定宽度方向，
+            // 此处 dir 已是本 tick 的实际位移方向，即命中点的切线），紧接着把当前位置
+            // 追加成第二个采样点。参数化随之就绪，当帧即可绘制。
+            BeginPathRecording();
+            AppendPathSample(pos);
             // 记住这个 def：后续发射直接按曲线绘制，不必每发都重新经历「先画一小段直线
             // 再切曲线」。仅内存、不进存档；重开游戏重新检测（见 ProjectileRules）。
             ProjectileRules.MarkAutoDetectedCurved(projectile?.def);

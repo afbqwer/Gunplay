@@ -46,7 +46,7 @@ namespace Gunplay
 
             // 原版投射物：弧线投射物（手雷/炮弹）画解析抛物线（与 Vanilla 视觉一致）；
             // 「原版投射物默认曲线绘制」开启时，其余投射物也默认走曲线——沿实际飞行路径
-            // 采样绘制（见 ProjectileTrailState.BeginPathTracking），弧高因子不再区分直线与曲线。
+            // 采样绘制（见 ProjectileTrailState.BeginPathRecording），弧高因子不再区分直线与曲线。
             return IsArcing(projectileDef) || GunplaySettings.vanillaCurveTrails;
         }
 
