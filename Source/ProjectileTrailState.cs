@@ -614,9 +614,12 @@ namespace Gunplay
                 verts[v] = center - side; uvs[v] = new Vector2(0f, f); v++;
                 verts[v] = center + side; uvs[v] = new Vector2(1f, f); v++;
 
-                if (center.x < cLoX) cLoX = center.x; else if (center.x > cHiX) cHiX = center.x;
-                if (center.y < cLoY) cLoY = center.y; else if (center.y > cHiY) cHiY = center.y;
-                if (center.z < cLoZ) cLoZ = center.z; else if (center.z > cHiZ) cHiZ = center.z;
+                if (center.x < cLoX) cLoX = center.x;
+                if (center.x > cHiX) cHiX = center.x;
+                if (center.y < cLoY) cLoY = center.y;
+                if (center.y > cHiY) cHiY = center.y;
+                if (center.z < cLoZ) cLoZ = center.z;
+                if (center.z > cHiZ) cHiZ = center.z;
             }
 
             for (int i = 0; i < segCount; i++)
