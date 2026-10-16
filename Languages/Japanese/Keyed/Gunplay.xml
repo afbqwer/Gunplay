@@ -123,9 +123,9 @@
   <GunplayOverrideTipSpeed>この発射体が全体の発射体速度の影響を受けるかどうか。未上書きの場合は既定の判定を表示します：弧状発射体（擲弾・砲弾）はスケールされず。クリックすると自動的に上書きが有効になります。上部の全体スイッチがオフのときは全発射体がスケールされません。行を押したまま上下にドラッグすると、なぞった行の速度設定をまとめて切り替えられます。</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>発射体</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
-  <GunplayOverrideColWidth>弾道の幅</GunplayOverrideColWidth>
-  <GunplayOverrideColLength>長さ</GunplayOverrideColLength>
-  <GunplayOverrideColFade>消滅</GunplayOverrideColFade>
+  <GunplayOverrideColWidth>弾道W</GunplayOverrideColWidth>
+  <GunplayOverrideColLength>長さT</GunplayOverrideColLength>
+  <GunplayOverrideColFade>消滅T</GunplayOverrideColFade>
   <GunplayOverrideTipWidth>弾道の幅（ワールド単位）。絶対値であり、幅の計算方法や全体的な倍率は適用されません。Shift を押しながらドラッグすると、なぞった行に同じ値を塗れます。</GunplayOverrideTipWidth>
   <GunplayOverrideTipLength>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになります。絶対値であり、全体的な弾道の長さの影響を受けません。Shift を押しながらドラッグすると、なぞった行に同じ値を塗れます。</GunplayOverrideTipLength>
   <GunplayOverrideTipFade>発射体が消えた後、弾道が縮んで消えるまでのティック数（60ティック＝1秒）。絶対値であり、全体的な消滅時間の影響を受けません。Shift を押しながらドラッグすると、なぞった行に同じ値を塗れます。</GunplayOverrideTipFade>

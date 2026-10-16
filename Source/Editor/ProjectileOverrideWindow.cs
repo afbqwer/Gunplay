@@ -67,14 +67,14 @@ namespace Gunplay
         const float SwatchWidth = 50f;
         const float SwatchHeight = 24f;
         const float ResetButtonWidth = 24f;
-        const float MaterialColumnWidth = 150f;
-        const float WidthColumnWidth = 80f;
-        const float LengthColumnWidth = 80f;
-        const float FadeColumnWidth = 80f;
+        const float MaterialColumnWidth = 130f;
+        const float WidthColumnWidth = 60f;
+        const float LengthColumnWidth = 60f;
+        const float FadeColumnWidth = 60f;
         const float ModButtonWidth = 200f;
         const float TrailFilterWidth = 190f;
-        const float OnlyOverriddenWidth = 130f;
-        const float OnlyWithWeaponWidth = 130f;
+        const float OnlyOverriddenWidth = 150f;
+        const float OnlyWithWeaponWidth = 150f;
         const float CountWidth = 200f;
         const float ClearButtonWidth = 150f;
         const float ScrollbarWidth = 16f;
@@ -550,7 +550,7 @@ namespace Gunplay
 
             // 与 CheckboxLabeled 内部同款分工：整格负责点击，方框只画不处理，避免同一次点击被算两遍
             Widgets.ToggleInvisibleDraggable(rect, ref state, true, false);
-            Widgets.CheckboxDraw(rect.xMax - ToggleSize - 4f, rect.y + (rect.height - ToggleSize) * 0.5f, state, false, ToggleSize);
+            Widgets.CheckboxDraw(rect.xMax - ToggleSize, rect.y + (rect.height - ToggleSize) * 0.5f, state, false, ToggleSize);
         }
 
         void OpenModMenu()

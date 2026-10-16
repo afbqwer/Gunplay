@@ -123,9 +123,9 @@
   <GunplayOverrideTipSpeed>该投射物是否受全局弹速缩放。未覆写时显示默认判定：弧线投射物（手雷/炮弹）不缩放；点击会顺带开启覆写。上面的总开关关闭时，全部投射物都不缩放.也可在某一行按住并上下拖动，把弹速开关批量应用到扫过的行.</GunplayOverrideTipSpeed>
   <GunplayOverrideColProjectile>投射物</GunplayOverrideColProjectile>
   <GunplayOverrideColWeapon>武器</GunplayOverrideColWeapon>
-  <GunplayOverrideColWidth>轨迹宽度</GunplayOverrideColWidth>
-  <GunplayOverrideColLength>长度</GunplayOverrideColLength>
-  <GunplayOverrideColFade>淡出</GunplayOverrideColFade>
+  <GunplayOverrideColWidth>轨迹W</GunplayOverrideColWidth>
+  <GunplayOverrideColLength>过程T</GunplayOverrideColLength>
+  <GunplayOverrideColFade>淡出T</GunplayOverrideColFade>
   <GunplayOverrideTipWidth>轨迹宽度，世界单位。绝对值，既不看宽度模式也不乘全局倍率.按住 Shift 拖动可把本行的值涂到扫过的行.</GunplayOverrideTipWidth>
   <GunplayOverrideTipLength>长度 = 该值 × 投射物自身的（未缩放）弹速。绝对值，不受全局轨迹长度影响.按住 Shift 拖动可把本行的值涂到扫过的行.</GunplayOverrideTipLength>
   <GunplayOverrideTipFade>弹体消失后，拖尾收缩到零所需的 tick 数（60 tick = 1 秒）。绝对值，不受全局淡出时长影响.按住 Shift 拖动可把本行的值涂到扫过的行.</GunplayOverrideTipFade>
