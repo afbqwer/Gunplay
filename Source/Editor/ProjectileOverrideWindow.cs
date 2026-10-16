@@ -156,7 +156,7 @@ namespace Gunplay
             internal readonly bool integer;   // 长度 / 淡出是整数刻度，涂过去的值要取整
             internal readonly int paintTag;   // Shift + 拖拽涂抹的格子种类（见 DragPaint.Cell）
             internal readonly Func<float, string> format;
-            internal readonly string tipKey;
+            internal readonly string tipKey;   // 本列的总说明；挂在表头上，不再逐格弹（见 DrawHeader）
             internal readonly Func<Row, float> effective;   // 该行当前生效值（未覆写时也用它做只读显示）
             internal readonly Action<Row, float> apply;     // 写入覆写
 
@@ -641,6 +641,10 @@ namespace Gunplay
                 "GunplayOverrideClearAll".Translate()));
         }
 
+        // 表头。每一列的总说明（「这一列是干什么的、点它会怎样、怎么拖拽涂抹」）挂在这里，
+        // 而不是像以前那样挂在每一行的格子上：列的介绍属于列本身，几百行里逐行弹同一段文字既啰嗦，
+        // 又会和格子随行变化的提示（材质列的已指定/继承/失效、颜色列的「×」、武器列的武器清单）
+        // 挤进同一个悬浮框。随行的状态提示仍留在格子上，见 DrawWeaponCell / DrawMaterialCell / DrawColorCell。
         void DrawHeader(Rect rect)
         {
             ColumnLayout layout = ColumnLayout.Compute(rect.width);
@@ -651,23 +655,45 @@ namespace Gunplay
             // 四个开关列（覆写 / 轨迹 / 曲线 / 弹速）的图标在格子里居中（见 DrawToggleBox），表头也居中才对得上；
             // 其余列的内容都是左对齐（按钮 / 色块 / 输入框统一内缩 4px），表头保持左对齐。
             Text.Anchor = TextAnchor.MiddleCenter;
-            Widgets.Label(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height), "GunplayOverrideColEnabled".Translate());
-            Widgets.Label(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height), "GunplayOverrideColTrail".Translate());
-            Widgets.Label(new Rect(layout.curveX, rect.y, CurveToggleWidth, rect.height), "GunplayOverrideColCurve".Translate());
+            HeaderCell(new Rect(layout.overrideX, rect.y, OverrideToggleWidth, rect.height),
+                "GunplayOverrideColEnabled", "GunplayOverrideTipEnabled");
+            HeaderCell(new Rect(layout.trailX, rect.y, TrailToggleWidth, rect.height),
+                "GunplayOverrideColTrail", "GunplayOverrideTipTrail");
+            HeaderCell(new Rect(layout.curveX, rect.y, CurveToggleWidth, rect.height),
+                "GunplayOverrideColCurve", "GunplayOverrideTipCurve");
             if (SpeedColumnShown)
-                Widgets.Label(new Rect(layout.speedX, rect.y, SpeedColumnWidth, rect.height), "GunplayOverrideColSpeed".Translate());
+                HeaderCell(new Rect(layout.speedX, rect.y, SpeedColumnWidth, rect.height),
+                    "GunplayOverrideColSpeed", "GunplayOverrideTipSpeed");
 
             Text.Anchor = TextAnchor.MiddleLeft;
-            Widgets.Label(new Rect(layout.materialX, rect.y, MaterialColumnWidth, rect.height), "GunplayOverrideColMaterial".Translate());
-            Widgets.Label(new Rect(layout.colorX, rect.y, ColorColumnWidth, rect.height), "GunplayOverrideColColor".Translate());
-            Widgets.Label(new Rect(layout.projX, rect.y, layout.projW, rect.height), "GunplayOverrideColProjectile".Translate());
-            Widgets.Label(new Rect(layout.weaponX, rect.y, layout.weaponW, rect.height), "GunplayOverrideColWeapon".Translate());
-            Widgets.Label(new Rect(layout.widthX, rect.y, WidthColumnWidth, rect.height), "GunplayOverrideColWidth".Translate());
-            Widgets.Label(new Rect(layout.lengthX, rect.y, LengthColumnWidth, rect.height), "GunplayOverrideColLength".Translate());
-            Widgets.Label(new Rect(layout.fadeX, rect.y, FadeColumnWidth, rect.height), "GunplayOverrideColFade".Translate());
+            // 材质列只有随行变化的三种状态提示留在格子上，列本身的介绍（点击换材质 / 清除回继承 / 拖拽涂抹）
+            // 用单独的一条表头提示，别把状态提示那一套搬上去。
+            HeaderCell(new Rect(layout.materialX, rect.y, MaterialColumnWidth, rect.height),
+                "GunplayOverrideColMaterial", "GunplayOverrideTipHeaderMaterial");
+            HeaderCell(new Rect(layout.colorX, rect.y, ColorColumnWidth, rect.height),
+                "GunplayOverrideColColor", "GunplayOverrideTipColor");
+            // 投射物 / 武器两列原先是「纯上下文、没有提示」，这里补齐。
+            HeaderCell(new Rect(layout.projX, rect.y, layout.projW, rect.height),
+                "GunplayOverrideColProjectile", "GunplayOverrideTipHeaderProjectile");
+            HeaderCell(new Rect(layout.weaponX, rect.y, layout.weaponW, rect.height),
+                "GunplayOverrideColWeapon", "GunplayOverrideTipHeaderWeapon");
+            // 数值三列的说明就存在各自的 NumberColumn 上（tipKey），画表头时一并取用
+            HeaderCell(new Rect(layout.widthX, rect.y, WidthColumnWidth, rect.height),
+                "GunplayOverrideColWidth", WidthColumn.tipKey);
+            HeaderCell(new Rect(layout.lengthX, rect.y, LengthColumnWidth, rect.height),
+                "GunplayOverrideColLength", LengthColumn.tipKey);
+            HeaderCell(new Rect(layout.fadeX, rect.y, FadeColumnWidth, rect.height),
+                "GunplayOverrideColFade", FadeColumn.tipKey);
 
             GUI.color = Color.white;
             Text.Anchor = TextAnchor.UpperLeft;
+        }
+
+        // 一格表头：画列名，并把该列的总说明挂在这一格上（见 DrawHeader 的注释）。
+        static void HeaderCell(Rect rect, string labelKey, string tipKey)
+        {
+            Widgets.Label(rect, labelKey.Translate());
+            TooltipHandler.TipRegion(rect, tipKey.Translate());
         }
 
         // 各列的 x 坐标与两个弹性列（投射物 / 武器）的宽度。用结构体而不是一排 out 参数：
@@ -861,7 +887,6 @@ namespace Gunplay
             Rect rect = new Rect(x, y, OverrideToggleWidth, RowHeight);
             DrawToggleBox(x + (OverrideToggleWidth - ToggleSize) * 0.5f, y, state);
             Widgets.ToggleInvisibleDraggable(rect, ref state, true, true);
-            TooltipHandler.TipRegion(rect, "GunplayOverrideTipEnabled".Translate());
 
             if (state == before) return;
             if (IsDragPaint) MarkPainted(row, OverridePaintTag);
@@ -910,7 +935,6 @@ namespace Gunplay
             Rect rect = new Rect(x, y, TrailToggleWidth, RowHeight);
             DrawToggleBox(x + (TrailToggleWidth - ToggleSize) * 0.5f, y, state);
             Widgets.ToggleInvisibleDraggable(rect, ref state, true, true);
-            TooltipHandler.TipRegion(rect, "GunplayOverrideTipTrail".Translate());
 
             if (state == before) return;
             if (IsDragPaint) MarkPainted(row, TrailPaintTag);
@@ -932,7 +956,6 @@ namespace Gunplay
             Rect rect = new Rect(x, y, CurveToggleWidth, RowHeight);
             DrawToggleBox(x + (CurveToggleWidth - ToggleSize) * 0.5f, y, state);
             Widgets.ToggleInvisibleDraggable(rect, ref state, true, true);
-            TooltipHandler.TipRegion(rect, "GunplayOverrideTipCurve".Translate());
 
             if (state == before) return;
             if (IsDragPaint) MarkPainted(row, CurvePaintTag);
@@ -951,7 +974,6 @@ namespace Gunplay
             Rect boxRect = new Rect(x, y, SpeedColumnWidth, RowHeight);
             DrawToggleBox(x + (SpeedColumnWidth - ToggleSize) * 0.5f, y, state);
             Widgets.ToggleInvisibleDraggable(boxRect, ref state, true, true);
-            TooltipHandler.TipRegion(boxRect, "GunplayOverrideTipSpeed".Translate());
 
             if (state == speedOn) return;
 
@@ -1065,7 +1087,7 @@ namespace Gunplay
                 Mathf.Min(SwatchWidth, Mathf.Max(0f, ColorColumnWidth - (hasColor ? ResetButtonWidth + 12f : 8f))), SwatchHeight);
 
             ColorPickerWindow.DrawCheckerSwatch(swatchRect, color);
-            TooltipHandler.TipRegion(swatchRect, "GunplayOverrideTipColor".Translate());
+            // 色块本身不再挂列介绍（那已在表头），只有「×」这条随单元格的提示留在行里。
 
             if (Widgets.ButtonInvisible(swatchRect))
             {
@@ -1228,7 +1250,6 @@ namespace Gunplay
                 Widgets.Label(rect, col.format(col.effective(row)));
                 Text.Anchor = TextAnchor.UpperLeft;
                 GUI.color = Color.white;
-                TooltipHandler.TipRegion(rect, col.tipKey.Translate());
                 return;
             }
 
@@ -1236,13 +1257,11 @@ namespace Gunplay
             if (yieldToPaint)
             {
                 DrawPaintValue(rect, col.format(editValue));
-                TooltipHandler.TipRegion(rect, col.tipKey.Translate());
                 return;
             }
 
             float before = editValue;
             Widgets.TextFieldNumeric(rect, ref editValue, ref buffer, col.min, col.max);
-            TooltipHandler.TipRegion(rect, col.tipKey.Translate());
 
             if (editValue == before) return;
 

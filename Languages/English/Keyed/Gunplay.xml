@@ -111,6 +111,9 @@
   <GunplayOverrideColSpeed>Speed</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>Color</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>Material</GunplayOverrideColMaterial>
+  <GunplayOverrideTipHeaderMaterial>The trail material (ProjectileTrailDef) used by this projectile. When not overridden this is the one resolved from its def. Click to open the material picker, and use "Clear" to inherit again. Press and drag on a row to paint its material onto the rows you sweep over.</GunplayOverrideTipHeaderMaterial>
+  <GunplayOverrideTipHeaderProjectile>Trails are decided by the projectile def alone, not by the weapon that fires it. This column shows that projectile; when several weapons share one projectile they are listed in the Weapon column.</GunplayOverrideTipHeaderProjectile>
+  <GunplayOverrideTipHeaderWeapon>Weapons that fire this projectile, shown as context only — trails depend on the projectile alone. When several weapons share one projectile the first is shown with a "+N" suffix; hover to list them all.</GunplayOverrideTipHeaderWeapon>
   <GunplayOverrideTipMaterialPicked>This projectile uses a material picked here: {0}. Click to pick another one, or "Clear" to inherit again. Press and drag over other rows to give them this material.</GunplayOverrideTipMaterialPicked>
   <GunplayOverrideTipMaterialInherited>This projectile inherits the material configured on its def: {0}. Click to pick a material just for it. Press and drag over other rows to give them this inherited material.</GunplayOverrideTipMaterialInherited>
   <GunplayOverrideMaterialMissingLabel>{0} (missing)</GunplayOverrideMaterialMissingLabel>

@@ -111,6 +111,9 @@
   <GunplayOverrideColSpeed>速度</GunplayOverrideColSpeed>
   <GunplayOverrideColColor>色</GunplayOverrideColColor>
   <GunplayOverrideColMaterial>マテリアル</GunplayOverrideColMaterial>
+  <GunplayOverrideTipHeaderMaterial>この発射体が使用する弾道マテリアル（ProjectileTrailDef）。未上書きの場合は def の設定から解決されたものになります。クリックでマテリアル選択ウィンドウを開き、「クリア」で継承に戻ります。行を押したままドラッグすると、その行のマテリアルをなぞった行に塗れます。</GunplayOverrideTipHeaderMaterial>
+  <GunplayOverrideTipHeaderProjectile>弾道は発射体 def のみで決まり、発射する武器には依存しません。ここにはその発射体自体を表示します。複数の武器が同じ発射体を使う場合は「武器」列に表示されます。</GunplayOverrideTipHeaderProjectile>
+  <GunplayOverrideTipHeaderWeapon>この発射体を発射する武器（参考情報のみ。弾道は発射体のみで決まります）。複数の武器が同じ発射体を使う場合は最初の1つを表示し、defName の後に「+N」を付けます。ホバーで全て表示します。</GunplayOverrideTipHeaderWeapon>
   <GunplayOverrideTipMaterialPicked>この発射体は個別にマテリアルを指定しています：{0}。クリックで別のマテリアルに変更、または「クリア」で継承に戻せます。押したまま他の行へドラッグすると、同じマテリアルをまとめて適用できます。</GunplayOverrideTipMaterialPicked>
   <GunplayOverrideTipMaterialInherited>この発射体は def に設定されたマテリアルを継承しています：{0}。クリックで個別に指定できます。押したまま他の行へドラッグすると、同じ継承マテリアルをまとめて適用できます。</GunplayOverrideTipMaterialInherited>
   <GunplayOverrideMaterialMissingLabel>{0}（欠落）</GunplayOverrideMaterialMissingLabel>
