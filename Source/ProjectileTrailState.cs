@@ -155,6 +155,21 @@ namespace Gunplay
         // null 表示无 def / 无材质，不绘制。
         internal ProjectileTrailBatcher.MeshGroup? drawGroup;
 
+        // ---------------- 3D 视角（IsoRim）专用状态 ----------------
+        // 该轨迹能否走 3D 口径。只有原版 Projectile 可以：IsoRim 只为它计算并绘制真实高度
+        // （Api.ProjectileHeight）。CE 的 ProjectileCE 不是 Projectile 子类，IsoRim 也不接管它的绘制，
+        // 所以 CE 轨迹保持 2D 平面画法——与 CE 弹体自己在 3D 视角里的样子一致（同样没被接管）。
+        internal bool iso3DTrail;
+        // 头部/尾部当前的真实高度（格）。每帧按弹体当前位置向 IsoRim 取一次（见 SampleHeights3D）。
+        float hHead3D;
+        float hTail3D;
+        // 是否已采到过有效高度。弹体消亡后的淡出期 projectile 为 null，此时沿用最后一次采样值：
+        // 淡出期尾巴只前移不到一格，高度线性插值的误差远小于肉眼可辨。
+        bool sampled3D;
+        // 迫击炮/炮弹类（flyOverhead 且弧高很小）：IsoRim 把它们画成一条高空抛物线，
+        // 而不是 def 的 arcHeightFactor。判定口径与 IsoRim.Projectiles.DrawAt 一致。
+        bool lobbed3D;
+
         // ---------------- 直线/通用状态 ----------------
         int ticksUtilDeath;
         // 连续没读到位置变化的 tick 数（移动即清零）。判定「投射物停住」的唯一依据，
@@ -233,6 +248,11 @@ namespace Gunplay
             ticksUtilDeath = -1;
             ticksIdle = 0;
             projectile = proj;
+            iso3DTrail = true;
+            // 局部取一次：直接对 proj.def.projectile 做 != null 比较会让编译器的可空流分析
+            // 把它当作「可能为空」，同一方法里后面几处正常使用就会报 CS8602。
+            ProjectileProperties? props = proj.def.projectile;
+            lobbed3D = props != null && props.flyOverhead && props.arcHeightFactor < 0.5f;
             a = proj.ExactPosition;
             Vector3 b = destination;
             altitude = proj.def.Altitude + DepthEpsilon;
@@ -285,6 +305,7 @@ namespace Gunplay
             ticksUtilDeath = -1;
             ticksIdle = 0;
             projectile = proj;
+            iso3DTrail = false;   // ProjectileCE：IsoRim 不知道它画在多高（见字段注释）
             a = PatchCECompat.GetExactPosition(proj);
             // 绘制映射器只由 def 决定：这一发解析一次，之后每 tick 直接用（见字段注释）
             PatchCECompat.ResolveDrawMapper(proj.def.projectile, out ceWorker, out ceDrawAccessor);
@@ -462,10 +483,43 @@ namespace Gunplay
         // 几何写进调用方的 GeometryBuffer（ref 传入，可扩容）；同时用 out 带出这段几何的 AABB：
         // 顶点在生成时就在寄存器里，顺手比较出包围盒，省掉了「写入后再逐顶点回读」那一趟。
         // 返回 false 表示本帧该轨迹无可绘制内容（未写入任何顶点，min/max 无意义）。
-        public bool AppendGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max)
+        //
+        // iso3D 由 batcher 每帧解析一次（IsoRim 3D 视角是否可用，见 IsoRimCompat.Frame3D）。
+        // 为 false 时下面的几何与旧实现逐顶点一致；为 true 时改按真实高度生成，交给绘制矩阵换算。
+        public bool AppendGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max, bool iso3D)
         {
-            if (arcing) return AppendArcGeometry(ref buffer, out min, out max);
-            return AppendStraightGeometry(ref buffer, out min, out max);
+            bool use3D = iso3D && iso3DTrail;
+            if (use3D) SampleHeights3D();
+
+            if (arcing) return AppendArcGeometry(ref buffer, out min, out max, use3D);
+            return AppendStraightGeometry(ref buffer, out min, out max, use3D);
+        }
+
+        // 采样本帧的头/尾真实高度（格）。只在 3D 口径下调用，且每帧每条轨迹一次（两次 Api 调用）。
+        //
+        // 头部取弹体当前位置、尾部取「头部沿飞行方向回退拖尾长度」那一点：IsoRim 的高度沿平飞路径
+        // 线性插值（枪口高度 → 目标高度），而这两个点都在那条直线上，所以两端一插就是精确值。
+        // 弧线同理——弧高是沿竖直方向叠加的，平飞坐标不变，尾部那一点仍在路径的平飞投影上。
+        void SampleHeights3D()
+        {
+            Vector3 headFlat = exactPosition;
+            float len = DrawLength();
+            // 尾部用「直线弦」而不是弧线上的真实点：高度的自变量是平飞进度，与竖直偏移无关。
+            Vector3 tailFlat = len > 0f ? exactPosition - dir * len : headFlat;
+
+            if (projectile is Projectile p)
+            {
+                hHead3D = IsoRimCompat.HeightOf(p, headFlat, altitude);
+                hTail3D = IsoRimCompat.HeightOf(p, tailFlat, altitude);
+                sampled3D = true;
+                return;
+            }
+
+            if (!sampled3D)
+            {
+                hHead3D = hTail3D = altitude;
+                sampled3D = true;
+            }
         }
 
         // 直线轨迹的几何：一个四边形，与 MeshPool.plane10 逐顶点/逐 UV/缠绕一致。
@@ -473,7 +527,7 @@ namespace Gunplay
         //   TRS(exactPosition - dir * len / 2, LookRotation(dir), (width, 1, len))
         // 变换到世界；这里把该变换展开成分量、直接写出世界坐标顶点（外观逐像素不变）：
         //   局部 +Z → dir（沿飞行方向），局部 +X → right = (dir.z, 0, -dir.x)（宽度方向）。
-        bool AppendStraightGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max)
+        bool AppendStraightGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max, bool use3D)
         {
             min = default;
             max = default;
@@ -482,9 +536,25 @@ namespace Gunplay
             float len = DrawLength();
             if (len <= 0f) return false;
 
-            Vector3 right = new Vector3(dir.z, 0f, -dir.x) * (width * 0.5f);
             Vector3 head = exactPosition;                   // 头部恒在弹体当前绘制位置
             Vector3 tail = exactPosition - dir * len;
+            Vector3 side;                                   // 半宽向量：顶点 = 中心 ± side
+
+            if (use3D)
+            {
+                // 3D：y 换成真实高度（格），宽度方向改成「垂直于这一段飞行方向与视线」，
+                // 整条带子始终正对相机。顶点不做任何缩放——1/Squash 由绘制矩阵统一施加。
+                head.y = hHead3D;
+                tail.y = hTail3D;
+                Vector3 push = IsoRimCompat.DepthPush;
+                head += push;
+                tail += push;
+                side = IsoRimCompat.RibbonSide(head - tail) * (width * 0.5f);
+            }
+            else
+            {
+                side = new Vector3(dir.z, 0f, -dir.x) * (width * 0.5f);
+            }
 
             // 一次性预留 4 顶点 / 6 索引，随后用局部数组引用直接写入：不逐顶点走方法调用。
             buffer.Ensure(4, 6);
@@ -496,10 +566,10 @@ namespace Gunplay
             int b = v;
 
             // 顶点顺序与 plane10 相同：(-x,-z)(-x,+z)(+x,+z)(+x,-z)，UV 的 v 从尾到头
-            verts[v] = tail - right; uvs[v] = UvTailLeft;  v++;
-            verts[v] = head - right; uvs[v] = UvHeadLeft;  v++;
-            verts[v] = head + right; uvs[v] = UvHeadRight; v++;
-            verts[v] = tail + right; uvs[v] = UvTailRight; v++;
+            verts[v] = tail - side; uvs[v] = UvTailLeft;  v++;
+            verts[v] = head - side; uvs[v] = UvHeadLeft;  v++;
+            verts[v] = head + side; uvs[v] = UvHeadRight; v++;
+            verts[v] = tail + side; uvs[v] = UvTailRight; v++;
 
             tris[t] = b; tris[t + 1] = b + 1; tris[t + 2] = b + 2; t += 3;
             tris[t] = b; tris[t + 1] = b + 2; tris[t + 2] = b + 3; t += 3;
@@ -508,18 +578,20 @@ namespace Gunplay
             buffer.triCount = t;
 
             // 包围盒直接由 head/tail 与半宽推得，不回读刚写入的 4 个顶点：
-            // 宽度方向 ±right 只在 X/Z 上张开（right.y 恒为 0），各轴取 |right| 即两端极值。
+            // 宽度方向在 X/Z 上张开（2D 下 side.y 恒为 0，3D 下侧向量可能有 Y 分量），
+            // 各轴取 |side| 即两端极值。
             // Min/Max/Abs 一律展开成三元式：这些 Mathf 方法在 Mono 下不会被内联，逐次都是真实调用。
-            float rx = right.x < 0f ? -right.x : right.x;
-            float rz = right.z < 0f ? -right.z : right.z;
+            float sx = side.x < 0f ? -side.x : side.x;
+            float sy = side.y < 0f ? -side.y : side.y;
+            float sz = side.z < 0f ? -side.z : side.z;
             min = new Vector3(
-                (head.x < tail.x ? head.x : tail.x) - rx,
-                head.y < tail.y ? head.y : tail.y,
-                (head.z < tail.z ? head.z : tail.z) - rz);
+                (head.x < tail.x ? head.x : tail.x) - sx,
+                (head.y < tail.y ? head.y : tail.y) - sy,
+                (head.z < tail.z ? head.z : tail.z) - sz);
             max = new Vector3(
-                (head.x > tail.x ? head.x : tail.x) + rx,
-                head.y > tail.y ? head.y : tail.y,
-                (head.z > tail.z ? head.z : tail.z) + rz);
+                (head.x > tail.x ? head.x : tail.x) + sx,
+                (head.y > tail.y ? head.y : tail.y) + sy,
+                (head.z > tail.z ? head.z : tail.z) + sz);
             return true;
         }
 
@@ -536,7 +608,7 @@ namespace Gunplay
         }
 
         // 弧线轨迹的几何：沿弹道路径在尾部窗口内生成一串四边形。
-        bool AppendArcGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max)
+        bool AppendArcGeometry(ref GeometryBuffer buffer, out Vector3 min, out Vector3 max, bool use3D)
         {
             min = default;
             max = default;
@@ -565,7 +637,15 @@ namespace Gunplay
 
             float halfWidth = width * 0.5f;
             float headMinusTail = head - tail;
-            Vector3 side = arcSide * halfWidth;   // 循环不变量（每段两次用到），移出循环
+
+            // 宽度方向。2D 下恒为弧线的水平侧向（arcSide，y 恒为 0），整条带子一个方向；
+            // 3D 下逐段按「切线 × 视线」重算（见循环内），所以初值先留零。
+            Vector3 side = use3D ? Vector3.zero : arcSide * halfWidth;
+            // 各轴上的最大半宽。2D 下是一个常量；3D 下逐段可能不同，取最大值作为包围盒外扩量，
+            // 保证包围盒一定包住整条带子（宁大勿小，剔除当前关闭，见 CullingEnabled）。
+            float sideMaxX = side.x < 0f ? -side.x : side.x;
+            float sideMaxY = side.y < 0f ? -side.y : side.y;
+            float sideMaxZ = side.z < 0f ? -side.z : side.z;
 
             // 一次性预留 (段数+1)*2 顶点 / 段数*6 索引，随后用局部数组引用直接写入
             buffer.Ensure((segCount + 1) * 2, segCount * 6);
@@ -590,6 +670,21 @@ namespace Gunplay
             // 带过点列末尾（见 AppendPathSample）。
             int sampleLast = pathSamples != null ? pathSamples.Count - 2 : -1;
             int seg = 0;
+            // 3D 下逐段求切线用的「上一段中心」。push3D 只在 3D 时取一次（2D 下连这个属性都不碰）
+            Vector3 prevCenter = Vector3.zero;
+            // 首段定下的宽度方向，后续段据此统一符号（见循环内的说明）
+            Vector3 sideAnchor = Vector3.zero;
+            Vector3 push3D = use3D ? IsoRimCompat.DepthPush : Vector3.zero;
+            // 解析抛物线才有可信的弧高；采样路径的起伏已经含在采样点里（3D 下就是高度本身）
+            bool analyticArc = pathSamples == null || pathCumLen == null;
+
+            // 迫击炮/炮弹：IsoRim 给它们拉的是另一条抛物线（apex = ShellArc × 平飞距离），
+            // 用的是自己的常量而不是 def 的 arcHeightFactor。轨迹要贴着弹体就得用同一个 apex；
+            // 取不到（IsoRim 换了成员）就退回解析弧高——轨迹矮一截，但位置仍然对。
+            float lobbedApex = 0f;
+            bool useLobbed = use3D && analyticArc && lobbed3D
+                && IsoRimCompat.LobbedApex(arcHorizontalLength, out lobbedApex);
+
             for (int i = 0; i <= segCount; i++)
             {
                 float f = i * invSeg;
@@ -597,12 +692,13 @@ namespace Gunplay
                 float tt = tail + headMinusTail * f;
 
                 Vector3 center;
-                if (pathSamples != null && pathCumLen != null)
+                float arc = 0f;
+                if (!analyticArc)
                 {
                     // 按绘制路径累计长度在采样点间插值（tt 单调递增，段指针只前进）
                     float d = tt * pathTotalLen;
-                    while (seg < sampleLast && pathCumLen[seg + 1] < d) seg++;
-                    float span = pathCumLen[seg + 1] - pathCumLen[seg];
+                    while (seg < sampleLast && pathCumLen![seg + 1] < d) seg++;
+                    float span = pathCumLen![seg + 1] - pathCumLen![seg];
                     float k = 0f;
                     if (span > 0.000001f)
                     {
@@ -610,14 +706,48 @@ namespace Gunplay
                         k = k < 0f ? 0f : (k > 1f ? 1f : k);
                     }
                     // 展开 Vector3.Lerp（其内部会调 Mathf.Clamp01，同样不内联）
-                    Vector3 p0 = pathSamples[seg];
+                    Vector3 p0 = pathSamples![seg];
                     Vector3 p1 = pathSamples[seg + 1];
                     center = new Vector3(p0.x + (p1.x - p0.x) * k, p0.y + (p1.y - p0.y) * k, p0.z + (p1.z - p0.z) * k);
                 }
                 else
                 {
-                    float height = arcHeight * 4f * tt * (1f - tt);
-                    center = a + dir * (arcHorizontalLength * tt) + ArcUp * height;
+                    arc = (useLobbed ? lobbedApex : arcHeight) * 4f * tt * (1f - tt);
+                    center = a + dir * (arcHorizontalLength * tt);
+                }
+
+                if (use3D)
+                {
+                    // 3D：高度 = 头尾真实高度的线性插值（IsoRim 的高度沿平飞进度线性变化）+ 解析弧高。
+                    // 原版弧线（2D）把弧高加在 +Z（屏幕竖直方向）上，那在 3D 里会变成一条在地上打弯的
+                    // 轨迹；这里换成真正的 +Y 抬高，与 IsoRim 对其弹体的处理一致。
+                    center.y = hTail3D + (hHead3D - hTail3D) * f + arc;
+                    center += push3D;
+
+                    // 逐段切线：首段没有前一点，用发射方向的水平分量兜底（弧线起始段与它基本同向）
+                    Vector3 tangent = i == 0 ? new Vector3(dir.x, 0f, dir.z) : center - prevCenter;
+                    prevCenter = center;
+                    side = IsoRimCompat.RibbonSide(tangent) * halfWidth;
+
+                    // 宽度方向的符号锚定在首段上。
+                    // RibbonSide 返回的是「某一支」垂直方向，法线方向变了它就翻 180°——切线扫过视线方向时
+                    // （炮弹下落段正对镜头）必然发生，而叉积退化的那一刻还会退回 cross(tangent, up)，
+                    // 手性也相反。翻一次 = 这一段的四边形绕序反过来 = 那段变成背面被剔除（弧线上出现缺口），
+                    // 同时也让带子扭一下。带子关于中心线对称，所以统一取与首段同向的那一支不损失外观。
+                    if (i == 0) sideAnchor = side;
+                    else if (Vector3.Dot(side, sideAnchor) < 0f) side = -side;
+
+                    float ax = side.x < 0f ? -side.x : side.x;
+                    float ay = side.y < 0f ? -side.y : side.y;
+                    float az = side.z < 0f ? -side.z : side.z;
+                    if (ax > sideMaxX) sideMaxX = ax;
+                    if (ay > sideMaxY) sideMaxY = ay;
+                    if (az > sideMaxZ) sideMaxZ = az;
+                }
+                else
+                {
+                    // 2D：弧高加在 +Z（屏幕竖直方向），与 Vanilla Projectile.DrawAt 一致
+                    center += ArcUp * arc;
                 }
 
                 verts[v] = center - side; uvs[v] = new Vector2(0f, f); v++;
@@ -631,21 +761,36 @@ namespace Gunplay
                 if (center.z > cHiZ) cHiZ = center.z;
             }
 
+            // 三角形绕序。
+            //
+            // 2D：宽度方向是 cross(dir, up)（即 arcSide），顶点按「本段一边 → 本段另一边 → 下一段另一边」排，
+            // 叉积得到 +Y —— 相机俯视时是正面。
+            //
+            // 3D：宽度方向换成 cross(切线, 视线)。视线朝下，相当于把 up 取反，手性随之相反，
+            // 同一套索引顺序算出的法线于是背离相机 —— 整条带子成了背面，被剔除后完全看不见
+            // （直线路径的顶点角色是「沿飞行方向 → 宽度方向」，绕序正好相反，所以那边一直没事）。
+            // 因此 3D 下把每个四边形的绕序反转一次，让法线与直线路径同侧；顶点与 UV 不变。
             for (int i = 0; i < segCount; i++)
             {
                 int i0 = baseIndex + i * 2;
-                tris[t] = i0;     tris[t + 1] = i0 + 1; tris[t + 2] = i0 + 3; t += 3;
-                tris[t] = i0;     tris[t + 1] = i0 + 3; tris[t + 2] = i0 + 2; t += 3;
+                if (use3D)
+                {
+                    tris[t] = i0; tris[t + 1] = i0 + 3; tris[t + 2] = i0 + 1; t += 3;
+                    tris[t] = i0; tris[t + 1] = i0 + 2; tris[t + 2] = i0 + 3; t += 3;
+                }
+                else
+                {
+                    tris[t] = i0; tris[t + 1] = i0 + 1; tris[t + 2] = i0 + 3; t += 3;
+                    tris[t] = i0; tris[t + 1] = i0 + 3; tris[t + 2] = i0 + 2; t += 3;
+                }
             }
 
             buffer.vertCount = v;
             buffer.triCount = t;
 
-            // 由中心围盒外扩半宽（arcSide.y 恒为 0，Y 不受影响）
-            float ox = (arcSide.x < 0f ? -arcSide.x : arcSide.x) * halfWidth;
-            float oz = (arcSide.z < 0f ? -arcSide.z : arcSide.z) * halfWidth;
-            min = new Vector3(cLoX - ox, cLoY, cLoZ - oz);
-            max = new Vector3(cHiX + ox, cHiY, cHiZ + oz);
+            // 由中心围盒外扩半宽（2D 下 arcSide.y 恒为 0，Y 不受影响；3D 下 Y 也要外扩）
+            min = new Vector3(cLoX - sideMaxX, cLoY - sideMaxY, cLoZ - sideMaxZ);
+            max = new Vector3(cHiX + sideMaxX, cHiY + sideMaxY, cHiZ + sideMaxZ);
             return true;
         }
 

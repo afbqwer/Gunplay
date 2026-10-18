@@ -103,14 +103,14 @@ namespace Gunplay
                 touched = false;
             }
 
-            internal void Add(ProjectileTrailState trail)
+            internal void Add(ProjectileTrailState trail, bool iso3D)
             {
                 if (material == null) return;
 
                 // 几何写进本组缓冲，并顺带带回这段几何的 AABB（out 参数），直接合并进本组包围盒。
                 // 旧写法是「先写入 List，再从头回读整段顶点求 min/max」——那次回读要对 List
                 // 逐顶点调 get_Item / get_Count；顶点在生成时本就在寄存器里，顺手比较更便宜。
-                if (!trail.AppendGeometry(ref buffer, out Vector3 lo, out Vector3 hi))
+                if (!trail.AppendGeometry(ref buffer, out Vector3 lo, out Vector3 hi, iso3D))
                     return;   // 本帧该轨迹无可绘制内容
 
                 if (!touched)
@@ -159,10 +159,14 @@ namespace Gunplay
                 // 结果 length 变成 0、submesh 变成脏值——不报错但一个三角形都不上传。务必按此顺序。
                 mesh.SetTriangles(buffer.tris, 0, buffer.triCount, 0, false);
                 // bounds 只影响 Unity 自身的视锥剔除；外扩一格避免边缘轨迹被剔
+                // （3D 口径下网格里的坐标是真实高度，bounds 也随之是真实尺度——
+                //  绘制矩阵在采样时同步缩放，所以两者始终一致）
                 mesh.bounds = new Bounds((min + max) * 0.5f, max - min + Vector3.one);
 
-                // 颜色已在建组时写进 props，这里不再重复设
-                Graphics.DrawMesh(mesh, Matrix4x4.identity, material, 0, null, 0, props);
+                // 颜色已在建组时写进 props，这里不再重复设。
+                // 矩阵：2D 下是单位矩阵；IsoRim 3D 视角下是 Scale(1, 1/Squash, 1)，
+                // 把几何里的「真实高度（格）」换算到该 mod 挤压过的绘制空间（见 IsoRimCompat.DrawMatrix）。
+                Graphics.DrawMesh(mesh, IsoRimCompat.DrawMatrix, material, 0, null, 0, props);
             }
         }
 
@@ -205,6 +209,11 @@ namespace Gunplay
 
         public static void Draw(List<ProjectileTrailState> trails)
         {
+            // 每帧一次，且必须先于任何几何生成：IsoRim 缺席时这里只有一次静态 bool 判断
+            // （见 IsoRimCompat.BeginFrame），3D 相关的分支在整条绘制路径上都不会进入。
+            IsoRimCompat.BeginFrame();
+            bool iso3D = IsoRimCompat.Frame3D;
+
             if (trails.Count == 0) return;
 
             for (int i = 0; i < used.Count; i++) used[i].Reset();
@@ -224,7 +233,7 @@ namespace Gunplay
                 MeshGroup? group = trail.drawGroup;
                 if (group == null) continue;
 
-                group.Add(trail);
+                group.Add(trail, iso3D);
             }
 
             for (int i = 0; i < used.Count; i++) used[i].UploadAndDraw();

@@ -37,6 +37,8 @@
   <GunplayTrailWidthFactorDesc>計算された弾道の幅に対する倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayTrailWidthFactorDesc>
   <GunplayCEStraightTrailsName>CE発射体の直線弾道</GunplayCEStraightTrailsName>
   <GunplayCEStraightTrailsDesc>Combat Extendedの発射体に直線の弾道を描画します。曲射される発射体（迫撃砲弾・擲弾など）には弾道を表示しません。無効にすると、全てのCE発射体の弾道が実際の飛翔経路に沿った弧状で描画されます。</GunplayCEStraightTrailsDesc>
+  <GunplayIsoRim3DName>IsoRim 3Dビュー対応</GunplayIsoRim3DName>
+  <GunplayIsoRim3DDesc>IsoRim（3Dビュー）を検出すると、弾道を発射体の実際の高さで描画し、常にカメラの方を向くようにします。無効にすると従来の平面描画に戻り、3Dビューでは地面に張り付いた状態になります（互換レイヤーの調査用）。IsoRim未導入時は表示されません。</GunplayIsoRim3DDesc>
   <GunplayUnarmedEffectsName>武器なしの発射体にエフェクトを表示</GunplayUnarmedEffectsName>
   <GunplayUnarmedEffectsDesc>武器なしで発射された発射体（タレットの射撃やスクリプト生成物など）に弾道と着弾音/エフェクトを追加します。</GunplayUnarmedEffectsDesc>
   <GunplayUnarmedBulletsOnlyName>武器なしの発射体は弾のみ</GunplayUnarmedBulletsOnlyName>

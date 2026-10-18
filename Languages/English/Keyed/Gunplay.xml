@@ -37,6 +37,8 @@
   <GunplayTrailWidthFactorDesc>Multiplies the calculated trail width. Default 100%, range 5% to 400%, in 5% steps.</GunplayTrailWidthFactorDesc>
   <GunplayCEStraightTrailsName>Straight trails for CE projectiles</GunplayCEStraightTrailsName>
   <GunplayCEStraightTrailsDesc>Draw straight trails for Combat Extended projectiles; lobbed projectiles (mortar shells, grenades) get no trail. When disabled, all CE projectile trails follow their actual flight path instead (arc style).</GunplayCEStraightTrailsDesc>
+  <GunplayIsoRim3DName>IsoRim 3D view compatibility</GunplayIsoRim3DName>
+  <GunplayIsoRim3DDesc>With IsoRim (3D view) detected, trails are drawn at the projectile's real height and always face the camera. Disable to go back to the flat drawing, which lies on the ground in the 3D view; only useful for troubleshooting the compatibility layer. Not shown when IsoRim is not installed.</GunplayIsoRim3DDesc>
   <GunplayUnarmedEffectsName>Effects for weapon-less projectiles</GunplayUnarmedEffectsName>
   <GunplayUnarmedEffectsDesc>Give projectiles fired without a weapon (turret shots, scripted projectiles) bullet trails and impact sounds/effects.</GunplayUnarmedEffectsDesc>
   <GunplayUnarmedBulletsOnlyName>Weapon-less projectiles: bullets only</GunplayUnarmedBulletsOnlyName>

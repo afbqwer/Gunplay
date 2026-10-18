@@ -67,6 +67,12 @@ namespace Gunplay
         // 检测出的 def 会在本次游戏会话内被记住，后续发射直接按曲线绘制。
         public static bool autoDetectCurvedProjectiles = true;
 
+        // IsoRim（3D 视角）兼容开关：开启后，检测到 IsoRim 且它的 3D 视角就绪时，
+        // 轨迹按真实高度绘制并始终正对相机（见 IsoRimCompat）。
+        // 关闭即回到原来的平面画法——在 3D 视角里轨迹会塌在地面上，只用于排查兼容层本身的问题。
+        // 没装 IsoRim 时不显示这一项，也不产生任何开销。
+        public static bool enableIsoRim3D = true;
+
         // 投射物单项覆写：键为投射物 defName。存在于字典中即代表该投射物开启了覆写。
         public static Dictionary<string, ProjectileOverride> projectileOverrides = new Dictionary<string, ProjectileOverride>();
 
@@ -102,6 +108,7 @@ namespace Gunplay
             Scribe_Values.Look(ref enableArcTrails, "enableArcTrails", true);
             Scribe_Values.Look(ref vanillaCurveTrails, "vanillaCurveTrails", false);
             Scribe_Values.Look(ref autoDetectCurvedProjectiles, "autoDetectCurvedProjectiles", true);
+            Scribe_Values.Look(ref enableIsoRim3D, "enableIsoRim3D", true);
 
             Scribe_Collections.Look(ref projectileOverrides, "projectileOverrides", LookMode.Value, LookMode.Deep);
             if (projectileOverrides == null) projectileOverrides = new Dictionary<string, ProjectileOverride>();
@@ -221,6 +228,14 @@ namespace Gunplay
                 {
                     listing_Standard.Gap(4f);
                     listing_Standard.CheckboxLabeled("GunplayCEStraightTrailsName".Translate(), ref ceStraightTrails, "GunplayCEStraightTrailsDesc".Translate());
+                }
+
+                // 仅在检测到 IsoRim 时显示：没装这个 mod 时该项无从谈起，
+                // 也避免让人以为它能解决别的 3D 相关问题（见 IsoRimCompat 顶部说明）。
+                if (IsoRimCompat.Present)
+                {
+                    listing_Standard.Gap(4f);
+                    listing_Standard.CheckboxLabeled("GunplayIsoRim3DName".Translate(), ref enableIsoRim3D, "GunplayIsoRim3DDesc".Translate());
                 }
 
                 listing_Standard.Gap(8f);
