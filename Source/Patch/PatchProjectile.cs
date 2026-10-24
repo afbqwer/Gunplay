@@ -78,7 +78,9 @@ namespace Gunplay.Patch
 
         static void RunPostfix(Projectile __instance, Vector3 ___destination, Thing launcher, ref Vector3 ___origin, LocalTargetInfo intendedTarget, Thing equipment, ref int ___ticksToImpact)
         {
-            CompGun? comp = equipment?.TryGetComp<CompGun>();
+            // 该偏移只在武器动画开启时才会被绘制补丁读取（见 PatchPawnRenderer），
+            // 关闭时连带跳过写入：省掉 TryGetComp、角度计算与属性赋值（setter 还会重置衰减速度）。
+            CompGun? comp = GunplaySettings.enableWeaponAnimations ? equipment?.TryGetComp<CompGun>() : null;
             if (comp != null)
             {
                 float angle = (___destination - ___origin).AngleFlat() - (intendedTarget.CenterVector3 - ___origin).AngleFlat();
