@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using RimWorld;
@@ -49,28 +50,107 @@ namespace Gunplay
         static bool saveFailureLogged;
         static string? signature;
 
+        // 分帧预热状态：设置窗口靠它画进度条，并在每帧推进一小段。
+        static List<ThingDef>? warmUpQueue;
+        static int warmUpIndex;
+        static bool warmingUp;
+        static float warmUpProgress;
+
+        // 单次 Step 的时间预算。设置窗口按 16ms 节流调用，两者叠加保证界面仍可交互。
+        const double StepBudgetMilliseconds = 6.0;
+
         static string CachePath => Path.Combine(GenFilePaths.ConfigFolderPath, CacheFileName);
 
-        // 启动时调用（见 GunplaySetup）：先读磁盘缓存，再补齐所有未命中的手持射击武器。
-        // 命中缓存的武器不再读贴图；首次运行/签名变化时才会真正扫一遍，随后写回缓存。
+        internal static bool IsWarmingUp
+        {
+            get
+            {
+                lock (cacheLock) return warmingUp;
+            }
+        }
+
+        internal static float WarmUpProgress01
+        {
+            get
+            {
+                lock (cacheLock) return warmUpProgress;
+            }
+        }
+
+        // 启动时（见 GunplaySetup）一次性跑完：先读缓存，再补齐所有未命中的手持射击武器。
         internal static void WarmUp()
+        {
+            BeginWarmUp();
+            while (IsWarmingUp) StepWarmUp();
+        }
+
+        // 设置窗口里改成逐帧推进：先建立缺失列表，进度只反映真正需要扫描的武器。
+        internal static void BeginWarmUp()
         {
             lock (cacheLock)
             {
+                if (warmingUp) return;
+
                 EnsureLoadedLocked();
 
-                int added = 0;
+                var missing = new List<ThingDef>();
                 foreach (ThingDef def in CandidateWeapons())
                 {
-                    if (cache.ContainsKey(def)) continue;
-
-                    cache[def] = Derive(def);
-                    added++;
+                    if (!cache.ContainsKey(def)) missing.Add(def);
                 }
 
-                if (added > 0) dirty = true;
-                if (dirty) SaveLocked();
+                warmUpQueue = missing;
+                warmUpIndex = 0;
+                warmUpProgress = 0f;
+
+                if (missing.Count == 0)
+                {
+                    warmingUp = false;
+                    warmUpProgress = 1f;
+                    if (dirty) SaveLocked();
+                    return;
+                }
+
+                warmingUp = true;
             }
+        }
+
+        // 推进一小步（最多 StepBudgetMilliseconds，至少一项）。由设置窗口每帧调用。
+        internal static void StepWarmUp()
+        {
+            lock (cacheLock)
+            {
+                if (!warmingUp || warmUpQueue == null) return;
+
+                long start = Stopwatch.GetTimestamp();
+                do
+                {
+                    ThingDef def = warmUpQueue[warmUpIndex];
+                    warmUpIndex++;
+
+                    if (!cache.ContainsKey(def))
+                    {
+                        cache[def] = Derive(def);
+                        dirty = true;
+                    }
+                }
+                while (warmUpIndex < warmUpQueue.Count && ElapsedMilliseconds(start) < StepBudgetMilliseconds);
+
+                warmUpProgress = (float)warmUpIndex / warmUpQueue.Count;
+
+                if (warmUpIndex >= warmUpQueue.Count)
+                {
+                    warmingUp = false;
+                    warmUpQueue = null;
+                    warmUpProgress = 1f;
+                    if (dirty) SaveLocked();
+                }
+            }
+        }
+
+        static double ElapsedMilliseconds(long startTimestamp)
+        {
+            return (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / Stopwatch.Frequency;
         }
 
         // 把尚未落盘的推导结果写出去（设置窗口关闭时兜底，见 Gunplay.WriteSettings）。

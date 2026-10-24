@@ -137,6 +137,9 @@ namespace Gunplay
         // 设置窗口的滚动状态。设置项较多而窗口高度有限，内容超出时需滚动。
         static Vector2 settingsScroll;
 
+        // 枪口预热的分帧节流时间戳（Time.realtimeSinceStartup）。
+        static float nextMuzzleWarmUpStep;
+
         // 内容高度缓存。Listing.CurHeight 就是 curY（=> curY），会随 GetRect/Gap 自动累加，
         // 前提是「不分栏」——见下面 maxOneColumn。这里在 Layout 阶段量取一次，供同一帧的
         // Repaint 使用（IMGUI 每帧先 Layout 再 Repaint），因此不会出现「滚动条晚一帧」的抖动。
@@ -186,6 +189,9 @@ namespace Gunplay
 
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());
+
+            bool muzzleAutoWasEnabled = enableMuzzleOffset && muzzleOffsetFromTexture;
+
             listing_Standard.CheckboxLabeled("GunplayEnableMuzzleOffsetName".Translate(), ref enableMuzzleOffset, "GunplayEnableMuzzleOffsetDesc".Translate());
             if (enableMuzzleOffset)
             {
@@ -193,6 +199,51 @@ namespace Gunplay
                 listing_Standard.CheckboxLabeled("GunplayMuzzleOffsetFromTextureName".Translate(), ref muzzleOffsetFromTexture, "GunplayMuzzleOffsetFromTextureDesc".Translate());
                 listing_Standard.Gap(4f);
             }
+
+            // 在设置界面里刚开启时立刻开始预热（分帧执行，见下方进度条）。
+            if (enableMuzzleOffset && muzzleOffsetFromTexture && !muzzleAutoWasEnabled)
+            {
+                try
+                {
+                    MuzzleOffset.BeginWarmUp();
+                }
+                catch (Exception exception)
+                {
+                    Log.WarningOnce("[Gunplay] Could not start the muzzle offset warm-up; offsets will be derived on demand.\n" + exception,
+                        "GunplayMuzzleWarmUpBegin".GetHashCode());
+                }
+            }
+
+            if (MuzzleOffset.IsWarmingUp)
+            {
+                // IMGUI 每帧会因多个事件多次调用本方法；按 16ms 节流，一帧只推进一次。
+                if (Time.realtimeSinceStartup >= nextMuzzleWarmUpStep)
+                {
+                    nextMuzzleWarmUpStep = Time.realtimeSinceStartup + 0.016f;
+                    try
+                    {
+                        MuzzleOffset.StepWarmUp();
+                    }
+                    catch (Exception exception)
+                    {
+                        Log.WarningOnce("[Gunplay] Muzzle offset warm-up failed; remaining offsets will be derived on demand.\n" + exception,
+                            "GunplayMuzzleWarmUpStep".GetHashCode());
+                    }
+                }
+
+                listing_Standard.Gap(4f);
+                Rect progressRect = listing_Standard.GetRect(Text.LineHeight);
+                float progress = MuzzleOffset.WarmUpProgress01;
+                Widgets.FillableBar(progressRect, progress);
+
+                TextAnchor anchor = Text.Anchor;
+                Text.Anchor = TextAnchor.MiddleCenter;
+                Widgets.Label(progressRect, "GunplayMuzzleWarmUpProgress".Translate(Mathf.RoundToInt(progress * 100f)));
+                Text.Anchor = anchor;
+
+                listing_Standard.Gap(4f);
+            }
+
             listing_Standard.CheckboxLabeled("GunplayEnableEffectsName".Translate(), ref enableEffects, "GunplayEnableEffectsDesc".Translate());
             if (enableEffects)
             {
