@@ -89,8 +89,9 @@ namespace Gunplay
         // 若允许输入 0，「填了 0」与「没填」会被判成同一件事——用户设 0 后实际回落到计算值，
         // 而输入框这一帧仍显示 0（打字路径不重算），当场看不出来。要「不画轨迹」有轨迹开关，
         // 0 宽度本身没有意义，因此把下限抬到刚好越过哨兵。
-        const float MinWidth = 0.01f;
-        const float MaxWidth = 2f;
+        // 区间与材质窗口、TrailWidth 的运行时兜底共用，避免三个入口各写一份后跑偏。
+        const float MinWidth = TrailWidth.MinWidth;
+        const float MaxWidth = TrailWidth.MaxWidth;
 
         const float ToggleSize = 24f;
 

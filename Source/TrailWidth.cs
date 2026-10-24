@@ -16,6 +16,15 @@ namespace Gunplay
     // internal：运行时与设置界面共用的内部口径，不对外暴露（入参携带内部解析状态 TrailResolve）。
     internal static class TrailWidth
     {
+        // 手动宽度输入（材质绝对值 / 单项覆写）的合法区间，与两个编辑窗口共用；
+        // 运行时也用它给所有输入（含基础宽度）设上限。
+        // 上限不是物理极限，而是「异常配置别把合并网格撑爆」的保险：编辑器本来就只允许到 2。
+        internal const float MinWidth = 0.01f;
+        internal const float MaxWidth = 2f;
+
+        // 全局宽度倍率的合法区间，与设置界面的滑杆共用（见 SanitizeFactor）。
+        internal const float MinFactor = 0.05f;
+        internal const float MaxFactor = 4f;
 
         // 覆写是否命中（命中即完全接管，调用方不应再叠加任何全局系数）。
         // 与 TrailLength / TrailFade 同形：命中判定与 0 哨兵的处理都在 ProjectileOverrides 里。
@@ -24,7 +33,12 @@ namespace Gunplay
         // 传 null 表示「无法解析」，各方法按 0 宽度或全局默认值处理，不抛异常。
         public static bool TryOverride(in TrailResolve r, out float width)
         {
-            return ProjectileOverrides.TryGetTrailWidth(r.over, out width);
+            if (!ProjectileOverrides.TryGetTrailWidth(r.over, out width)) return false;
+
+            // 存档或外部改出来的 NaN / 无穷值不能进几何：NaN 视为未设定（回落到材质/基础宽度），
+            // 正无穷按输入上限截断。见 SanitizeWidth。
+            width = SanitizeWidth(width);
+            return width > 0f;
         }
 
         // 基础宽度（伤害 / 贴图口径），不含材质覆盖与全局系数。
@@ -49,20 +63,36 @@ namespace Gunplay
 
             float width = Base(projectileDef, damage);
 
-            // 材质层：绝对值口径，-1 表示未设定（继续走基础宽度）
+            // 材质层：绝对值口径，-1（或任何非正值）表示未设定（继续走基础宽度，见 TrailMaterialParams.Clamp）
             float materialWidth = r.material.trailWidth;
             if (materialWidth > 0f) width = materialWidth;
 
-            return width * GunplaySettings.trailWidthFactor;
+            // 输入宽度与全局倍率各夹一次：坏值在这里止步，不进入顶点数组。
+            return SanitizeWidth(width) * SanitizeFactor(GunplaySettings.trailWidthFactor);
         }
 
         // 设置界面口径：无法知道实际开火的武器，因此按无武器加成解析伤害（见 BaseDamage）。
         // 已解析结果在手时用这个重载（窗口同步输入框、新建覆写取默认值都走它）。
         public static float EffectiveForDef(in TrailResolve r, ThingDef? projectileDef)
         {
-            if (TryOverride(r, out float w)) return w;
-
+            // Effective 内部已处理覆写命中，这里不再重复判断。
             return Effective(r, projectileDef, BaseDamage(projectileDef));
+        }
+
+        // 宽度输入的最终防线：NaN / 负数 / 0 归零，正无穷与超大值截到 MaxWidth。
+        // 0 是合法结果（不绘制），只是不允许坏值进入顶点数组——合并网格里一条坏几何会拖垮整组。
+        static float SanitizeWidth(float width)
+        {
+            if (!(width > 0f)) return 0f;   // 同时挡住 NaN（NaN 与任何数比较都是 false）
+            return width < MaxWidth ? width : MaxWidth;
+        }
+
+        // 全局倍率的最终防线。Mathf.Clamp 对 NaN 会原样返回（UnityStubs 里是比较式的实现），
+        // 所以 NaN 单独回落默认值 1；±Infinity 则由 Clamp 自然截到区间端点。
+        static float SanitizeFactor(float factor)
+        {
+            if (float.IsNaN(factor)) return 1f;
+            return Mathf.Clamp(factor, MinFactor, MaxFactor);
         }
 
         // 仅有 def 时（覆写窗口的宽度列只读显示）。

@@ -14,7 +14,7 @@
          宽度轮廓：headWidth / tailWidth / widthProfileCurve
                    （两端是**相对**比例，生成时按较大者归一化到 1：最宽端必然贴住四边形边缘。
                      两端相等 = 等宽；尾部更小 = 尾部逐渐收缩；尾部更大 = 尾部逐渐放大）
-         几何与色：trailColor / trailWidth（-1=未设定，按基础宽度×全局倍率）
+         几何与色：trailColor / trailWidth（非正值=未设定，按基础宽度×全局倍率）
                    trailLengthFactor（-1=未设定，跟随全局「轨迹长度」）
                    trailFadeTicks（-1=未设定，跟随全局「轨迹淡出时长」） -->
 

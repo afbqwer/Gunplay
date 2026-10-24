@@ -220,7 +220,8 @@ namespace Gunplay
                 if (listing_Standard.RadioButton("GunplayTrailWidthModeTexture".Translate(), trailWidthMode == TrailWidthMode.Texture, tooltip: "GunplayTrailWidthModeDesc".Translate()))
                     trailWidthMode = TrailWidthMode.Texture;
                 trailWidthFactor = Mathf.Round(trailWidthFactor * 20f) / 20f;
-                listing_Standard.SliderLabeled("GunplayTrailWidthFactorName".Translate(), ref trailWidthFactor, "GunplayTrailWidthFactorDesc".Translate(), 0.05f, 4f);
+                // 区间与 TrailWidth.SanitizeFactor 共用；公式侧还会再夹一次，防止手改配置留下越界值。
+                listing_Standard.SliderLabeled("GunplayTrailWidthFactorName".Translate(), ref trailWidthFactor, "GunplayTrailWidthFactorDesc".Translate(), TrailWidth.MinFactor, TrailWidth.MaxFactor);
                 trailWidthFactor = Mathf.Round(trailWidthFactor * 20f) / 20f;
 
                 // 仅在显示轨迹且检测到 CE（兼容补丁挂载成功）时显示

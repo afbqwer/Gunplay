@@ -210,10 +210,11 @@ namespace Gunplay
             y = GroupHeader(y, contentWidth, "GunplayTrailMaterialGroupGeometry");
             y = ColorRow(y, contentWidth);
 
-            // 宽度：材质值一旦设定就是绝对值（0 世界单位是合法值，用勾选框而不是 -1 哨兵来表达"未设定"）
+            // 宽度：材质值一旦设定就是绝对值；非正值是「未设定」哨兵（见 TrailMaterialParams.Clamp），
+            // 因此滑块下限抬到 0.01，避免拖到 0 后勾选框自己变回未勾选、值又静默回落到基础宽度。
             y = OverrideRow(y, contentWidth, "GunplayTrailMaterialWidth",
                 m => m.trailWidth, (m, v) => m.trailWidth = v,
-                WidthOverrideStart, 0f, 2f, false, "GunplayTrailMaterialWidthTip");
+                WidthOverrideStart, TrailWidth.MinWidth, TrailWidth.MaxWidth, false, "GunplayTrailMaterialWidthTip");
 
             // 长度与淡出的哨兵在数据类里是 -1（与宽度同口径），这里同样用勾选框表达"未设定"
             y = OverrideRow(y, contentWidth, "GunplayTrailMaterialLength",

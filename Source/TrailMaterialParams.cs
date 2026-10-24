@@ -17,8 +17,9 @@ namespace Gunplay
     //
     // 「未设定」哨兵：宽度 / 长度 / 淡出用 -1（与 ProjectileTrailDef.trailWidth 的历史口径一致）。
     // 材质只是中间一层，未设定的字段必须能继续回落到下层口径
-    // （宽度 → 伤害/贴图基础宽度 × 全局系数；长度 / 淡出 → 全局设置），
-    // 而 0 在这些字段里是合法值（宽度 0 = 不绘制），不能拿来当哨兵。
+    // （宽度 → 伤害/贴图基础宽度 × 全局系数；长度 / 淡出 → 全局设置）。
+    // 0 与负数一律按未设定处理，由 Clamp 归一为 -1：宽度 0 没有意义（要隐藏轨迹用轨迹开关），
+    // 长度 / 淡出的有效下限也大于 0，让 0 成为一个单独状态只会让「填了 0」和「没填」难以区分。
     public class TrailMaterialParams : IExposable
     {
         // ---------------- 贴图来源 ----------------
@@ -78,6 +79,7 @@ namespace Gunplay
         public Color trailColor = new Color(1f, 1f, 1f, 0.7f);
 
         // 轨迹宽度（四边形宽度，世界单位）。-1 = 未设定，回落基础宽度（伤害/贴图口径）× 全局系数。
+        // 0 / 负数同样视为未设定，由 Clamp 归一为 -1。
         public float trailWidth = -1f;
 
         // 拖尾长度系数（length = 弹速 × 该值）。-1 = 未设定，回落全局设置。
@@ -139,10 +141,11 @@ namespace Gunplay
             tailWidth = Mathf.Clamp(tailWidth, WidthProfileMin, WidthProfileMax);
             widthProfileCurve = Mathf.Clamp(widthProfileCurve, WidthProfileCurveMin, WidthProfileCurveMax);
 
-            // 三个哨兵字段只做下限保护：-1 必须原样保留（它表示"未设定"）
-            if (trailWidth < 0f) trailWidth = -1f;
-            if (trailLengthFactor < 0f) trailLengthFactor = -1f;
-            if (trailFadeTicks < 0f) trailFadeTicks = -1f;
+            // 三个哨兵字段：非正值（含 NaN）一律归一为 -1 = 未设定，见类注释。
+            // 写成 !(x > 0f) 而不是 x <= 0f，是为了同时拦住 NaN。
+            if (!(trailWidth > 0f)) trailWidth = -1f;
+            if (!(trailLengthFactor > 0f)) trailLengthFactor = -1f;
+            if (!(trailFadeTicks > 0f)) trailFadeTicks = -1f;
         }
 
         // 全场反馈：是否处于"等宽"（轮廓遮罩完全不起作用）。等宽时贴图与旧实现逐像素一致。
