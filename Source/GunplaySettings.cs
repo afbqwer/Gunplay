@@ -30,6 +30,10 @@ namespace Gunplay
         // 同时也不再重算 ticksToImpact（原点没变，原 tick 数仍然正确）。
         // 只影响原版 Projectile；CE 的 ProjectileCE 走自己的发射路径，本来就不经过这个补丁。
         public static bool enableMuzzleOffset = true;
+
+        // 枪口距离来源：关闭时用 GunPropDef.barrelLength；开启时，未显式配置 barrelLength
+        // 的武器改为按武器贴图自动推导（见 MuzzleOffset），显式配置仍然优先。
+        public static bool muzzleOffsetFromTexture = false;
         public static bool enableEffects = true;
         public static bool showPuffs = true;
         public static bool unarmedProjectileEffects = true;
@@ -98,6 +102,7 @@ namespace Gunplay
             Scribe_Values.Look(ref enableSounds, "enableSounds", true);
             Scribe_Values.Look(ref enableWeaponAnimations, "enableWeaponAnimations", true);
             Scribe_Values.Look(ref enableMuzzleOffset, "enableMuzzleOffset", true);
+            Scribe_Values.Look(ref muzzleOffsetFromTexture, "muzzleOffsetFromTexture", false);
             Scribe_Values.Look(ref enableEffects, "enableEffects", true);
             Scribe_Values.Look(ref showPuffs, "showPuffs", true);
             Scribe_Values.Look(ref unarmedProjectileEffects, "unarmedProjectileEffects", true);
@@ -182,6 +187,12 @@ namespace Gunplay
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableMuzzleOffsetName".Translate(), ref enableMuzzleOffset, "GunplayEnableMuzzleOffsetDesc".Translate());
+            if (enableMuzzleOffset)
+            {
+                listing_Standard.Gap(4f);
+                listing_Standard.CheckboxLabeled("GunplayMuzzleOffsetFromTextureName".Translate(), ref muzzleOffsetFromTexture, "GunplayMuzzleOffsetFromTextureDesc".Translate());
+                listing_Standard.Gap(4f);
+            }
             listing_Standard.CheckboxLabeled("GunplayEnableEffectsName".Translate(), ref enableEffects, "GunplayEnableEffectsDesc".Translate());
             if (enableEffects)
             {

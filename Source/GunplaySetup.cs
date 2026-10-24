@@ -44,8 +44,16 @@ namespace Gunplay
                 if (target == null) target = DefDatabase<ThingDef>.GetNamed(def.defName, false);
                 if (target != null) propMap[target] = def;
 
-                if (def.barrelLength == -1) def.barrelLength = defaultDef.barrelLength;
+                if (def.barrelLength == -1)
+                {
+                    def.barrelLength = defaultDef.barrelLength;
+                    def.barrelLengthInherited = true;
+                }
             }
+
+            // default 是未单独配置的武器共同使用的兜底：对它来说这个值同样是「继承」，
+            // 以便「按贴图自动推导枪口」能接管这些武器。
+            defaultDef.barrelLengthInherited = true;
 
             foreach (ThingDef def in DefDatabase<ThingDef>.AllDefs)
             {

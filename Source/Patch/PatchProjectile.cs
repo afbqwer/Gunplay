@@ -95,7 +95,22 @@ namespace Gunplay.Patch
             GunPropDef? gunProp = GunplaySettings.enableMuzzleOffset ? GunplaySetup.GunProp(equipment) : null;
             if (launcher as Pawn != null && gunProp != null)
             {
-                ___origin += (___destination - ___origin).normalized * gunProp.barrelLength;
+                float barrelLength = gunProp.barrelLength;
+
+                // 自动推导只接管 XML 未显式配置 barrelLength 的武器（见 GunPropDef / GunplaySetup）。
+                // 单把武器的显式配置仍然优先；贴图解析失败时 TryGetBarrelLength 返回 false，同样回退。
+                // 只对真正手持的武器（category Item）生效：轮式炮塔射击时 equipment 是炮塔本体，
+                // 它的贴图不是枪管，按贴图推导会得到毫无意义的值（原有 barrelLength 分支保持不变）。
+                if (GunplaySettings.muzzleOffsetFromTexture
+                    && gunProp.barrelLengthInherited
+                    && equipment != null
+                    && equipment.def.IsWeapon
+                    && MuzzleOffset.TryGetBarrelLength(equipment.def, out float autoLength))
+                {
+                    barrelLength = autoLength;
+                }
+
+                ___origin += (___destination - ___origin).normalized * barrelLength;
 
                 // 取值失败时（绑定失败回落反射 / 版本变动改名）保留原 tick 数，
                 // 不在这条热路径上抛异常影响轨迹登记

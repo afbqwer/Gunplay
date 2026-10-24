@@ -23,6 +23,11 @@ namespace Gunplay
 
         public float barrelLength = -1;
 
+        // 该值是否来自 default（XML 未显式配置 barrelLength）。
+        // 不参与 XML 读写，仅由 GunplaySetup 在启动解析时标记：
+        // 「按贴图自动推导枪口」只接管这一类武器，显式配置（含 0）仍然优先。
+        internal bool barrelLengthInherited;
+
         public float drawScale = 1;
     }
 }
