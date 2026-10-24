@@ -25,6 +25,11 @@ namespace Gunplay
         public static bool enableTrails = true;
         public static bool enableSounds = true;
         public static bool enableWeaponAnimations = true;
+
+        // 枪口前移总开关：关闭后投射物回到原版从角色中心发射的行为，
+        // 同时也不再重算 ticksToImpact（原点没变，原 tick 数仍然正确）。
+        // 只影响原版 Projectile；CE 的 ProjectileCE 走自己的发射路径，本来就不经过这个补丁。
+        public static bool enableMuzzleOffset = true;
         public static bool enableEffects = true;
         public static bool showPuffs = true;
         public static bool unarmedProjectileEffects = true;
@@ -92,6 +97,7 @@ namespace Gunplay
             Scribe_Values.Look(ref enableTrails, "enableTrails", true);
             Scribe_Values.Look(ref enableSounds, "enableSounds", true);
             Scribe_Values.Look(ref enableWeaponAnimations, "enableWeaponAnimations", true);
+            Scribe_Values.Look(ref enableMuzzleOffset, "enableMuzzleOffset", true);
             Scribe_Values.Look(ref enableEffects, "enableEffects", true);
             Scribe_Values.Look(ref showPuffs, "showPuffs", true);
             Scribe_Values.Look(ref unarmedProjectileEffects, "unarmedProjectileEffects", true);
@@ -175,6 +181,7 @@ namespace Gunplay
 
             listing_Standard.CheckboxLabeled("GunplayEnableSoundsName".Translate(), ref enableSounds, "GunplayEnableSoundsDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableWeaponAnimationsName".Translate(), ref enableWeaponAnimations, "GunplayEnableWeaponAnimationsDesc".Translate());
+            listing_Standard.CheckboxLabeled("GunplayEnableMuzzleOffsetName".Translate(), ref enableMuzzleOffset, "GunplayEnableMuzzleOffsetDesc".Translate());
             listing_Standard.CheckboxLabeled("GunplayEnableEffectsName".Translate(), ref enableEffects, "GunplayEnableEffectsDesc".Translate());
             if (enableEffects)
             {

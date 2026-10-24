@@ -88,8 +88,9 @@ namespace Gunplay.Patch
                 comp.RotationOffset = (angle + 180) % 360 - 180;
             }
 
-            // 枪口前移仍由武器侧 barrelLength 决定
-            GunPropDef? gunProp = GunplaySetup.GunProp(equipment);
+            // 枪口前移仍由武器侧 barrelLength 决定；总开关关闭时整块跳过——
+            // 原点保持 Launch 传入的角色中心，原 tick 数也仍然正确，无需重算。
+            GunPropDef? gunProp = GunplaySettings.enableMuzzleOffset ? GunplaySetup.GunProp(equipment) : null;
             if (launcher as Pawn != null && gunProp != null)
             {
                 ___origin += (___destination - ___origin).normalized * gunProp.barrelLength;

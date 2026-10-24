@@ -8,6 +8,8 @@
   <GunplayEnableSoundsDesc>いくつかの武器のために射撃音と発射体が命中する音を変更します。ゲームを再起動する必要な場合があります。</GunplayEnableSoundsDesc>
   <GunplayEnableWeaponAnimationsName>武器のアニメを有効</GunplayEnableWeaponAnimationsName>
   <GunplayEnableWeaponAnimationsDesc>ガトリングや弓のような武器の挙動をアニメ化したり、目標を外したポーンの持つ武器の動きなどもアニメ化します。</GunplayEnableWeaponAnimationsDesc>
+  <GunplayEnableMuzzleOffsetName>銃口オフセットを有効</GunplayEnableMuzzleOffsetName>
+  <GunplayEnableMuzzleOffsetDesc>射撃時、発射体をポーンの中心ではなく銃口から発射します（武器に設定された銃身長だけ弾道に沿って前へ移動）。無効にするとバニラの挙動に戻ります。バニラの発射体にのみ影響し、CE（Combat Extended）の発射体には適用されません。</GunplayEnableMuzzleOffsetDesc>
   <GunplayEnableEffectsName>視覚効果を有効</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>目標に影響する発射体の視覚的な効果を表示します。</GunplayEnableEffectsDesc>
   <GunplayShowPuffsName>土煙を表示</GunplayShowPuffsName>

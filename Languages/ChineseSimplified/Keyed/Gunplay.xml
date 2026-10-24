@@ -8,6 +8,8 @@
   <GunplayEnableSoundsDesc>改变一些武器射击和子弹碰撞的声音（可能需要重启游戏）.</GunplayEnableSoundsDesc>
   <GunplayEnableWeaponAnimationsName>启用武器动态动画</GunplayEnableWeaponAnimationsName>
   <GunplayEnableWeaponAnimationsDesc>1.更改部分武器贴图2.当小人使用速射机枪和弓箭一类武器射击目标时加上动画（弓箭蓄力和转轮机枪旋转）</GunplayEnableWeaponAnimationsDesc>
+  <GunplayEnableMuzzleOffsetName>启用枪口偏移</GunplayEnableMuzzleOffsetName>
+  <GunplayEnableMuzzleOffsetDesc>射击时投射物从枪口而不是角色中心飞出（按武器配置的枪管长度沿弹道前移）。关闭后恢复原版从角色中心发射的行为。只影响原版投射物，CE（战斗扩展）投射物不受此补丁影响.</GunplayEnableMuzzleOffsetDesc>
   <GunplayEnableEffectsName>显示视觉效果</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>显示子弹击中目标的视觉效果（火花四溅等）.</GunplayEnableEffectsDesc>
   <GunplayShowPuffsName>显示尘云</GunplayShowPuffsName>

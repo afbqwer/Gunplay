@@ -8,6 +8,8 @@
   <GunplayEnableSoundsDesc>Change fire and projectile impact sounds for some weapons. May require restart.</GunplayEnableSoundsDesc>
   <GunplayEnableWeaponAnimationsName>Enable weapon animations</GunplayEnableWeaponAnimationsName>
   <GunplayEnableWeaponAnimationsDesc>Animate weapons like miniguns and bows, and also animate weapon movement for pawns missing their targets.</GunplayEnableWeaponAnimationsDesc>
+  <GunplayEnableMuzzleOffsetName>Enable muzzle offset</GunplayEnableMuzzleOffsetName>
+  <GunplayEnableMuzzleOffsetDesc>Projectiles start at the muzzle instead of the pawn's center, shifted along the shot line by the weapon's configured barrel length. Disable to restore vanilla behaviour. Only affects vanilla projectiles; Combat Extended projectiles are not handled by this patch.</GunplayEnableMuzzleOffsetDesc>
   <GunplayEnableEffectsName>Enable effects</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>Show visual effects for projectiles impacting targets.</GunplayEnableEffectsDesc>
   <GunplayShowPuffsName>Show dust puffs</GunplayShowPuffsName>
