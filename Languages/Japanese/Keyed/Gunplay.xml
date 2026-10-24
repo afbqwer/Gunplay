@@ -11,7 +11,7 @@
   <GunplayEnableMuzzleOffsetName>銃口オフセットを有効</GunplayEnableMuzzleOffsetName>
   <GunplayEnableMuzzleOffsetDesc>射撃時、発射体をポーンの中心ではなく銃口から発射します（武器に設定された銃身長だけ弾道に沿って前へ移動）。無効にするとバニラの挙動に戻ります。バニラの発射体にのみ影響し、CE（Combat Extended）の発射体には適用されません。</GunplayEnableMuzzleOffsetDesc>
   <GunplayMuzzleOffsetFromTextureName>テクスチャから銃口位置を自動算出</GunplayMuzzleOffsetFromTextureName>
-  <GunplayMuzzleOffsetFromTextureDesc>有効にすると、銃身長（GunPropDef.barrelLength）を明示していない武器は既定の1.5タイルを使わず、武器テクスチャの右端にある最初の不透明ピクセルから銃口位置を算出します。barrelLength を明示している武器はその値のままです。テクスチャを読み取れない、または解析に失敗した場合は設定値にフォールバックします。RimWorld の武器テクスチャの慣例どおり、銃口がテクスチャの右端にあることを前提とします。以後に発射される発射体にのみ適用されます。</GunplayMuzzleOffsetFromTextureDesc>
+  <GunplayMuzzleOffsetFromTextureDesc>銃身長を明示していない武器の銃口位置をテクスチャから自動算出します（明示値が優先）。結果はキャッシュされ、次回以降の起動で再利用されます。</GunplayMuzzleOffsetFromTextureDesc>
   <GunplayEnableEffectsName>視覚効果を有効</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>目標に影響する発射体の視覚的な効果を表示します。</GunplayEnableEffectsDesc>
   <GunplayShowPuffsName>土煙を表示</GunplayShowPuffsName>

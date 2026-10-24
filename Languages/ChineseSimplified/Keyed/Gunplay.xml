@@ -11,7 +11,7 @@
   <GunplayEnableMuzzleOffsetName>启用枪口偏移</GunplayEnableMuzzleOffsetName>
   <GunplayEnableMuzzleOffsetDesc>射击时投射物从枪口而不是角色中心飞出（按武器配置的枪管长度沿弹道前移）。关闭后恢复原版从角色中心发射的行为。只影响原版投射物，CE（战斗扩展）投射物不受此补丁影响.</GunplayEnableMuzzleOffsetDesc>
   <GunplayMuzzleOffsetFromTextureName>按贴图自动推导枪口</GunplayMuzzleOffsetFromTextureName>
-  <GunplayMuzzleOffsetFromTextureDesc>开启后，未显式配置枪管长度（GunPropDef.barrelLength）的武器不再使用默认的 1.5 格，而是按武器贴图里最右侧的不透明像素自动求出枪口位置；显式配置了 barrelLength 的武器仍按配置值。贴图无法读取或解析失败时回退到配置值。假定武器贴图的枪口朝右（RimWorld 武器贴图惯例）.只对之后新发射的投射物生效.</GunplayMuzzleOffsetFromTextureDesc>
+  <GunplayMuzzleOffsetFromTextureDesc>未显式配置枪管长度的武器按贴图自动推导枪口位置；显式配置仍优先。结果会被缓存，之后启动直接复用.</GunplayMuzzleOffsetFromTextureDesc>
   <GunplayEnableEffectsName>显示视觉效果</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>显示子弹击中目标的视觉效果（火花四溅等）.</GunplayEnableEffectsDesc>
   <GunplayShowPuffsName>显示尘云</GunplayShowPuffsName>

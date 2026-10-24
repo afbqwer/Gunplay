@@ -25,6 +25,9 @@ namespace Gunplay
         public override void WriteSettings()
         {
             settings!.Write();
+
+            // 兜底：运行中懒加载产生的新枪口值也在这里落盘（正常路径见 MuzzleOffset.TryGetBarrelLength）。
+            MuzzleOffset.Flush();
         }
 
         public override string SettingsCategory()

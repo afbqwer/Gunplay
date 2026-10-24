@@ -78,6 +78,21 @@ namespace Gunplay
             BuildProjectileProps();
 
             ImpactEffectTuner.Apply();
+
+            // 枪口贴图推导的跨启动缓存：命中就跳过贴图扫描，未命中才补算。
+            // 只在功能实际启用时预热；关闭时不产生任何 I/O 与贴图访问。
+            if (GunplaySettings.enableMuzzleOffset && GunplaySettings.muzzleOffsetFromTexture)
+            {
+                try
+                {
+                    MuzzleOffset.WarmUp();
+                }
+                catch (Exception exception)
+                {
+                    // 缓存只是优化：失败时退回按需推导，不能让静态构造整体失败。
+                    Log.Warning("[Gunplay] Could not warm up the muzzle offset cache; offsets will be derived on demand.\n" + exception);
+                }
+            }
         }
 
         // 构建投射物映射表。解析优先级：defTargets > weaponTargets > 名称关键字规则 > default。

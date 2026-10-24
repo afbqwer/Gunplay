@@ -11,7 +11,7 @@
   <GunplayEnableMuzzleOffsetName>Enable muzzle offset</GunplayEnableMuzzleOffsetName>
   <GunplayEnableMuzzleOffsetDesc>Projectiles start at the muzzle instead of the pawn's center, shifted along the shot line by the weapon's configured barrel length. Disable to restore vanilla behaviour. Only affects vanilla projectiles; Combat Extended projectiles are not handled by this patch.</GunplayEnableMuzzleOffsetDesc>
   <GunplayMuzzleOffsetFromTextureName>Derive muzzle offset from texture</GunplayMuzzleOffsetFromTextureName>
-  <GunplayMuzzleOffsetFromTextureDesc>When enabled, weapons that do not explicitly set a barrel length (GunPropDef.barrelLength) no longer use the default 1.5 tiles; their muzzle position is derived from the rightmost opaque pixel of the weapon texture instead. Weapons with an explicit barrelLength keep that value. Falls back to the configured value if the texture cannot be read or parsed. Assumes the muzzle is on the right edge of the texture, as is standard for RimWorld weapon art. Applies only to projectiles fired afterwards.</GunplayMuzzleOffsetFromTextureDesc>
+  <GunplayMuzzleOffsetFromTextureDesc>Weapons without an explicit barrel length derive their muzzle position from the weapon texture; explicit values still win. Results are cached and reused on later launches.</GunplayMuzzleOffsetFromTextureDesc>
   <GunplayEnableEffectsName>Enable effects</GunplayEnableEffectsName>
   <GunplayEnableEffectsDesc>Show visual effects for projectiles impacting targets.</GunplayEnableEffectsDesc>
   <GunplayShowPuffsName>Show dust puffs</GunplayShowPuffsName>
