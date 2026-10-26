@@ -107,8 +107,12 @@ namespace Gunplay
 
     internal class ProjectileTrailState
     {
-        // 当前生效段数（全局设置 + 夹取）。夹取放在这里，设置项即使被外部改成越界值也不会炸几何。
-        // 代价是每次求值都走一遍属性 + Mathf.Clamp，所以调用方（AppendArcGeometry）先取一次存局部再用。
+        // 段数的取值口径：全局设置 + 夹取。夹取放在这里，设置项被外部改成越界值也不会炸几何。
+        //
+        // 只在登记时求值一次（见 Initialize / InitializeCE 赋给 arcSegCount），不参与每帧路径。
+        // 这是「轨迹参数在发射时快照、飞行中不读设置」的一部分：length / fadeTicks / width /
+        // color / def 走的都是这个口径。中途拖段数滑杆不该让已经在飞的轨迹当场改变段数——
+        // 那是可见的跳变，而且没有任何响应它的必要。
         static int ArcSegmentCount => Mathf.Clamp(GunplaySettings.arcSegmentCount, ArcSegments.Min, ArcSegments.Max);
 
         // 尾部至少占整段弧线的比例，避免低速抛射物（如手雷）的轨迹过短而不明显。
@@ -191,6 +195,13 @@ namespace Gunplay
 
         // ---------------- 弧线轨迹专用状态（仅 arcing == true 时使用） ----------------
         bool arcing;
+        // 本发使用的段数，登记时从 ArcSegmentCount 快照一次（与 length / fadeTicks / width 同一口径）。
+        //
+        // 必须在 Initialize / InitializeCE 里**无条件**赋值，不能只在 arcing 分支里赋：
+        // 自动检测那条路是发射之后才把 arcing 置 true 的（见 SwitchToArcDrawing），
+        // 走到 AppendArcGeometry 时这个字段若还是 0，invSeg = 1/0 会让整条带子变成 NaN——
+        // 而且 NaN 顶点会经合并网格放大成整批轨迹消失（见 ApplyPosition 的入口判据）。
+        int arcSegCount;
         Vector3 arcSide;
         float arcHorizontalLength;
         float arcHeight;
@@ -247,6 +258,8 @@ namespace Gunplay
             color = TrailColor.Effective(r);
             ticksUtilDeath = -1;
             ticksIdle = 0;
+            // 段数快照：无条件赋值，理由见 arcSegCount 的字段注释（自动检测会在发射后才把 arcing 置 true）
+            arcSegCount = ArcSegmentCount;
             projectile = proj;
             iso3DTrail = true;
             // 局部取一次：直接对 proj.def.projectile 做 != null 比较会让编译器的可空流分析
@@ -304,6 +317,8 @@ namespace Gunplay
             color = TrailColor.Effective(r);
             ticksUtilDeath = -1;
             ticksIdle = 0;
+            // 段数快照：无条件赋值，理由见 arcSegCount 的字段注释
+            arcSegCount = ArcSegmentCount;
             projectile = proj;
             iso3DTrail = false;   // ProjectileCE：IsoRim 不知道它画在多高（见字段注释）
             a = PatchCECompat.GetExactPosition(proj);
@@ -409,7 +424,25 @@ namespace Gunplay
 
         void ApplyPosition(Vector3 pos)
         {
+            // y 恒由 altitude 覆盖（位置的 Y 分量没人用，深度由层高决定），顺手把外来的 NaN 也洗掉
             pos.y = altitude;
+
+            // 位置必须是有界的有限值。NaN / ±Inf 一旦进了 exactPosition，就会原样变成顶点坐标，
+            // 而顶点是写进「按材质+颜色合并」的那张共用网格里的（见 ProjectileTrailBatcher）——
+            // 一个坏顶点能让整张网格失效，全图同类轨迹一起消失，比这一条轨迹画错严重得多。
+            //
+            // 判据用有界比较而不是 IsNaN/IsInfinity：NaN 与任何值比较都为 false，
+            // 于是 !(NaN > lo && NaN < hi) 自然为 true，一次就把 NaN 与 ±Inf 都挡掉。
+            // 上界取远大于地图尺寸（地图最大 400 格）的值，正常弹体永远碰不到。
+            if (!(pos.x > -1e5f && pos.x < 1e5f && pos.z > -1e5f && pos.z < 1e5f))
+            {
+                // 与「这一 tick 没动」同等对待：不写 exactPosition，保持上一次的有效位置，
+                // 由现有的 ticksIdle 看门狗（StationaryTicksBeforeDrop）自然收尾。
+                // 这里必须计数而不能直接 return——否则一颗持续吐 NaN 的弹体会让轨迹永久挂住。
+                ticksIdle++;
+                return;
+            }
+
             Vector3 delta = pos - previousPosition;
             if (delta.sqrMagnitude > 0.000001f)
             {
@@ -614,9 +647,9 @@ namespace Gunplay
             max = default;
             if (arcHorizontalLength <= 0.0001f) return false;
 
-            // 段数先取一次存局部：ArcSegmentCount 是带 Mathf.Clamp 的属性，而下面有三处都要用它，
-            // 若写在循环条件/循环体里，每次迭代都会重算一遍属性并连带一次 Clamp。
-            int segCount = ArcSegmentCount;
+            // 段数取一次存局部：值在登记时就定了（见 arcSegCount），这里只是让下面三处共用同一个值，
+            // 不再回读字段。写成局部还顺带保留了原实现的读法，减少这处热循环的改动面。
+            int segCount = arcSegCount;
 
             // traveled 即沿飞行方向已经过的距离，可直接换算成弧线比例。
             // Clamp01 展开成三元式：Mathf.* 在 Mono 下都是真实调用。
@@ -899,7 +932,9 @@ namespace Gunplay
         // 与 traveled 从同一个增量序列累加（步长都是这一 tick 的位移量），因此差值恒定，
         // 且恒有 traveled ≥ pathTotalLen——AppendArcGeometry 里
         // head = traveled / arcHorizontalLength 于是恒被夹到 1，弹体永远在采样路径末端。
-        // （强制曲线从发射起记录时二者相等；自动检测命中时播种的弦比真实路径短，差一个常量。）
+        // （强制曲线从发射起记录时二者相等；自动检测命中时连拐点一起播种（见 SwitchToArcDrawing），
+        //   播种段与 traveled 也相等；只有退化情形（拐点与发射点/当前位置重合而被跳过）
+        //   与位置跳变才会出现 traveled > pathTotalLen，此时 head 被夹到 1，仍指向路径末端。）
         // 触发上限丢弃后保留窗口变短，同一条结论依然成立。
         void AppendPathSample(Vector3 pos)
         {
@@ -961,10 +996,12 @@ namespace Gunplay
 
         // 自动检测命中：切换为曲线绘制，并从此开始记录路径。
         //
-        // 已飞的那一段用「发射点 → 当前位置」的直线弦播种，而不是逐 tick 的真实路径：
-        // 能走到这里，说明此前每个 tick 的偏离都小于阈值（否则早就触发了），弦与真实路径
-        // 的差异必然在同一量级（2~15°/tick 的连续转向下实测 0.05~0.10 格，远小于阈值），
-        // 而尾部窗口要回溯到发射点的需求由此得到满足——切换那一帧轨迹不会缩短，
+        // 已飞的那一段用「发射点 → 上一 tick 位置 → 当前位置」两点播种，而不是逐 tick 的完整
+        // 真实路径：能走到这里，说明此前每个 tick 的偏离都小于阈值（否则早就触发了），
+        // 而偏离小于阈值意味着那段路近似直线，用一条弦代替的误差在 0.05~0.10 格量级。
+        // 但「弦」必须止于拐点（上一 tick 的位置）而不是当前位置——否则这一 tick 的转向会被
+        // 一并抹平，带子在转弯后的头几帧看起来像没拐过（见方法体里的详细说明）。
+        // 尾部窗口要回溯到发射点的需求由此得到满足——切换那一帧轨迹不会缩短，
         // 且顺带修掉旧直线四边形沿切线回退带来的尾部偏差（同场景实测 0.7 格）。
         // 代价是直线投射物（大概率一生都不会弯）在命中前不分配采样缓冲、也不做逐 tick 的追加。
         void SwitchToArcDrawing(Vector3 pos)
@@ -972,9 +1009,24 @@ namespace Gunplay
             arcing = true;
             curveDetecting = false;
             // 播种：BeginPathRecording 先放发射点（并按下「此刻的飞行方向」定宽度方向，
-            // 此处 dir 已是本 tick 的实际位移方向，即命中点的切线），紧接着把当前位置
-            // 追加成第二个采样点。参数化随之就绪，当帧即可绘制。
+            // 此处 dir 已是本 tick 的实际位移方向，即命中点的切线），然后把**上一 tick 的位置**
+            // 和当前位置依次追加进去。参数化随之就绪，当帧即可绘制。
+            //
+            // 为什么要把上一 tick 的位置也播种进去：它此刻还没被 Tick 末尾那句
+            // previousPosition = exactPosition 覆盖（那一句在检测之后），所以它就是拐点本身。
+            // 能走到这里说明此前每个 tick 的偏离都小于阈值，a → previousPosition 这一段就是
+            // 真实路径（直线），于是 a → previousPosition → pos 三点还原出真实折线，拐角得以保留。
+            //
+            // 只播种 a → pos 的弦是旧做法，它把拐角抹平：转弯后的头几个 tick 里整条带子都是
+            // 一条从发射点直连到当前位置的斜线，看上去像"根本没拐"。拖尾越长越明显。
+            // 两个退化情形跳过：拐点与发射点重合（发射后第一个 tick 就转了）、
+            // 或与当前位置重合（这一 tick 其实没动），否则会追加零长度采样段。
             BeginPathRecording();
+            if ((previousPosition - a).sqrMagnitude > 0.000001f
+                && (previousPosition - pos).sqrMagnitude > 0.000001f)
+            {
+                AppendPathSample(previousPosition);
+            }
             AppendPathSample(pos);
             // 记住这个 def：后续发射直接按曲线绘制，不必每发都重新经历「先画一小段直线
             // 再切曲线」。仅内存、不进存档；重开游戏重新检测（见 ProjectileRules）。
