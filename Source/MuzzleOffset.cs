@@ -34,7 +34,8 @@ namespace Gunplay
 
         // ---------------- 持久化缓存 ----------------
 
-        const string HeaderPrefix = "#Gunplay muzzle offsets v1 ";
+        // v2：每个武器单独带指纹，mod 列表增减时只重算受影响的武器，不再整份作废。
+        const string HeaderPrefix = "#Gunplay muzzle offsets v2 ";
         const string CacheFileName = "GunplayMuzzleOffsets.txt";
 
         // 公式或扫描口径变更时递增；与下面的常量、RimWorld 版本、程序集版本一起参与签名。
@@ -211,23 +212,37 @@ namespace Gunplay
                     string? header = reader.ReadLine();
                     if (header != HeaderPrefix + Signature())
                     {
-                        // 贴图/绘制参数/公式/游戏版本有变化：整份重建，避免继续用旧枪口。
+                        // 只有公式、游戏版本或程序集版本变化才会走到这里：整份重建。
                         dirty = true;
-                        Log.Message("[Gunplay] Muzzle offset cache is stale; rebuilding it once.");
+                        Log.Message("[Gunplay] Muzzle offset cache format/formula changed; rebuilding it once.");
                         return;
                     }
 
                     int count = 0;
+                    int stale = 0;
                     string? line;
                     while ((line = reader.ReadLine()) != null)
                     {
                         int tab = line.IndexOf('\t');
                         if (tab <= 0) continue;
-                        if (!float.TryParse(line.Substring(tab + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float value)) continue;
+                        int tab2 = line.IndexOf('\t', tab + 1);
+                        if (tab2 <= tab + 1) continue;
+
+                        if (!ulong.TryParse(line.Substring(tab + 1, tab2 - tab - 1), NumberStyles.HexNumber,
+                                CultureInfo.InvariantCulture, out ulong storedHash)) continue;
+                        if (!float.TryParse(line.Substring(tab2 + 1), NumberStyles.Float, CultureInfo.InvariantCulture,
+                                out float value)) continue;
 
                         // 已移除的内容直接跳过；新增内容由 WarmUp/懒加载补。
                         ThingDef? def = DefDatabase<ThingDef>.GetNamed(line.Substring(0, tab), false);
                         if (def == null) continue;
+
+                        // 单把武器的贴图路径/绘制尺寸/偏移变了：只丢这一条，交给 WarmUp 重算。
+                        if (EntryHash(def) != storedHash)
+                        {
+                            stale++;
+                            continue;
+                        }
 
                         cache[def] = value;
                         count++;
@@ -236,6 +251,12 @@ namespace Gunplay
                     if (count > 0)
                     {
                         Log.Message("[Gunplay] Loaded " + count + " cached muzzle offsets.");
+                    }
+
+                    if (stale > 0)
+                    {
+                        dirty = true;
+                        Log.Message("[Gunplay] " + stale + " cached muzzle offsets are stale and will be rebuilt.");
                     }
                 }
             }
@@ -264,6 +285,8 @@ namespace Gunplay
                         if (pair.Key == null) continue;
 
                         writer.Write(pair.Key.defName);
+                        writer.Write('\t');
+                        writer.Write(EntryHash(pair.Key).ToString("X16", CultureInfo.InvariantCulture));
                         writer.Write('\t');
                         writer.WriteLine(pair.Value.ToString("R", CultureInfo.InvariantCulture));
                     }
@@ -334,8 +357,8 @@ namespace Gunplay
             return false;
         }
 
-        // 缓存指纹：覆盖 Derive 的全部输入（公式常量、武器 def 的贴图路径/绘制尺寸/偏移、版本）。
-        // 贴图内容本身无法廉价校验；同路径同尺寸替换贴图的情况会命中旧值。
+        // 全局头指纹：只覆盖所有条目共享的输入（公式常量、游戏版本、程序集版本）。
+        // 增删武器 mod 不会改它，因此不会让整份缓存失效；单条失效见 EntryHash。
         static string Signature()
         {
             if (signature != null) return signature;
@@ -350,20 +373,24 @@ namespace Gunplay
             AddString(ref hash, VersionControl.CurrentVersionString);
             AddString(ref hash, typeof(MuzzleOffset).Assembly.GetName().Version?.ToString() ?? "");
 
-            List<ThingDef> candidates = CandidateWeapons();
-            AddInt(ref hash, candidates.Count);
-            foreach (ThingDef def in candidates)
-            {
-                GraphicData? data = def.graphicData;
-                AddString(ref hash, def.defName ?? "");
-                AddString(ref hash, data?.texPath ?? "");
-                AddString(ref hash, data?.graphicClass?.Name ?? "");
-                AddInt(ref hash, BitConverter.SingleToInt32Bits(data?.drawSize.x ?? 0f));
-                AddInt(ref hash, BitConverter.SingleToInt32Bits(def.equippedDistanceOffset));
-            }
-
             signature = hash.ToString("X16", CultureInfo.InvariantCulture);
             return signature;
+        }
+
+        // 单把武器的指纹：只覆盖该 def 影响推导的字段。
+        // 贴图内容本身无法廉价校验；同路径同尺寸替换贴图的情况仍会命中旧值。
+        static ulong EntryHash(ThingDef def)
+        {
+            ulong hash = 14695981039346656037UL;
+            GraphicData? data = def.graphicData;
+
+            AddString(ref hash, def.defName ?? "");
+            AddString(ref hash, data?.texPath ?? "");
+            AddString(ref hash, data?.graphicClass?.Name ?? "");
+            AddInt(ref hash, BitConverter.SingleToInt32Bits(data?.drawSize.x ?? 0f));
+            AddInt(ref hash, BitConverter.SingleToInt32Bits(def.equippedDistanceOffset));
+
+            return hash;
         }
 
         static void AddString(ref ulong hash, string value)
