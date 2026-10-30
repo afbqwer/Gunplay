@@ -84,13 +84,21 @@ namespace Gunplay
 
         // 为"接下来要写 extraVerts 个顶点、extraTris 个索引"预留容量，仅在不足时按 2 倍扩容。
         // 每条轨迹只调一次（不是每个顶点一次），调用开销可忽略。
+        //
+        // 扩容循环带溢出保护：cap 翻倍越过 int 上限会变成负数，此时 `cap < needV` 恒成立，
+        // while 就再也退不出来（主线程挂死）。正常量级永远走不到（那需要十亿级顶点、早就 OOM），
+        // 但只要一条路径能挂死游戏就不该留着；退化时直接取需求值，交给 Array.Resize 抛 OOM。
         internal void Ensure(int extraVerts, int extraTris)
         {
             int needV = vertCount + extraVerts;
             if (needV > verts.Length)
             {
                 int cap = verts.Length == 0 ? 64 : verts.Length;
-                while (cap < needV) cap *= 2;
+                while (cap < needV)
+                {
+                    int next = cap * 2;
+                    cap = next > cap ? next : needV;
+                }
                 Array.Resize(ref verts, cap);
                 Array.Resize(ref uvs, cap);
             }
@@ -99,7 +107,11 @@ namespace Gunplay
             if (needT > tris.Length)
             {
                 int cap = tris.Length == 0 ? 192 : tris.Length;
-                while (cap < needT) cap *= 2;
+                while (cap < needT)
+                {
+                    int next = cap * 2;
+                    cap = next > cap ? next : needT;
+                }
                 Array.Resize(ref tris, cap);
             }
         }
@@ -251,8 +263,9 @@ namespace Gunplay
 
         // ---------------- 初始化 ----------------
 
-        // 原版投射物入口
-        public void Initialize(Projectile proj, Vector3 destination, in TrailResolve r)
+        // 原版投射物入口。返回 false 表示发射输入（位置/目标）不是有界有限坐标，
+        // 调用方应跳过登记——见 IsBoundedPosition。
+        public bool Initialize(Projectile proj, Vector3 destination, in TrailResolve r)
         {
             def = r.trailDef!;
             color = TrailColor.Effective(r);
@@ -268,6 +281,13 @@ namespace Gunplay
             lobbed3D = props != null && props.flyOverhead && props.arcHeightFactor < 0.5f;
             a = proj.ExactPosition;
             Vector3 b = destination;
+            // 发射侧的位置入口：a / b 直接决定 dir、arcHorizontalLength 等几何参数，
+            // 坏值必须在这里挡住，飞行中的守卫（ApplyPosition）救不回来（见 IsBoundedPosition）。
+            if (!IsBoundedPosition(a) || !IsBoundedPosition(b))
+            {
+                LogInvalidLaunch(proj.def);
+                return false;
+            }
             altitude = proj.def.Altitude + DepthEpsilon;
             a.y = b.y = altitude;
             speed = proj.def.projectile.SpeedTilesPerTick;
@@ -307,11 +327,13 @@ namespace Gunplay
                 // 判定直接读本发已解析的覆写记录（r.over），不再按 defName 查一遍字典。
                 BeginCurveDetection();
             }
+            return true;
         }
 
         // CE（Combat Extended）投射物入口。ProjectileCE 不是 Projectile 子类，位置/伤害/
         // 出射仰角等信息全部经由 PatchCECompat 的反射读取。
-        public void InitializeCE(Thing proj, Vector3 destination, in TrailResolve r)
+        // 返回 false 表示发射输入（位置/目标）不是有界有限坐标，调用方应跳过登记。
+        public bool InitializeCE(Thing proj, Vector3 destination, in TrailResolve r)
         {
             def = r.trailDef!;
             color = TrailColor.Effective(r);
@@ -322,9 +344,16 @@ namespace Gunplay
             projectile = proj;
             iso3DTrail = false;   // ProjectileCE：IsoRim 不知道它画在多高（见字段注释）
             a = PatchCECompat.GetExactPosition(proj);
+            Vector3 b = destination;
+            // 发射侧位置入口，理由同 Initialize（见 IsBoundedPosition）。放在解析绘制映射器之前，
+            // 坏输入直接不付那份反射开销。
+            if (!IsBoundedPosition(a) || !IsBoundedPosition(b))
+            {
+                LogInvalidLaunch(proj.def);
+                return false;
+            }
             // 绘制映射器只由 def 决定：这一发解析一次，之后每 tick 直接用（见字段注释）
             PatchCECompat.ResolveDrawMapper(proj.def.projectile, out ceWorker, out ceDrawAccessor);
-            Vector3 b = destination;
             altitude = proj.def.Altitude + DepthEpsilon;
             a.y = b.y = altitude;
             speed = proj.def.projectile.SpeedTilesPerTick;
@@ -359,6 +388,7 @@ namespace Gunplay
                     InitializeArc(b, Mathf.Tan(shotAngle) * (b - a).magnitude / 4f);
                 }
             }
+            return true;
         }
 
         // 宽度口径统一走 TrailWidth：单项覆写 > ProjectileTrailDef.trailWidth > 伤害/贴图基础宽度。
@@ -422,19 +452,42 @@ namespace Gunplay
             }
         }
 
+        // 位置判据的绝对值上界。地图最大 400 格，正常弹体（含飞离地图的）永远碰不到。
+        const float PositionLimit = 1e5f;
+
+        // 位置必须是有界的有限坐标。NaN / ±Inf 一旦进了 exactPosition 或几何参数，
+        // 就会原样变成顶点坐标，而顶点是写进「按材质+颜色合并」的那张共用网格里的
+        // （见 ProjectileTrailBatcher）——一个坏顶点能让整张网格失效，全图同类轨迹一起消失。
+        //
+        // 判据用有界比较而不是 IsNaN/IsInfinity：NaN 与任何值比较都为 false，
+        // 于是 !(NaN > -limit && NaN < limit) 自然为 true，一次就把 NaN 与 ±Inf 都挡掉。
+        //
+        // 两个入口都要过这一关：
+        //   * 发射时（Initialize / InitializeCE）：a / b 会推出 dir、arcHorizontalLength 等参数，
+        //     而这些参数是 NaN 时，几何生成里的阈值判断（`arcHorizontalLength <= 0.0001f`、
+        //     `dir.sqrMagnitude < 0.000001f`）对 NaN 恒为 false，会被直接放行；
+        //   * 飞行中（ApplyPosition）：每次读到的绘制位置。
+        static bool IsBoundedPosition(Vector3 p)
+        {
+            return p.x > -PositionLimit && p.x < PositionLimit
+                && p.z > -PositionLimit && p.z < PositionLimit;
+        }
+
+        // 发射输入不可用：丢弃这一发轨迹（不登记）。按 def 去重，避免弹幕时刷屏。
+        static void LogInvalidLaunch(ThingDef def)
+        {
+            Log.WarningOnce("[Gunplay] Skipped a projectile trail: launch position or destination is not a "
+                + "finite bounded coordinate (def '" + def.defName + "').",
+                ("GunplayBadLaunch" + def.defName).GetHashCode());
+        }
+
         void ApplyPosition(Vector3 pos)
         {
             // y 恒由 altitude 覆盖（位置的 Y 分量没人用，深度由层高决定），顺手把外来的 NaN 也洗掉
             pos.y = altitude;
 
-            // 位置必须是有界的有限值。NaN / ±Inf 一旦进了 exactPosition，就会原样变成顶点坐标，
-            // 而顶点是写进「按材质+颜色合并」的那张共用网格里的（见 ProjectileTrailBatcher）——
-            // 一个坏顶点能让整张网格失效，全图同类轨迹一起消失，比这一条轨迹画错严重得多。
-            //
-            // 判据用有界比较而不是 IsNaN/IsInfinity：NaN 与任何值比较都为 false，
-            // 于是 !(NaN > lo && NaN < hi) 自然为 true，一次就把 NaN 与 ±Inf 都挡掉。
-            // 上界取远大于地图尺寸（地图最大 400 格）的值，正常弹体永远碰不到。
-            if (!(pos.x > -1e5f && pos.x < 1e5f && pos.z > -1e5f && pos.z < 1e5f))
+            // 位置必须是有界的有限值，判据与理由见 IsBoundedPosition。
+            if (!IsBoundedPosition(pos))
             {
                 // 与「这一 tick 没动」同等对待：不写 exactPosition，保持上一次的有效位置，
                 // 由现有的 ticksIdle 看门狗（StationaryTicksBeforeDrop）自然收尾。
@@ -933,8 +986,9 @@ namespace Gunplay
         // 且恒有 traveled ≥ pathTotalLen——AppendArcGeometry 里
         // head = traveled / arcHorizontalLength 于是恒被夹到 1，弹体永远在采样路径末端。
         // （强制曲线从发射起记录时二者相等；自动检测命中时连拐点一起播种（见 SwitchToArcDrawing），
-        //   播种段与 traveled 也相等；只有退化情形（拐点与发射点/当前位置重合而被跳过）
-        //   与位置跳变才会出现 traveled > pathTotalLen，此时 head 被夹到 1，仍指向路径末端。）
+        //   但播种把切换前的逐 tick 弦长折叠成一条 a→拐点的弦，所以 traveled 只会 ≥ 播种后的
+        //   pathTotalLen，差值是切换前那些亚阈值起伏多出来的长度——正常极小，蛇形飞行时可观，
+        //   但 head 被夹到 1，头部仍精确落在最后一个采样点。）
         // 触发上限丢弃后保留窗口变短，同一条结论依然成立。
         void AppendPathSample(Vector3 pos)
         {

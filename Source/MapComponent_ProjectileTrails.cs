@@ -33,7 +33,9 @@ namespace Gunplay
         {
             ProjectileTrailState state = new ProjectileTrailState();
             state.LookupKey = proj;
-            state.Initialize(proj, destination, in r);
+            // 发射输入不可用（NaN/±Inf 位置或目标）时 Initialize 返回 false，直接不登记：
+            // 坏参数会一路污染几何参数与合并网格，见 ProjectileTrailState.IsBoundedPosition。
+            if (!state.Initialize(proj, destination, in r)) return;
             // 材质与颜色此时已定，分组解析一次，之后每帧直接用
             state.drawGroup = ProjectileTrailBatcher.ResolveGroup(state);
             trails.Add(state);
@@ -45,7 +47,7 @@ namespace Gunplay
         {
             ProjectileTrailState state = new ProjectileTrailState();
             state.LookupKey = proj;
-            state.InitializeCE(proj, destination, in r);
+            if (!state.InitializeCE(proj, destination, in r)) return;
             state.drawGroup = ProjectileTrailBatcher.ResolveGroup(state);
             trails.Add(state);
             byProjectile[proj] = state;
