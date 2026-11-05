@@ -18,6 +18,24 @@ namespace Gunplay
                 && projectileDef.projectile.arcHeightFactor > ArcHeightThreshold;
         }
 
+        // 「炮击/弧线类」投射物：迫击炮弹等 flyOverhead 的间接火力，以及带弧高的手雷/榴弹。
+        //
+        // 必须与 IsArcing 分开：原版迫击炮弹根本没有 arcHeightFactor（它靠 flyOverhead 飞越屋顶），
+        // 只看弧高会把迫击炮整类漏掉——那正是「炮弹跟着子弹一起被加速」的来源。
+        //
+        // 两类合成一个口径，是因为它们同属「本该有滞空时间的间接火力」：手感上该慢，
+        // 而不是弹速该不该缩放的技术原因。原版对缩放是安全的——弧高由 ArcHeightFactor
+        // （只与水平距离有关）决定，归一化进度用的是同一个 StartingTicksToImpact 作分母
+        // （DistanceCoveredFractionArc），分子 ticksToImpact 又从它初始化，两者同比例变化，
+        // 抛物线形状与落点一点不变，只是整段被压进更短的 tick 数。
+        // 所以关掉它纯粹是观感：300% 下炮弹像曳光弹一样直接砸下来，失去抛射的节奏感。
+        public static bool IsArtillery(ThingDef? projectileDef)
+        {
+            if (projectileDef?.projectile == null) return false;
+
+            return projectileDef.projectile.flyOverhead || IsArcing(projectileDef);
+        }
+
         // 该投射物是否使用曲线绘制（弧线轨迹样式，而非直线四边形）。
         // 与 TrailEnabled / SpeedAffected 同构：这是「怎么画」的唯一口径，
         // 运行时登记（Initialize / InitializeCE）、CE 的抛射拦截门与覆写窗口的曲线列都只走这里。
@@ -101,7 +119,9 @@ namespace Gunplay
 
             // ---- 以下为该投射物的「默认」是否受全局弹速缩放 ----
 
-            if (IsArcing(projectileDef)) return false; // 弧线投射物（手雷/炮弹）不缩放
+            // 炮击/弧线类（迫击炮弹、手雷）由独立开关控制，默认不缩放。
+            // 单项覆写在本方法开头已经接管，所以这里只管「默认」。
+            if (IsArtillery(projectileDef) && !GunplaySettings.artillerySpeedAffected) return false;
 
             // 配置包显式豁免（preserveSpeed，如燃烧弹）
             ProjectilePropDef? prop = GunplaySetup.ProjectileProp(projectileDef);

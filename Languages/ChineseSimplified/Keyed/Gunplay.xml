@@ -20,9 +20,11 @@
   <GunplayParticleMultiplierName>命中粒子数量倍率</GunplayParticleMultiplierName>
   <GunplayParticleMultiplierDesc>对命中特效生成的粒子数量进行倍率调整（默认100%，范围5%~400%，步进5%）.</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedEnabledName>投射物受全局弹速影响</GunplayProjectileSpeedEnabledName>
-  <GunplayProjectileSpeedEnabledDesc>开启后，「子弹速度」作用于所有投射物；关闭后所有投射物保持各自 def 的原始弹速。弧线投射物（手雷/炮弹）本就不缩放，不受此项影响.</GunplayProjectileSpeedEnabledDesc>
+  <GunplayProjectileSpeedEnabledDesc>开启后，「子弹速度」作用于所有投射物；关闭后所有投射物保持各自 def 的原始弹速。迫击炮弹、手雷这类弧线/炮击投射物是否缩放由下一项单独控制（默认不缩放）.</GunplayProjectileSpeedEnabledDesc>
   <GunplayProjectileSpeedName>子弹速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>将所有子弹的速度调整到指定的百分比(默认300%)</GunplayProjectileSpeedDesc>
+  <GunplayArtillerySpeedName>迫击炮/弧线投射物受弹速影响</GunplayArtillerySpeedName>
+  <GunplayArtillerySpeedDesc>开启后，迫击炮弹、手雷等弧线/间接火力投射物也受「子弹速度」缩放；关闭（默认）时它们保持各自 def 的原始弹速。缩放不影响抛物线形状与落点，只是把整段飞行压进更短的时间——炮弹会像曳光弹一样直接砸下来，失去炮击的滞空感，因此默认关闭。覆写窗口的「弹速」列仍然优先于本项.</GunplayArtillerySpeedDesc>
   <GunplayTrailLengthName>轨迹长度</GunplayTrailLengthName>
   <GunplayTrailLengthDesc>长度 = 该值 × 投射物自身的（未缩放）弹速，所以快弹拖尾长、慢弹拖尾短。例如弹速70的子弹取默认值15时，拖尾长10.5格（默认15，范围1~120）。只对之后新发射的投射物生效.</GunplayTrailLengthDesc>
   <GunplayTrailFadeName>轨迹淡出时长</GunplayTrailFadeName>

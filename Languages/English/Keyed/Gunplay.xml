@@ -20,9 +20,11 @@
   <GunplayParticleMultiplierName>Impact particle multiplier</GunplayParticleMultiplierName>
   <GunplayParticleMultiplierDesc>Multiplies the number of particles spawned by impact effects. Default 100%, range 5% to 400%, in 5% steps.</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedEnabledName>Projectiles affected by global speed</GunplayProjectileSpeedEnabledName>
-  <GunplayProjectileSpeedEnabledDesc>When enabled, Projectile speed applies to all projectiles. When disabled, every projectile keeps its own def's original speed. Arcing projectiles (grenades, shells) are never scaled, so this does not affect them.</GunplayProjectileSpeedEnabledDesc>
+  <GunplayProjectileSpeedEnabledDesc>When enabled, Projectile speed applies to all projectiles. When disabled, every projectile keeps its own def's original speed. Whether artillery-type projectiles (mortar shells, grenades) are scaled is controlled separately by the next option (not scaled by default).</GunplayProjectileSpeedEnabledDesc>
   <GunplayProjectileSpeedName>Projectile speed</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>Alter speed to specified percentage for all projectiles.</GunplayProjectileSpeedDesc>
+  <GunplayArtillerySpeedName>Artillery and arcing projectiles scale with speed</GunplayArtillerySpeedName>
+  <GunplayArtillerySpeedDesc>When enabled, mortar shells, grenades and other arcing or indirect-fire projectiles also scale with Projectile speed. When disabled (default) they keep the speed defined in their own def. Scaling does not change the arc shape or the impact point, it only compresses the whole flight into fewer ticks, so a shell drops onto the target like a tracer round and loses the feel of indirect fire. The Speed column in the override window still takes priority over this option.</GunplayArtillerySpeedDesc>
   <GunplayTrailLengthName>Trail length</GunplayTrailLengthName>
   <GunplayTrailLengthDesc>Trail length is this value multiplied by the projectile's own (unscaled) speed, so faster projectiles get longer trails. By default a bullet with speed 70 gets a 10.5 tile trail. Default 15, range 1 to 120. Applies only to projectiles fired afterwards.</GunplayTrailLengthDesc>
   <GunplayTrailFadeName>Trail fade duration</GunplayTrailFadeName>

@@ -43,8 +43,18 @@ namespace Gunplay
         // 是否让投射物受全局弹速缩放（projectileSpeed）影响。关闭后 projectileSpeed 完全不起作用，
         // 所有投射物保持各自 def 的原始弹速。这是总开关，优先于单项覆写。
         // 判定统一收在 ProjectileRules.ShouldScaleSpeed（补丁只读那一处）：
-        // 总开关 > 单项覆写（覆写窗口的「弹速」列，命中即接管）> 默认规则（弧线不缩放 / 配置包 preserveSpeed）。
+        // 总开关 > 单项覆写（覆写窗口的「弹速」列，命中即接管）> 默认规则（炮击类见下 / 配置包 preserveSpeed）。
         public static bool projectileSpeedEnabled = true;
+
+        // 炮击/弧线类投射物（迫击炮弹、手雷）是否也受全局弹速缩放。默认关闭。
+        //
+        // 关掉的理由是观感，不是正确性：原版对缩放是安全的——抛物线形状与落点都由
+        // 空间几何决定，飞行时间只是把它按比例压在更少的 tick 里（见 ProjectileRules.IsArtillery）。
+        // 但迫击炮是间接火力，压缩滞空时间后炮弹会像曳光弹一样直接砸到落点，看着很怪，
+        // 所以默认让它们保持自己 def 的弹速。
+        // 单项覆写（覆写窗口的「弹速」列）仍然优先于本项：想吃加速的某一发炮弹可以单独勾上。
+        public static bool artillerySpeedAffected = false;
+
         public static float projectileSpeed = 3f;
         public static TrailWidthMode trailWidthMode = TrailWidthMode.Damage;
         public static float trailWidthFactor = 1f;
@@ -109,6 +119,7 @@ namespace Gunplay
             Scribe_Values.Look(ref unarmedOnlyBullets, "unarmedOnlyBullets", true);
             Scribe_Values.Look(ref particleMultiplier, "particleMultiplier", 1f);
             Scribe_Values.Look(ref projectileSpeedEnabled, "projectileSpeedEnabled", true);
+            Scribe_Values.Look(ref artillerySpeedAffected, "artillerySpeedAffected", false);
             Scribe_Values.Look(ref projectileSpeed, "projectileSpeed");
             Scribe_Values.Look(ref trailWidthMode, "trailWidthMode", TrailWidthMode.Damage);
             Scribe_Values.Look(ref trailWidthFactor, "trailWidthFactor", 1f);
@@ -183,6 +194,10 @@ namespace Gunplay
                     listing_Standard.SliderLabeled("GunplayProjectileSpeedName".Translate(), ref projectileSpeed, "GunplayProjectileSpeedDesc".Translate(), 0.1f, 10f);
                     // 按 5% 步进吸附，与粒子倍率的处理方式一致
                     projectileSpeed = Mathf.Round(projectileSpeed * 20f) / 20f;
+
+                    // 炮击/弧线类（迫击炮弹、手雷）默认不跟着缩放；跟随总开关显示，
+                    // 因为总开关关闭时整项缩放都不生效，留着只会是个无效控件。
+                    listing_Standard.CheckboxLabeled("GunplayArtillerySpeedName".Translate(), ref artillerySpeedAffected, "GunplayArtillerySpeedDesc".Translate());
                 }
                 listing_Standard.Gap(4f);
             }

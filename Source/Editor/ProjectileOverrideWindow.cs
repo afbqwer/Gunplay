@@ -30,7 +30,8 @@ namespace Gunplay
     //              轨迹关掉时本项暂时不生效，但覆写会保留（重新打开轨迹时继续有效）。
     //   「弹速」—— 该投射物是否受全局弹速缩放影响。唯一与轨迹无关的覆写项：轨迹关掉它照样生效，
     //              因此不像材质/颜色/数值那样随轨迹开关变灰。未覆写时显示该投射物的「默认」判定
-    //              （见 ProjectileRules.SpeedAffected：弧线投射物不缩放，配置包可用 preserveSpeed 豁免），
+    //              （见 ProjectileRules.SpeedAffected：炮击/弧线类默认不缩放，见设置项
+    //              artillerySpeedAffected；配置包可用 preserveSpeed 豁免），
     //              同样点一下就顺带开启覆写。已单独指定时右侧有「×」可回到继承——否则要取消它
     //              只能关掉整行覆写，那会一并丢掉同一行的宽度/长度/淡出/颜色。
     //              CE 在场时整列隐藏：CE 的 ProjectileCE 不继承原版 Projectile，弹速缩放对它不生效，

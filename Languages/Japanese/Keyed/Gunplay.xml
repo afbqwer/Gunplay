@@ -20,9 +20,11 @@
   <GunplayParticleMultiplierName>命中パーティクル数の倍率</GunplayParticleMultiplierName>
   <GunplayParticleMultiplierDesc>命中エフェクトで発生するパーティクル数の倍率（既定100%、5%～400%の範囲で5%刻み）。</GunplayParticleMultiplierDesc>
   <GunplayProjectileSpeedEnabledName>発射体を全体速度の影響下に置く</GunplayProjectileSpeedEnabledName>
-  <GunplayProjectileSpeedEnabledDesc>有効にすると「発射体速度」が全発射体に適用されます。無効にすると全発射体がそれぞれのdefの本来の速度を保ちます。弧状発射体（擲弾・砲弾）は元々スケールされないため、この項目の影響を受けません。</GunplayProjectileSpeedEnabledDesc>
+  <GunplayProjectileSpeedEnabledDesc>有効にすると「発射体速度」が全発射体に適用されます。無効にすると全発射体がそれぞれのdefの本来の速度を保ちます。迫撃砲弾や擲弾などの砲撃系・弧状発射体をスケールするかは次の項目で個別に設定します（既定ではスケールしません）。</GunplayProjectileSpeedEnabledDesc>
   <GunplayProjectileSpeedName>発射体速度</GunplayProjectileSpeedName>
   <GunplayProjectileSpeedDesc>全種類の発射体の飛翔速度を指定したパーセンテージに変更します。</GunplayProjectileSpeedDesc>
+  <GunplayArtillerySpeedName>迫撃砲・弧状発射体を速度の影響下に置く</GunplayArtillerySpeedName>
+  <GunplayArtillerySpeedDesc>有効にすると、迫撃砲弾や擲弾など砲撃系・弧状の発射体も「発射体速度」でスケールされます。無効（既定）の場合はそれぞれのdef本来の速度を保ちます。スケールしても放物線の形状や着弾点は変わらず、飛翔時間が短くなるだけですが、砲弾がトレーサーのように一気に落下して砲撃らしさが失われるため既定では無効です。上書きウィンドウの「弾速」列はこの項目より優先されます。</GunplayArtillerySpeedDesc>
   <GunplayTrailLengthName>弾道の長さ</GunplayTrailLengthName>
   <GunplayTrailLengthDesc>長さはこの値に発射体自身の（未スケールの）速度を掛けたものになるため、速い弾ほど弾道が長くなります。速度70の弾なら既定値15で10.5タイル（既定15、範囲1～120）。以後に発射される発射体にのみ適用されます。</GunplayTrailLengthDesc>
   <GunplayTrailFadeName>弾道の消滅時間</GunplayTrailFadeName>
