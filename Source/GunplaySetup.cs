@@ -227,7 +227,9 @@ namespace Gunplay
                     ThingDef? weapon = DefDatabase<ThingDef>.GetNamed(name, false);
                     if (weapon == null)
                     {
-                        Log.Error("[Gunplay] ProjectilePropDef '" + def.defName
+                        // 目标 def 可能来自未启用的 DLC / 未安装的 mod（如 Anomaly 的 FleshmassSpitter），
+                        // 属于可预期的缺失，只提示不报错。
+                        Log.Warning("[Gunplay] ProjectilePropDef '" + def.defName
                             + "': weaponTargets entry '" + name + "' not found.");
                         continue;
                     }

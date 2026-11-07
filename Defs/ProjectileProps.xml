@@ -81,13 +81,16 @@
     <trail>shotgun</trail>
   </Gunplay.ProjectilePropDef>
 
-  <!-- 酸性投射物（defName 含 acid，如 Bullet_AcidSpray）
+  <!-- 酸性投射物（defName 含 acid，如 Bullet_AcidSpray、Bullet_Shell_AcidSpit）
        撞击特效 / 音效缺省 -> 启动时自动继承 default 的 generic；弹速不豁免，跟随全局缩放 -->
   <Gunplay.ProjectilePropDef>
     <defName>acid</defName>
     
     <matchKeywords>
       <li>acid</li>
+      <!-- 比 shell 长，确保 Bullet_Shell_AcidSpit 不被 shell 关键字抢走；
+           未装 Anomaly 时 weaponTargets 失效，也能靠它命中 -->
+      <li>acidspit</li>
       <li>tox</li>
       <li>corrosive</li>
       <li>sludge</li>
